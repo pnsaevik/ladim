@@ -1,0 +1,53 @@
+# Numba test:
+
+Skrur av diffusjon, både horisontalt og vertikalt, bruker RK2
+
+subgrid = [300, -1000, 450, 630], 1302*180 = 234360 grid celler
+
+2000 partikler hver tredje time, 5 ganger totalt 10000 partikler
+
+Kontrollverdi: pf.X[42, 1000] = 391.55527
+
+### profile, base case uten numba
+python -m cProfile -o ladim0.prof /opt/anaconda/envs/py38/bin/ladim2
+snakevis ladim0.prof
+
+ROMS.py
+    update              44.8%
+    _read_velocity      29.6%
+    force_particles     23.4%
+    sample3D            24.8%
+    z2s                 19.5%
+tracker.py
+    update              30.5%
+    rk2b                29.4%   hvorav 29.1% i ROMS.velocity  (bruker z2s unødig?)
+salmon_lice_ibm.py
+    update              19.2%
+    Mye sample3D og z2s (siste unødig?)
+    surface_light       3.2%
+    xy2ll               3.1%
+
+Optimalisering:
+    Unngå unødige kall til s2z, (kalles nå 4 ganger per tidsteg)   OK
+    Effektiviser sample3D og s2z (numba er effektiv)               OK
+    tracker: lite å tjene på selve algoritmene
+    Mer effektiv netcdf-lesing ville gitt mest gevinst,
+        men dette er vanskelig. parallell netcdf, dynamisk subgrid
+
+
+
+                                        speed-up
+Base:                         43.5 s     100%
+Kaller z2s en gang            35.9 s     121%
+numba i sample3D              29.6 s     147%
+numba i z2s                   28.2 s     154%
+parallell                     27.2 s     160%
+
+
+
+
+numba i z2s                         88.3 s   112% speed-up
++ numba i sample3D for U og V       76.8 s   139% speed-up
+
+Balanse: Større område => mindre speed-up, lese netcdf dominerer
+         Flere partikler => mer speed-up, sample 3D felt

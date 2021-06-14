@@ -1,463 +1,468 @@
-import os
-import numpy as np
-import pandas as pd
+# import os
+from io import StringIO
+import numpy as np  # type: ignore
+
+# import pandas as pd
 import pytest
-from ladim.release import ParticleReleaser
+from ladim2.release import ParticleReleaser
+from ladim2.timekeeper import TimeKeeper
+
+# from ladim2.state import State
 
 
-def releaser(conf, grid, text):
-    fname = conf["particle_release_file"]
-    try:
-        with open(fname, "w", encoding="utf-8-sig") as file:
-            file.write(text)
-        pr = ParticleReleaser(conf, grid)
-    finally:
-        os.remove(fname)
-    return pr
+class Dummy:
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
 
-@pytest.fixture()
-def minimal_config():
-    return dict(
-        start="cold",
-        dt=3600,
-        start_time=np.datetime64("2015-03-31 12"),
-        reference_time=np.datetime64("2015-03-31 12"),
-        stop_time=np.datetime64("2015-04-04"),
-        particle_release_file="release.rls",
-        release_format=["release_time", "X", "Y"],
-        release_dtype=dict(release_time=np.datetime64, X=float, Y=float),
-        release_type="discrete",
-        particle_variables=[],
+timer = TimeKeeper(
+    start=np.datetime64("2015-03-31 12"),
+    stop=np.datetime64("2015-04-04"),
+    dt=np.timedelta64(15, "m"),
+)
+datatypes0 = dict(mult=int, X=float, Y=float, Z=float)
+state0 = Dummy(dtypes=datatypes0)
+modules0 = dict(time=timer, state=state0, grid=None)
+
+
+def test_read_release():
+    f = StringIO(
+        """
+        release_time      X    Y    Z   super
+        2015-04-01      100  200    5    1000
+        2015-04-01T00   111  220    5    2000
+        "2015-04-03 12" 200  300.0  5    3333
+    """
+    )
+    datatypes = dict(datatypes0, super=int)
+
+    A = ParticleReleaser.read_release_file(f, datatypes)
+    assert len(A) == 3
+    assert A.index[1] == np.datetime64("2015-04-01 00:00:00")
+    assert all(A.X == [100.0, 111.0, 200.0])
+    assert all(A.super == [1000, 2000, 3333.0])
+
+
+def test_read_release_no_header():
+
+    f = StringIO(
+        """
+        2    2015-04-01     100 200   5
+        1    2015-04-01T00  111 220   5
+        3   "2015-04-03 12" 200 300.0 5
+    """
     )
 
-
-@pytest.fixture()
-def mult_config(minimal_config):
-    c = minimal_config.copy()
-    c["release_format"] = ["mult"] + c["release_format"]
-    c["release_dtype"]["mult"] = int
-    return c
-
-
-@pytest.fixture()
-def lonlat_config(minimal_config):
-    c = minimal_config.copy()
-    c["release_format"] = ["release_time", "lat", "lon"]
-    return c
+    A = ParticleReleaser.read_release_file(
+        f, datatypes0, names=["mult", "release_time", "X", "Y", "Z"]
+    )
+    assert len(A) == 3
+    assert A.index[1] == np.datetime64("2015-04-01 00:00:00")
+    assert all(A.X == [100.0, 111.0, 200.0])
 
 
-@pytest.fixture()
-def pvar_config(minimal_config):
-    c = minimal_config.copy()
-    c["release_format"] += ["pvar"]
-    c["release_dtype"]["pvar"] = int
-    c["particle_variables"] = ["release_time", "pvar"]
-    return c
+def test_read_release_no_header_no_names():
+
+    f = StringIO(
+        """
+        2    2015-04-01     100 200   5
+        1    2015-04-01T00  111 220   5
+        3   "2015-04-03 12" 200 300.0 5
+    """
+    )
+
+    # Have more explicit error
+    with pytest.raises(ValueError):
+        ParticleReleaser.read_release_file(f, datatypes0)
 
 
-class Test_Releaser:
-    def test_attr_total_particle_count_correct_when_simple_config(self, minimal_config):
-        release_text = "2015-04-01T00 0 0\n" "2015-04-01T01 0 0\n" "2015-04-01T02 0 0\n"
-        pr = releaser(minimal_config, grid=None, text=release_text)
-        assert pr.total_particle_count == 3
+def test_read_release_both_header_names():
 
-    def test_attr_times_correct_when_simple_config(self, minimal_config):
-        release_text = "2015-04-01T00 0 0\n" "2015-04-01T01 0 0\n" "2015-04-01T02 0 0\n"
-        pr = releaser(minimal_config, grid=None, text=release_text)
+    f = StringIO(
+        """
+        mult release_time     X   Y   Z
+        2    2015-04-01     100 200   5
+        1    2015-04-01T00  111 220   5
+        3   "2015-04-03 12" 200 300.0 5
+    """
+    )
 
-        assert pr.times.astype(str).tolist() == [
-            "2015-04-01T00:00:00.000000000",
-            "2015-04-01T01:00:00.000000000",
-            "2015-04-01T02:00:00.000000000",
-        ]
-
-    def test_attr_steps_correct_when_simple_config(self, minimal_config):
-        release_text = "2015-04-01T00 0 0\n" "2015-04-01T01 0 0\n" "2015-04-01T02 0 0\n"
-        pr = releaser(minimal_config, grid=None, text=release_text)
-
-        assert pr.steps.tolist() == [12, 13, 14]
-
-    def test_conversion_when_latlon(self, lonlat_config):
-        release_text = "2015-04-01T00 1 2\n" "2015-04-01T01 3 4\n" "2015-04-01T02 5 6\n"
-
-        class Grid:
-            @staticmethod
-            def ll2xy(lon, lat):
-                return 10 * lon, 10 * lat
-
-        pr = releaser(lonlat_config, grid=Grid(), text=release_text)
-        frame = pd.concat(list(pr))
-        assert frame["X"].values.tolist() == [20, 40, 60]
-        assert frame["Y"].values.tolist() == [10, 30, 50]
-
-    def test_accepts_multiple_date_formats(self, minimal_config):
-        release_text = "2015-04-01 0 0\n" '"2015-04-01 01" 0 0\n' "2015-04-01T02 0 0\n"
-        pr = releaser(minimal_config, grid=None, text=release_text)
-        assert pr.total_particle_count == 3
-
-    def test_correct_particle_count_when_mult(self, mult_config):
-        release_text = (
-            "1 2015-04-01T00 0 0\n" "4 2015-04-01T01 0 0\n" "2 2015-04-01T02 0 0\n"
+    with pytest.raises(ValueError):
+        ParticleReleaser.read_release_file(
+            f, datatypes0, names=["mult", "release_time", "X", "Y", "Z"]
         )
-        pr = releaser(mult_config, grid=None, text=release_text)
-        assert pr.total_particle_count == 7
-
-    def rest_correct_particles_released_when_mult(self, mult_config):
-        release_text = (
-            "1 2015-04-01T00 0 0\n" "4 2015-04-01T01 0 0\n" "2 2015-04-01T02 0 0\n"
-        )
-        pr = releaser(mult_config, grid=None, text=release_text)
-        assert pr.particles_released == [0, 1, 4, 2]
-
-    def test_is_iterator_of_dataframes(self, minimal_config):
-        release_text = "2015-04-01T00 0 0\n" "2015-04-01T01 0 0\n" "2015-04-01T02 0 0\n"
-        pr = releaser(minimal_config, grid=None, text=release_text)
-        pr_list = list(pr)
-        assert len(pr_list) == 3
-        assert isinstance(pr_list[0], pd.DataFrame)
-        assert list(pr_list[0].columns) == ["release_time", "X", "Y", "pid"]
-        assert list(pr_list[0].release_time) == [pd.Timestamp("2015-04-01 00")]
-
-    def test_returns_one_dataframe_per_timestep_if_mult(self, mult_config):
-        release_text = (
-            "1 2015-04-01T00 0 0\n" "4 2015-04-01T01 0 0\n" "2 2015-04-01T02 0 0\n"
-        )
-        pr = releaser(mult_config, grid=None, text=release_text)
-        assert len(pr.times) == 3
-        pr_list = list(pr)
-        assert len(pr_list) == 3
-        assert len(pr_list[0]) == 1
-        assert len(pr_list[1]) == 4
-
-    def test_returns_one_dataframe_per_timestep(self, minimal_config):
-        release_text = (
-            "2015-04-01T00:00 0 0\n"
-            "2015-04-01T00:30 0 0\n"
-            "2015-04-01T00:45 0 0\n"
-            "2015-04-01T02:00 0 0\n"
-        )
-        pr = releaser(minimal_config, grid=None, text=release_text)
-        list_pr = list(pr)
-
-        assert pr.total_particle_count == 4
-        assert len(list_pr) == 4
-
-    def test_correct_particle_variables(self, pvar_config):
-        release_text = (
-            "2015-04-01T00:00 0 0 1\n"
-            "2015-04-01T00:00 0 0 2\n"
-            "2015-04-01T02:00 0 0 3\n"
-        )
-        pr = releaser(pvar_config, grid=None, text=release_text)
-        assert pr.particle_variables["pvar"].tolist() == [1, 2, 3]
-        assert pr.particle_variables["release_time"].tolist() == [43200, 43200, 50400]
 
 
-def test_discrete() -> None:
+def test_clean_add_mult():
+    """If no mult column, clean_release_data should add mult=1"""
 
-    # Make a minimal config object
-    config = {
-        "start": "cold",
-        "start_time": np.datetime64("2015-03-31 12"),
-        "stop_time": np.datetime64("2015-04-04"),
-        "dt": 3600,
-        "particle_release_file": "release.rls",
-        "release_format": ["mult", "release_time", "X", "Y"],
-        "release_dtype": dict(mult=int, release_time=np.datetime64, X=float, Y=float),
-        "release_type": "discrete",
-        "particle_variables": [],
-    }
+    f = StringIO(
+        """
+        release_time     X   Y   Z
+        2015-04-01     100 200   5
+        2015-04-01T00  111 220   5
+        "2015-04-03 12" 200 300.0 5
+    """
+    )
 
-    # Make a release file
-    with open("release.rls", mode="w") as f:
-        f.write("2 2015-04-01 100 200\n")
-        f.write("1 2015-04-01T00 111 220\n")
-        f.write('3 "2015-04-03 12" 200 300\n')
-    # Make the ParticleReleaser object
-    release = ParticleReleaser(config, grid=None)
-    # Clean up the release file
-    os.remove("release.rls")
+    pr = ParticleReleaser(modules0, f)
+    assert all(pr._df.mult == [1, 1, 1])
 
-    assert len(release.times) == 2
-    assert release.total_particle_count == 6
 
-    # First release
-    S = next(release)
-    assert np.all(S["pid"] == [0, 1, 2])
-    assert S["release_time"][0] == np.datetime64("2015-04-01")
-    assert np.all(S["X"] == [100, 100, 111])
-    assert np.all(S["Y"] == [200, 200, 220])
+def test_clean_nopos():
+    """Missing position info in release file"""
 
-    # Second release
-    S = next(release)
-    assert np.all(S["pid"] == [3, 4, 5])
-    assert S["release_time"][0] == np.datetime64("2015-04-03T12:00:00")
-    assert np.all(S["X"] == [200, 200, 200])
+    f = StringIO(
+        """
+        release_time    Z
+        2015-04-01      5
+        2015-04-01T00   5
+        "2015-04-03 12" 5
+    """
+    )
 
-    # No more releases
+    with pytest.raises(SystemExit):
+        ParticleReleaser(modules0, f)
+
+
+def test_clean_convert_lonlat():
+    """Test automatic conversion from geographical to grid coordinates"""
+
+    # Use grid coords = lon, 2*lat (suitable for 60 deg north)
+    class Grid:
+        def ll2xy(self, lon, lat):
+            return lon, 2 * lat
+
+    # grid = Grid()
+
+    f = StringIO(
+        """
+        release_time     lon   lat   Z
+        2015-04-01         4    60   5
+        2015-04-01T00    4.2  59.5   5
+        "2015-04-03 12"  3.9  58.0   5
+    """
+    )
+
+    modules = dict(modules0, grid=Grid())
+    pr = ParticleReleaser(modules, f)
+    df = pr._df
+    assert all(df["Y"] == 2 * np.array([60, 59.5, 58.0]))
+
+
+def test_clean_lonlat_no_convert():
+
+    f = StringIO(
+        """
+        release_time     lon   lat   Z
+        2015-04-01         4    60   5
+        2015-04-01T00    4.2  59.5   5
+        "2015-04-03 12"  3.9  58.0   5
+    """
+    )
+
+    with pytest.raises(SystemExit):
+        ParticleReleaser(modules0, f)
+
+
+def test_remove_late_release():
+    """Remove releases after stop"""
+
+    f = StringIO(
+        """
+        release_time       X     Y   Z
+        2015-04-01         4    60   5
+        2015-05-01T00    4.2  59.5   5
+        "2015-05-03 12"  3.9  58.0   5
+    """
+    )
+    pr = ParticleReleaser(modules0, f)
+    df = pr._df
+    assert pr.total_particle_count == 1
+    assert len(pr.steps) == 1
+    assert pr.steps[0] == 12 * 4  # 12 hours, 4 steps per hour
+    assert all(df.index == np.datetime64("2015-04-01"))
+    assert df.X[0] == 4
+
+
+def test_remove_early_release():
+    """Remove too early release entries"""
+
+    # time[0] < time[1] == start < time[2] < stop
+    f = StringIO(
+        """
+        release_time       X     Y   Z
+        2015-03-01         4    60   5
+        2015-03-31T12    4.2  59.5   5
+        "2015-04-03 12"  3.9  58.0   5
+    """
+    )
+    pr = ParticleReleaser(modules0, f)
+    df = pr._df
+    assert pr.total_particle_count == 2
+    assert len(pr.steps) == 2
+    assert pr.steps[0] == 0
+    assert pr.steps[1] == 3 * 24 * 4  # 3 days, 4 steps per hour
+    assert df.index[0] == np.datetime64("2015-03-31 12")
+    assert df.index[1] == np.datetime64("2015-04-03 12")
+    assert all(df.X == [4.2, 3.9])
+
+
+def test_remove_early_release2():
+    """Remove too early release entries, no entry at start"""
+
+    # time[0] < time[1] < start < time[2] < stop
+    f = StringIO(
+        """
+        release_time       X     Y   Z
+        2015-03-01         4    60   5
+        2015-03-15T00:00 4.2  59.5   5
+        "2015-04-03 12"  3.9  58.0   5
+    """
+    )
+    pr = ParticleReleaser(modules0, f)
+    df = pr._df
+    assert pr.total_particle_count == 1
+    assert len(pr.steps) == 1
+    assert pr.steps[0] == 3 * 24 * 4  # 3 days, 4 steps per hour
+    assert df.index[0] == np.datetime64("2015-04-03 12")
+    assert all(df.X == [3.9])
+
+
+def test_too_late_release():
+    """All release after stop"""
+
+    f = StringIO(
+        """
+        release_time       X     Y   Z
+        2015-05-01         4    60   5
+        2015-05-01T00    4.2  59.5   5
+        "2015-05-03 12"  3.9  58.0   5
+    """
+    )
+    with pytest.raises(SystemExit):
+        ParticleReleaser(modules0, f)
+
+
+def test_too_early_release():
+    """All release before start"""
+
+    f = StringIO(
+        """
+        release_time       X     Y   Z
+        2015-03-01         4    60   5
+        2015-03-10T00    4.2  59.5   5
+        "2015-03-20 12"  3.9  58.0   5
+    """
+    )
+    with pytest.raises(SystemExit):
+        ParticleReleaser(modules0, f)
+
+
+def test_continuous0():
+    """Single constant continuous release"""
+
+    f = StringIO(
+        """
+    release_time     X     Y    Z
+    2015-03-01     100   400    5
+    """
+    )
+    freq = np.timedelta64(12, "h")
+    pr = ParticleReleaser(modules0, f, continuous=True, release_frequency=freq)
+
+    df = pr._df
+    assert len(df) == 7
+    assert pr.total_particle_count == 7
+    assert len(pr.steps) == 7
+    assert pr.steps[0] == 0
+    assert pr.steps[1] == 12 * 4
+    assert df.index[0] == timer.start_time
+    assert timer.stop_time - freq <= df.index[-1] < timer.stop_time
+
+
+def test_continuous1():
+    """Non-constant continuous release"""
+
+    f = StringIO(
+        """
+    release_time     X     Y    Z
+    2015-03-01     100   400    5
+    2015-04-02     101   401    5
+    """
+    )
+    freq = np.timedelta64(12, "h")
+    pr = ParticleReleaser(modules0, f, continuous=True, release_frequency=freq)
+
+    df = pr._df
+    assert pr.total_particle_count == 7
+    assert df.index[3] == np.datetime64("2015-04-02")
+    assert all(df.Y == 3 * [400] + 4 * [401])
+
+
+def test_continuous2():
+    """Multiple non-constant continuous release"""
+
+    f = StringIO(
+        """
+    release_time     X     Y    Z
+    2015-03-01     100   400    5
+    2015-03-01     110   410    5
+    2015-04-02     101   401    5
+    2015-04-02     111   411    5
+    2015-04-02     121   421    5
+    2015-04-03     102   402    5
+    2015-04-04     103   403    5
+    """
+    )
+    freq = np.timedelta64(12, "h")
+    pr = ParticleReleaser(modules0, f, continuous=True, release_frequency=freq)
+
+    df = pr._df
+    assert pr.total_particle_count == 14
+    assert df.index[5] == np.datetime64("2015-04-01 12")
+    assert df.index[6] == np.datetime64("2015-04-02")
+    assert df.index[7] == np.datetime64("2015-04-02")
+    assert all(df.Y == 3 * [400, 410] + 2 * [401, 411, 421] + 2 * [402])
+
+
+def test_continuous_freq_mismatch():
+    """
+    file times and freq does not match
+
+    File time is not on a release time,
+    new info is used at first release step after file time
+
+    in example below, the response is the same as if
+    the second time was 2015-04-02T12
+    """
+
+    f = StringIO(
+        """
+    release_time      X     Y    Z
+    2015-03-01      100   400    5
+    2015-04-02T06   106   406    5
+    """
+    )
+
+    freq = np.timedelta64(12, "h")
+    pr = ParticleReleaser(modules0, f, continuous=True, release_frequency=freq)
+    df = pr._df
+    assert pr.total_particle_count == 7
+    assert len(pr.steps) == 7
+    assert all(pr.steps == 48 * np.arange(7))
+    assert df.index[3] == timer.start_time + 3 * freq
+    assert all(df.X == 4 * [100] + 3 * [106])
+
+
+# Multiple releases between release times
+# Ignoring all but last
+# Is this best behaviour
+# Alternative: All releases between are released
+#    at release time.
+# Advantage: Number of particles become correct
+# Alternative: Raise an error (or warning)
+#    user responsibility to match up release times.
+def test_continuous_freq_mismatch2():
+    """
+    file times and freq does not match
+
+    Two releases between release times,
+    First is ignored, last work from release time
+
+    Example below, same result as if second line removed
+    """
+
+    f = StringIO(
+        """
+    release_time      X     Y    Z
+    2015-03-01      100   400    5
+    2015-04-02T05   105   405    5
+    2015-04-02T06   106   406    5
+    """
+    )
+
+    freq = np.timedelta64(12, "h")
+    pr = ParticleReleaser(modules0, f, continuous=True, release_frequency=freq)
+    df = pr._df
+    assert pr.total_particle_count == 7
+    assert all(df.X == 4 * [100] + 3 * [106])
+
+
+def test_release_time_column():
+    """With release time in datatypes include a release_time column"""
+
+    f = StringIO(
+        """
+        release_time      X    Y    Z   super
+        2015-04-01      100  200    5    1000
+        2015-04-01T00   111  220    5    2000
+        "2015-04-03 12" 200  300.0  5    3333
+    """
+    )
+    freq = np.timedelta64(12, "h")
+    datatypes = dict(datatypes0, super=int, release_time=np.dtype("M8[s]"))
+    modules = modules0.copy()
+    modules['state'] = Dummy(dtypes=datatypes)
+    pr = ParticleReleaser(modules, f, timer=timer)
+    A = pr._df
+    assert A.index[1] == np.datetime64("2015-04-01 00:00:00")
+    assert A["release_time"][1] == np.datetime64("2015-04-01")
+    assert A["release_time"][2] == np.datetime64("2015-04-03 12:00:00")
+    assert A["release_time"].dtype == np.dtype("M8[ns]")
+
+
+def test_iterate1():
+    f = StringIO(
+        """
+        release_time      X    Y    Z   super
+        2015-04-01      100  200    5    1000
+        2015-04-02T00   111  220    5    2000
+        "2015-04-03 12" 200  300.0  5    3333
+    """
+    )
+
+    pr = ParticleReleaser(modules0, f)
+    A = next(pr)
+    assert len(A) == 1
+    assert A.X[0] == 100
+    A = next(pr)
+    assert len(A) == 1
+    assert A.X[0] == 111
+    A = next(pr)
+    assert len(A) == 1
+    assert A.X[0] == 200
     with pytest.raises(StopIteration):
-        next(release)
+        next(pr)
 
 
-#
-# ------------------------------------------------------
-#
-def test_continuous() -> None:
+def test_iterate2():
+    """Multiple non-constant continuous release"""
 
-    config = {
-        "start": "cold",
-        "start_time": np.datetime64("2015-03-31 12"),
-        "stop_time": np.datetime64("2015-04-04"),
-        "dt": 3600,
-        "particle_release_file": "release.rls",
-        "release_format": ["mult", "release_time", "X", "Y"],
-        "release_dtype": dict(mult=int, release_time=np.datetime64, X=float, Y=float),
-        "release_type": "continuous",
-        "release_frequency": np.timedelta64(12, "h"),
-        "particle_variables": [],
-    }
+    f = StringIO(
+        """
+    release_time     X     Y    Z
+    2015-03-01     100   400    5
+    2015-03-01     110   410    5
+    2015-04-02     101   401    5
+    2015-04-02     111   411    5
+    2015-04-02     121   421    5
+    2015-04-03     102   402    5
+    2015-04-04     103   403    5
+    """
+    )
+    freq = np.timedelta64(12, "h")
+    pr = ParticleReleaser(modules0,  f, continuous=True, release_frequency=freq)
 
-    # Make a release file
-    with open("release.rls", mode="w") as f:
-        f.write("2 2015-04-01 100 200\n")
-        f.write("1 2015-04-01T00 111 220\n")
-        f.write('3 "2015-04-02" 200 300\n')
-
-    # Make the ParticleReleaser object
-    release = ParticleReleaser(config, grid=None)
-    # Clean out the release file
-    os.remove("release.rls")
-
-    # Check some overall sizes
-    assert len(release.times) == 6
-    assert config["total_particle_count"] == 18
-
-    # --- Check the releases
-    for t, S in enumerate(release):
-        assert np.all(S["pid"] == [3 * t, 1 + 3 * t, 2 + 3 * t])
-        assert (
-            S["release_time"][0]
-            == np.datetime64("2015-04-01") + t * config["release_frequency"]
-        )
-        if t < 2:
-            assert np.all(S["X"] == [100, 100, 111])
-        else:
-            assert np.all(S["X"] == [200, 200, 200])
-
-
-#
-# --------------------------------------------------
-#
-def test_late_start() -> None:
-    """Model start after first release in file"""
-
-    config = {
-        "start": "cold",
-        "start_time": np.datetime64("2015-04-03 00"),
-        "stop_time": np.datetime64("2015-04-05 13"),
-        "dt": 3600,
-        "particle_release_file": "release.rls",
-        "release_format": ["mult", "release_time", "X", "Y"],
-        "release_dtype": dict(mult=int, release_time=np.datetime64, X=float, Y=float),
-        "release_type": "continuous",
-        "release_frequency": np.timedelta64(12, "h"),
-        "particle_variables": [],
-    }
-
-    # Release file: create, read and remove
-    with open("release.rls", mode="w") as f:
-        f.write("2 2015-04-01 100 200\n")
-        f.write("1 2015-04-01 150 200\n")
-        f.write("4 2015-04-02 200 200\n")
-        f.write("3 2015-04-02 250 200\n")
-        f.write("4 2015-04-03 300 200\n")
-        f.write("1 2015-04-03 350 200\n")
-        f.write("2 2015-04-04 400 200\n")
-        f.write("1 2015-04-04 450 200\n")
-        f.write("2 2015-04-05 500 200\n")
-        f.write("2 2015-04-05 550 200\n")
-        f.write("3 2015-04-06 600 200\n")
-        f.write("2 2015-04-06 650 200.0\n")
-    release = ParticleReleaser(config, grid=None)
-    os.remove("release.rls")
-
-    # Correct release times
-    release_times = [
-        "2015-04-03",
-        "2015-04-03 12",
-        "2015-04-04",
-        "2015-04-04 12",
-        "2015-04-05",
-        "2015-04-05 12",
-    ]
-    release_times = np.array(release_times, dtype=np.datetime64)
-    # Number of particles per release time
-    counts = [5, 5, 3, 3, 4, 4]
-    cumcount = [0] + list(np.cumsum(counts))
-
-    # print(release.times)
-    # Check the release times
-    assert len(release.times) == len(release_times)
-    assert np.all(release.times == release_times)
-
-    # Total particle count
-    assert config["total_particle_count"] == sum(counts)
-
-    for i, S in enumerate(release):
-        assert np.all(S["pid"] == range(cumcount[i], cumcount[i + 1]))
-        j = i // 2
-        assert S["X"][0] == (j + 3) * 100
-        assert S["X"].iloc[-1] == (j + 3) * 100 + 50
-
-
-def test_too_late_start() -> None:
-    """Model start after last release in file"""
-
-    config = {
-        "start": "cold",
-        "start_time": np.datetime64("2015-05-02 12"),
-        "stop_time": np.datetime64("2015-05-03 12"),
-        "particle_release_file": "release.rls",
-        "release_format": ["mult", "release_time", "X", "Y"],
-        "release_dtype": dict(mult=int, release_time=np.datetime64, X=float, Y=float),
-        "release_type": "discrete",
-        "dt": 3600,
-        "particle_variables": [],
-    }
-
-    # Make a release file
-    with open("release.rls", mode="w") as f:
-        f.write("2 2015-04-01 100 200\n")
-
-    # Release should quit with SystemExit
-    with pytest.raises(SystemExit):
-        ParticleReleaser(config, grid=None)
-
-    # Clean up
-    os.remove("release.rls")
-
-
-def test_early_stop() -> None:
-    """Model stop before last release in release file"""
-
-    config = {
-        "start": "cold",
-        "start_time": np.datetime64("2015-04-02"),
-        "stop_time": np.datetime64("2015-04-05"),
-        "dt": 3600,
-        "particle_release_file": "release.rls",
-        "release_format": ["mult", "release_time", "X", "Y"],
-        "release_dtype": dict(mult=int, release_time=np.datetime64, X=float, Y=float),
-        "release_type": "continuous",
-        "release_frequency": np.timedelta64(12, "h"),
-        "particle_variables": [],
-    }
-
-    # Release file: create, read and remove
-    with open("release.rls", mode="w") as f:
-        f.write("2 2015-04-01 100 201\n")
-        f.write("3 2015-04-03 200 202\n")
-        f.write("1 2015-04-08 300 203\n")
-    release = ParticleReleaser(config, grid=None)
-    os.remove("release.rls")
-
-    # Correct release times
-    # First release neglected since before start
-    release_times = [
-        "2015-04-02",
-        "2015-04-02 12",
-        "2015-04-03",
-        "2015-04-03 12",
-        "2015-04-04",
-        "2015-04-04 12",
-    ]
-    release_times = np.array(release_times, dtype=np.datetime64)
-
-    assert len(release.times) == len(release_times)
-    assert np.all(release.times == release_times)
-
-    # The entries have the correct information
-    for t, S in enumerate(release):
-        assert np.all(S["release_time"] == pd.to_datetime(release_times[t]))
-        if t < 2:
-            assert np.all(S["pid"] == [2 * t, 2 * t + 1])
-            # assert(np.all(S['X'] == 100.0))
-        if t > 2:
-            assert np.all(S["pid"] == np.array([3 * t, 3 * t + 1, 3 * t + 2]) - 2)
-            # assert(np.all(S['X'] == 200.0))
-
-
-def test_too_early_stop() -> None:
-    """Model stop before first release in release file"""
-
-    config = {
-        "start": "cold",
-        "start_time": np.datetime64("2015-03-02"),
-        "stop_time": np.datetime64("2015-03-05"),
-        "dt": 3600,
-        "particle_release_file": "release.rls",
-        "release_format": ["mult", "release_time", "X", "Y"],
-        "release_dtype": dict(mult=int, release_time=np.datetime64, X=float, Y=float),
-        "release_type": "continuous",
-        "release_frequency": np.timedelta64(12, "h"),
-        "particle_variables": [],
-    }
-
-    # Release file: create, read and remove
-    with open("release.rls", mode="w") as f:
-        f.write("2 2015-04-01 100 200\n")
-        f.write("3 2015-04-03 200 300\n")
-
-    # Should exit
-    with pytest.raises(SystemExit):
-        ParticleReleaser(config, grid=None)
-
-    # Clean up
-    os.remove("release.rls")
-
-
-def test_subgrid() -> None:
-    """Particle release outside subgrid should be ignored"""
-
-    config = {
-        "start": "cold",
-        "start_time": np.datetime64("2015-03-01"),
-        "stop_time": np.datetime64("2015-03-03"),
-        "dt": 3600,
-        "particle_release_file": "release.rls",
-        "release_format": ["mult", "release_time", "X", "Y"],
-        "release_dtype": dict(mult=int, release_time=np.datetime64, X=float, Y=float),
-        "release_type": "continuous",
-        "release_frequency": np.timedelta64(12, "h"),
-        "particle_variables": [],
-        "grid_args": dict(subgrid=[100, 120, 10, 20]),
-    }
-
-    # Release file: create, read and remove
-    with open("release.rls", mode="w") as f:
-        f.write("2 2015-03-01 110 15\n")  # Inside
-        f.write("3 2015-03-01 200 30\n")  # Outside
-
-    # Make the ParticleReleaser object
-    release = ParticleReleaser(config, grid=None)
-    # Clean out the release file
-    os.remove("release.rls")
-
-    # Check some overall sizes
-    assert len(release.times) == 4
-    assert config["total_particle_count"] == 2 * 4
-
-    for t, S in enumerate(release):
-        assert np.all(S["pid"] == [2 * t, 2 * t + 1])
-        assert np.all(S["X"] == [110, 110])
-        assert np.all(S["Y"] == [15, 15])
-
-
-if __name__ == "__main__":
-    pass
-    # test_discrete()
-    # git pustest_continuous()
-    # test_late_start()
-    # test_too_late_start()
-    # test_early_stop()
+    for k in range(3):
+        A = next(pr)
+        assert all(A.X == [100, 110])
+    for k in range(2):
+        A = next(pr)
+        assert all(A.X == [101, 111, 121])
+    for k in range(2):
+        A = next(pr)
+        assert all(A.X == [102])
+    with pytest.raises(StopIteration):
+        next(pr)

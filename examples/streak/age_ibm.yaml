@@ -1,0 +1,62 @@
+# Configuration file for ladim
+#
+# Streak example, using an IBM to keep track of particle age
+#
+
+version: 2.0
+
+time:
+    # Start and stop of simulation
+    start: 1989-05-24 12:00:00
+    stop:  1989-06-15 12:00:00
+    dt: 300
+
+#grid:
+#    module: ROMS
+
+forcing:
+    module: ladim2.ROMS
+    filename: ../data/ocean_avg_0014.nc
+
+tracker:
+    advection: EF
+
+release:
+    release_file : streak.rls
+    names: [release_time, X, Y, Z]    # Given explicitly since not in rls-file
+    continuous: True
+    release_frequency: 3600
+
+state:
+   instance_variables: {age: float}
+   default_values: {age: 0}
+
+ibm:
+    module: age_ibm
+
+output:
+    filename: out_ibm.nc
+    ncargs: {data_model: NETCDF4_CLASSIC}
+    output_period: [3, h]
+    instance_variables:
+        pid:
+            encoding: {datatype: i4, zlib=True}
+            attributes: {long_name: particle_identifier}
+        X:
+            encoding: {datatype: f4, zlib=True}
+            attributes: {long_name: particle X-coordinate}
+        Y:
+            encoding: {datatype: f4, zlib=True}
+            attributes: {long_name: particle Y-coordinate}
+        Z:
+            encoding: {datatype: f4, zlib=True}
+            attributes:
+                long_name: particle depth
+                standard_name: depth_below_surface
+                units: m
+                positive: down
+        age:
+            encoding: {datatype: f4, zlib=True}
+            attributes:
+                long_name: particle age
+                units: seconds

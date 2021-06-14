@@ -67,7 +67,7 @@ M = np.ma.masked_where(M > 0, M)
 plt.pcolormesh(Xb, Yb, M, cmap=constmap)
 
 # Plot initial particle distribution
-particle_dist, = ax.plot(X, Y, ".", color="red", markeredgewidth=0, lw=0.5)
+(particle_dist,) = ax.plot(X, Y, ".", color="red", markeredgewidth=0, lw=0.5)
 timestamp = ax.text(0.01, 0.97, timestr, fontsize=15, transform=ax.transAxes)
 
 
@@ -95,3 +95,5 @@ anim = FuncAnimation(
 )
 
 plt.show()
+
+pf.close()

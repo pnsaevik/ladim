@@ -1,35 +1,13 @@
-LADiM – the Lagrangian Advection and Diffusion Model
-====================================================
+LADiM2 – the Lagrangian Advection and Diffusion Model, version 2
+================================================================
 
-LADiM is an off-line ocean particle tracking code. Presently  using results from the
-ocean model `ROMS <http://www.myroms.org/>`_ as input.
+This is a new developing version of `LADiM <https://github.com/bjornaa/ladim>`_.
 
-Try out LADiM
--------------
+The main difference from the old version is higher flexibility. In particular, it can be
+used as a library.
 
-The model is written in python and requires python 3.6 and some scientific packages. The anaconda python distribution is recommended.
-
-Download the code from ``github`` and install by::
-
-  python setup.py install.
-
-Get a small example data set by running the download script in
-``examples/data``. The different examples can be run by the sequence of
-commands::
-
-  python make_release.py
-  ladim
-
-
-Source code and documentation
------------------------------
-
-The code is open source using the MIT License. It is available from
-`github <https://github.com/bjornaa/ladim>`_
-
-The documentation is hosted on `readthedocs
-<https://ladim.readthedocs.io/en/master>`_. A `pdf version
-<https://media.readthedocs.org/pdf/ladim/master/ladim.pdf>`_ is also available.
+The yaml configuration interface to the ladim2 script is close to final, but the API is
+not fixed yet.
 
 ::
 

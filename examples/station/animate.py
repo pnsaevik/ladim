@@ -14,8 +14,8 @@ particle_file = "station.nc"
 grid_file = "../data/ocean_avg_0014.nc"
 
 # Subgrid definition
-i0, i1 = 100, 140
-j0, j1 = 84, 133
+i0, i1 = 90, 135
+j0, j1 = 70, 120
 
 # ----------------
 
@@ -42,7 +42,7 @@ ax = plt.axes(xlim=(i0 + 1, i1 - 1), ylim=(j0 + 1, j1 - 1), aspect="equal")
 
 # Background bathymetry
 cmap = plt.get_cmap("Blues")
-ax.contourf(Xcell, Ycell, H, cmap=cmap, alpha=0.3)
+ax.contourf(Xcell, Ycell, H, cmap=cmap, alpha=0.9)
 
 # Lon/lat lines
 ax.contour(Xcell, Ycell, lat, levels=range(57, 64), colors="black", linestyles=":")
@@ -85,3 +85,5 @@ anim = FuncAnimation(
 )
 
 plt.show()
+
+pf.close()

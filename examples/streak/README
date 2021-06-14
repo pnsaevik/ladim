@@ -1,0 +1,39 @@
+Streak example
+==============
+
+In this example there is a continuous release of particles from a single position. This
+is called a streakline. The example demonstrates how to do continuous release, how to
+use particle variables and a simple IBM.
+
+
+To improve the graphics, the output is coloured by the age of the particles.  The age is
+calculated in two ways. Both versions use the same release file, streak.rls, computed by
+make_release.py.
+
+The first version is run by the command ladim2 and is defined by ladim2.yaml, the output
+is out.nc. Here the release time of the particles are stored in a particle variable
+release_time. The animation script, animate.py, computes the age of the particles using
+this piece of information.
+
+The second version is defined by age_ibm.yaml and is run by the command ladim2
+age_ibm.yaml and the result is stored in out_ibm.py. Here age is an instance variable
+computed by the simple IBM module age_ibm in age_ibm.py and saved to the output file. The
+corresponding animation script, animate_ibm.py, reads the age directly from the output.
+
+NOTE 1: In simple cases where a fixed number of particles are released at a fixed
+frequency, the release time can be calculated from the particle identifier. No extra
+variables are needed. In our case, with one particle every hour, the pid equals the
+release time in hours since the start of the simulation.
+
+NOTE 2: A particle variable named "release_time" is handled specially, and is initiated
+by the release_time implied by the release file. Any other variable would have to be
+initialized explicitly. For instance using a particle variable "release_step" saving the
+release step number, would require a change to discrete release and a release file with
+columns, [release_time, X, Y, Z, release_step] and many rows like:
+
+        1989-05-24T12 115 100 5 0
+        1989-05-24T13 115 100 5 1
+        1989-05-24T14 115 100 5 2
+        ...
+
+The advantage of using a make_release script, is that this can easily be accomplished.

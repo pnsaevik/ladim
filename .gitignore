@@ -1,6 +1,10 @@
 # Python stuff
 *.pyc
 build/
+.mypy
+__pycache__/
+dist/
+LADiM2.egg-info/
 
 # Hidden directories
 .*/
@@ -16,7 +20,7 @@ examples/data/*
 # Release files
 *.rls
 
-# Documentation stuff
+# Documentation build stuff
 doc/build
 
 # Emacs noise

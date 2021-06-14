@@ -1,67 +1,59 @@
-# Configuration file for ladim
-#
-# Continuous  release example
-#
+# unsplit.yaml – configuration file for LADiM v2
+# Unsplitted output into one result file
 
+version: 2.0
 
-time_control:
-    # Start and stop of simulation
-    start_time: 1989-05-24 12:00:00
-    stop_time:  1989-05-28 12:00:00
-    reference_time: 1989-01-01
+time:
+    start: 1989-05-24 12:00
+    stop: 1989-05-25 00:00
+    reference: 1989-01-01
+    dt: [1, h]
 
-files:
-    particle_release_file : restart.rls
-    output_file           : unsplit.nc
+grid:
+    module: ladim2.ROMS
 
-particle_release:
-    # type = continuous or discrete [default]
-    release_type: 'continuous'
-    release_frequency: [3600, s]
-    variables: [release_time, X, Y, Z]
-    # Data type [int, float, time], default = float
-    release_time: time
+forcing:
+    module: ladim2.ROMS
+    filename: ../data/ocean_avg_0014.nc
+
+tracker:
+    advection: EF
+
+release:
+    release_file : restart.rls
+    names: [release_time, X, Y, Z]    # Given explicitly since not in rls-file
+    continuous: True
+    release_frequency: 3600
     particle_variables: [release_time]
 
-gridforce:
-    module: ladim.gridforce.ROMS
-    input_file            : ../data/ocean_avg_0014.nc
+state:
+    particle_variables: {release_time: time}
 
-output_variables:
-    # Skip initial field
-    #skip_initial : True
-
-    # Output period, format [value, unit], unit = s, m, h, or d
-    outper: [3, h]
-    # Records per file
-    # numrec: 4
-
-    particle: [release_time]
-    instance: [pid, X, Y, Z]
-    # NetCDF arguments
-    release_time:
-        ncformat: f8
-        long_name: particle release time
-        units: seconds since reference_time
-    # Få til template over
-    pid: {ncformat: i4, long_name: particle identifier}
-    X: {ncformat: f4, long_name: particle X-coordinate}
-    Y: {ncformat: f4, long_name: particle Y-coordinate}
-    Z:
-        ncformat: f4
-        long_name: particle depth
-        standard_name: depth_below_surface
-        units: m
-        positive: down
-
-
-numerics:
-    # Model time step, [value, unit]
-    dt: [1, h]
-    # Advection method: options =
-    #        EF = Euler-Forward,
-    #        RK2, RK4 = Runge-Kutta 2nd or 4th order
-    advection: RK2
-    # Horizontal diffusion coefficient [m2.s-1]
-    #         zero = no diffusion
-    diffusion: 0.0
+output:
+    filename: unsplit.nc
+    ncargs: {data_model: NETCDF4_CLASSIC}
+    output_period: [1, h]
+    numrec: 0     # unsplitted output
+    instance_variables:
+        pid:
+            encoding: {datatype: i4, zlib=True}
+            attributes: {long_name: particle_identifier}
+        X:
+            encoding: {datatype: f4, zlib=True}
+            attributes: {long_name: particle X-coordinate}
+        Y:
+            encoding: {datatype: f4, zlib=True}
+            attributes: {long_name: particle Y-coordinate}
+        Z:
+            encoding: {datatype: f4, zlib=True}
+            attributes:
+                long_name: particle depth
+                standard_name: depth_below_surface
+                units: m
+                positive: down
+    particle_variables:
+        release_time:
+            encoding: {datatype: f8}
+            attributes:
+                long_name: particle release time
+                units: seconds since reference_time

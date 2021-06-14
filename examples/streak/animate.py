@@ -10,7 +10,7 @@ from postladim import ParticleFile
 # ---------------
 
 # Files
-particle_file = "streak.nc"
+particle_file = "out.nc"
 grid_file = "../data/ocean_avg_0014.nc"
 
 # Subgrid definition
@@ -18,6 +18,8 @@ i0, i1 = 100, 140
 j0, j1 = 85, 130
 
 # ----------------
+
+DAY = np.timedelta64(1, "D")
 
 # ROMS grid, plot domain
 with Dataset(grid_file) as f0:
@@ -32,16 +34,15 @@ Ycell = np.arange(j0, j1)
 Xb = np.arange(i0 - 0.5, i1)
 Yb = np.arange(j0 - 0.5, j1)
 
-
-def age(t):
-    """Return age in days of the particles with time index t"""
-    day = np.timedelta64(1, "D")
-    return (pf.time[t] - pf.release_time[pf.pid[t]]) / day
-
-
 # particle_file
 pf = ParticleFile(particle_file)
 num_times = pf.num_times
+
+
+def age(t):
+    """Return age in days of the particles with time index t"""
+    return (pf.time[t] - pf.release_time[pf.pid[t]]) / DAY
+
 
 # Set up the plot area
 fig = plt.figure(figsize=(12, 10))
@@ -63,10 +64,8 @@ plt.pcolormesh(Xb, Yb, M, cmap=constmap)
 # Scatter plot, colour = particle age
 X, Y = pf.position(0)
 pids = pf["pid"][0]
-
-
 C = age(0)
-vmax = pf.num_times / 6  # Maximum particle age in days
+vmax = (pf.time[-1] - pf.time[0]) / DAY  # Time span of output (in days)
 pdistr = ax.scatter(X, Y, c=C, vmin=0, vmax=vmax, cmap=plt.get_cmap("plasma_r"))
 cb = plt.colorbar(pdistr)
 cb.set_label("Particle age [days]", fontsize=14)
@@ -77,7 +76,6 @@ timestamp = ax.text(0.01, 0.97, pf.time(0), fontsize=15, transform=ax.transAxes)
 def animate(t):
     X, Y = pf.position(t)
     pdistr.set_offsets(np.vstack((X, Y)).T)
-    # Particle age in days
     C = age(t)
     pdistr.set_array(C)
     timestamp.set_text(pf.time(t))
@@ -96,3 +94,5 @@ anim = FuncAnimation(
 )
 
 plt.show()
+
+pf.close()

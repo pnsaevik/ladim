@@ -1,0 +1,50 @@
+#
+# Configuration file for ladim2
+#
+# Backwards version of the line example
+#
+
+version: 2.0
+
+time:
+    start:  1989-06-18T12
+    stop: 1989-05-24 12:00:00
+    reference: 1970-01-01 00
+    # Time step
+    dt: 3600
+    time_reversal: True
+
+forcing:
+    module: ladim2.ROMS
+    filename: ../data/ocean_avg_0014.nc
+
+tracker:
+    advection: EF
+
+release:
+    release_file : backwards.rls
+
+output:
+    # module: output
+    filename: backwards.nc
+    ncargs: {data_model: NETCDF3_CLASSIC}
+    output_period: [3, h]
+    instance_variables:
+        pid:
+            encoding: {datatype: i4, zlib=True}
+            attributes: {long_name: particle_identifier}
+        X:
+            encoding: {datatype: f4, zlib=True}
+            attributes: {long_name: particle X-coordinate}
+        Y:
+            encoding: {datatype: f4, zlib=True}
+            attributes: {long_name: particle Y-coordinate}
+        Z:
+            encoding: {datatype: f4, zlib=True}
+            attributes:
+                long_name: particle depth
+                standard_name: depth_below_surface
+                units: m
+                positive: down
+    # particle_variables:
+    #     X0: {ncformat: f4, long_name: X-coordinate of particle release}

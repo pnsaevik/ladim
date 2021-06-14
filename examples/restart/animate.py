@@ -10,14 +10,14 @@ from postladim import ParticleFile
 # ---------------
 
 # Files
-particle_file = "unsplit.nc"
-# particle_file = 'split_0001.nc'
+# particle_file = "unsplit.nc"
+particle_file = "split_002.nc"
 # particle_file = 'restart_0002.nc'
 grid_file = "../data/ocean_avg_0014.nc"
 
 # Subgrid definition
-i0, i1 = 100, 130
-j0, j1 = 90, 115
+i0, i1 = 108, 123
+j0, j1 = 90, 102
 
 # ----------------
 
@@ -44,7 +44,7 @@ ax = plt.axes(xlim=(i0 + 1, i1 - 1), ylim=(j0 + 1, j1 - 1), aspect="equal")
 
 # Background bathymetry
 cmap = plt.get_cmap("Blues")
-ax.contourf(Xcell, Ycell, H, cmap=cmap, alpha=0.3)
+ax.contourf(Xcell, Ycell, H, cmap=cmap, alpha=0.6)
 
 # Lon/lat lines
 ax.contour(Xcell, Ycell, lat, levels=range(57, 64), colors="black", linestyles=":")
@@ -57,7 +57,7 @@ plt.pcolormesh(Xb, Yb, M, cmap=constmap)
 
 # Plot initial particle distribution
 X, Y = pf.position(0)
-particle_dist, = ax.plot(X, Y, ".", color="red", markeredgewidth=0, lw=0.5)
+(particle_dist,) = ax.plot(X, Y, ".", color="red", markeredgewidth=0, lw=0.5)
 # title = ax.set_title(pf.time(0))
 timestamp = ax.text(0.01, 0.97, pf.time(0), fontsize=15, transform=ax.transAxes)
 
@@ -82,3 +82,5 @@ anim = FuncAnimation(
 )
 
 plt.show()
+
+pf.close()

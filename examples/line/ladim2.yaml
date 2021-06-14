@@ -1,0 +1,54 @@
+#
+# Configuration file for ladim2
+#
+# Line source example
+#
+
+version: 2.0
+
+time:
+    # Start of simulation
+    start: 1989-05-24 12:00:00
+    # End of simulation
+    stop:  1989-06-20T12
+    # Reference time for netcdf output
+    # this is optional, by default equal to start_time
+    reference: 1970-01-01 00
+    # Time step
+    dt: [1, 'h']
+
+forcing:
+    module: ladim2.ROMS
+    filename: ../data/ocean_avg_0014.nc
+
+tracker:
+    advection: EF
+
+release:
+    release_file : line.rls
+
+output:
+    module: ladim2.out_netcdf
+    filename: out.nc
+    ncargs: {data_model: NETCDF3_CLASSIC}
+    output_period: [3, h]
+    instance_variables:
+        pid:
+            encoding: {datatype: i4, zlib=True}
+            attributes: {long_name: particle_identifier}
+        X:
+            encoding: {datatype: f4, zlib=True}
+            attributes: {long_name: particle X-coordinate}
+        Y:
+            encoding: {datatype: f4, zlib=True}
+            attributes: {long_name: particle Y-coordinate}
+        Z:
+            encoding: {datatype: f4, zlib=True}
+            attributes:
+                long_name: particle depth
+                standard_name: depth_below_surface
+                units: m
+                positive: down
+    global_attributes:
+        title: LADiM line example
+        institution: Institute of Marine Research

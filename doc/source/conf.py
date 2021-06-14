@@ -24,9 +24,9 @@ author = "Bjørn Ådlandsvik"
 copyright = "2018, Institute of Marine Research"
 
 # The short X.Y version
-version = "1.1"
+version = "2.0"
 # The full version, including alpha/beta/rc tags
-release = "1.1.0"
+release = "2.0.0"
 today_fmt = "%Y-%m-%d"
 
 # -- General configuration ---------------------------------------------------

@@ -1,35 +1,46 @@
+"""IBM module for the gosouth example in LADiM version 2"""
+
+# ---------------------------------
+# Bjørn Ådlandsvik <bjorn@imr.no>
+# Institute of Marine Research
+# ----------------------------------
+
+# 2021-01-18 Modified for LADiM v.2
+
 import numpy as np
 
 
 class IBM:
     """Adding a constant horizontal velocity to the particle tracking"""
 
-    def __init__(self, config):
-        # Can not initialize here, as grid is not available
+    def __init__(
+        self,
+        modules: dict,
+        direction: float,  # clockwise degree from North
+        speed: float,  # swimming speed [m/s]
+    ):
+        self.dt = modules['time'].dtsec
+        self.state = modules['state']
+        self.grid = modules['grid']
 
-        # Azimuthal direction, 0 = N, 90 = E, 180 = S, 270 = W
-        self.direction = 180  # [clockwise degree from North]
-        self.speed = 0.02  # [m/s]
-        self.first = True  # Flag for first time
+        # Compute swimming velocity in grid coordinates
+        azimuth = direction * np.pi / 180
+        angle = self.grid.angle  # type: ignore
+        self.Xs = speed * np.sin(azimuth + angle)
+        self.Ys = speed * np.cos(azimuth + angle)
 
-    def update_ibm(self, grid, state, forcing):
+    def update(self) -> None:
 
-        # Initialize on first call
-        if self.first:
-            angle = grid.grid.angle
-            azim = self.direction * np.pi / 180.0
-            # (self.Xs, self.Ys) is unit vector in the direction
-            self.Xs = np.sin(azim + angle)
-            self.Ys = np.cos(azim + angle)
-            self.first = False
+        state = self.state
+        grid = self.grid
 
-        # Update position
+        # Compute new position
         I = np.round(state.X).astype("int")
         J = np.round(state.Y).astype("int")
-        X1 = state.X + self.speed * state.dt * self.Xs[J, I] / grid.grid.dx[J, I]
-        Y1 = state.Y + self.speed * state.dt * self.Ys[J, I] / grid.grid.dy[J, I]
+        X1 = state.X + self.Xs[J, I] * self.dt / grid.dx[J, I]  # type: ignore
+        Y1 = state.Y + self.Ys[J, I] * self.dt / grid.dy[J, I]  # type: ignore
 
-        # Do not move out of grid or on land
-        I = grid.ingrid(X1, Y1) & grid.atsea(X1, Y1)
-        state.X[I] = X1[I]
-        state.Y[I] = Y1[I]
+        # Only move particles to sea positions inside the grid
+        move = grid.ingrid(X1, Y1) & grid.atsea(X1, Y1)
+        state.X[move] = X1[move]
+        state.Y[move] = Y1[move]

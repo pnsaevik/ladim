@@ -1,0 +1,26 @@
+Backwards example
+=================
+
+This example demonstrates how to do time reversed simulations. The "initial" particle
+release is a perturbed version of the particle distribution from the line example after
+25 days simulation. The particles are tracked backwards for these 25 days.
+
+With unpertubed release (sigma = 0 in make_release.py) the particles that do not get close
+to the coast ends up very close to the original particle position. An interesting
+exercise is to see how large pertubations can be used before the backwards tracking no
+longer converges to the forward initial line distribution.
+
+make_release.py
+  Reads the forward file at record 200, perturbates, and writes a release file.
+
+ladim2 ladim2.yaml
+  Backtracks the particles
+
+animate.py
+  Animates the reversal of the particle distribution. The purple line shows the initial
+  distibution of the forward particles.
+
+To activate backwards simulations in the yaml file, the start time must be later than the
+stop time and the time_reversal flag must be set to True.
+
+The line example must be run prior to running the present example.

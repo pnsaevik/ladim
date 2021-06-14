@@ -1,17 +1,20 @@
 # Minimal IBM to kill old particles
 
-DAY = 24 * 60 * 60  # Number of seconds in a day
-
+import numpy as np
 
 class IBM:
-    def __init__(self, config):
-        print("Initializing killer feature")
-        self.lifetime = config["ibm"]["lifetime"]
+    def __init__(self, modules, **kwargs) -> None:
 
-    def update_ibm(self, grid, state, forcing):
+        print("Initializing killer feature")
+        self.state = modules["state"]
+        self.dt = modules["time"].dt / np.timedelta64(1, "D")  # Unit = days
+        self.lifetime = kwargs["lifetime"]
+
+
+    def update(self) -> None:
 
         # Update the particle age
-        state.age += state.dt  # Update the age
+        self.state["age"] += self.dt
 
-        # Mark particles older than 2 days as dead
-        state.alive = state.age < self.lifetime * DAY
+        # Add particles older than prescribed lifetime to dead
+        self.state["alive"] &= self.state["age"] < self.lifetime

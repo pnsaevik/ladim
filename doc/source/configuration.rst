@@ -3,8 +3,9 @@
 LADiM configuration
 ===================
 
-The LADiM model system is highly configurable using a separate configuration file. The goal is that a user should not have to touch the code, every
-necessary aspect should be customizable by the configuration file.
+The LADiM model system is highly configurable using a separate configuration file. The
+goal is that a user should not have to touch the code, every necessary aspect should be
+customizable by the configuration file.
 
 The name of the configuration file is given as a command line argument to the
 main ladim script. If the name is missing, a default name of :file:`ladim.yaml`
@@ -23,7 +24,7 @@ example configuration files are self-describing and can easily be modified.
   The indentation in a yaml file is mandatory, it is part of the syntax. In
   particular note that the indentation has to be done by **spaces**, **not tabs**.
   Reasonable editors will recognize yaml-files by the extension and will
-  automatically produce spaces when you hit the tab key.
+  automatically produce spaces if you hit the tab key.
 
 .. seealso::
   Module :mod:`configuration`
@@ -34,5 +35,5 @@ An example configuration file
 
 Below is an example configuration file, :file:`models/salmon_lice/ladim.yaml`.
 
-.. literalinclude:: ../../models/salmon_lice/ladim.yaml
+.. literalinclude:: ../../examples/lakselus/ladim2.yaml
   :language: yaml
