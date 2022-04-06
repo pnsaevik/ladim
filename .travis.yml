@@ -5,17 +5,14 @@ python:
 - "3.7"
 - "3.8"
 - "3.9"
+- "3.10"
 
 before_install:
   - python --version
   - pip --version
   - pip install --upgrade setuptools numpy pip
-  - pip install typing-extensions
-  - pip install numpy pyyaml netCDF4 pandas
 
 install:
-  - pwd
-  - ls
   - pip install -v .
   - pip list
 
