@@ -11,6 +11,7 @@ before_install:
   - pip --version
   - pip install --upgrade setuptools numpy pip
   - pip install typing-extensions
+  - pip install numpy pyyaml netCDF4 pandas
   - pip install git+https://github.com/pnsaevik/ladim
 
 install:
