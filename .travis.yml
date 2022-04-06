@@ -1,0 +1,19 @@
+language: python
+
+python:
+- "3.8"
+- "3.9"
+
+before_install:
+  - python --version
+  - pip --version
+  - pip install --upgrade setuptools numpy
+  - pip install typing-extensions
+  - pip install git+https://github.com/pnsaevik/ladim
+
+install:
+  - pip install .
+  - pip list
+
+script:
+  - echo pytest -Wignore
