@@ -11,7 +11,6 @@ Lagrangian Advection and Diffusion Model
 # Institute of Marine Research
 # ---------------------------------
 
-import sys
 import logging
 
 import ladim
@@ -56,7 +55,6 @@ def main(config_stream, loglevel=logging.INFO):
     logging.info("Starting time loop")
     for step in range(config["numsteps"] + 1):
 
-
         # --- Particle release ---
         if step in releaser.steps:
             V = next(releaser)
@@ -80,3 +78,72 @@ def main(config_stream, loglevel=logging.INFO):
     # TODO: should also close the releaser
     forcing.close()
     # out.close()
+
+
+def run():
+    import sys
+    import argparse
+    import logging
+    import datetime
+    from pathlib import Path
+
+    # ===========
+    # Logging
+    # ===========
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s:%(module)s - %(message)s')
+
+    # ====================
+    # Parse command line
+    # ====================
+
+    parser = argparse.ArgumentParser(
+        description='LADiM — Lagrangian Advection and Diffusion Model')
+    parser.add_argument(
+        '-d', '--debug',
+        help="Show more information",
+        action="store_const", dest="loglevel", const=logging.DEBUG,
+        default=logging.INFO)
+    parser.add_argument(
+        '-s', '--silent',
+        help='Show less information',
+        action="store_const", dest="loglevel", const=logging.WARNING)
+    parser.add_argument('config_file', nargs='?', default='ladim.yaml')
+
+    logging.info(" ================================================")
+    logging.info(" === Lagrangian Advection and Diffusion Model ===")
+    logging.info(" ================================================\n")
+
+    logging.info(f"LADiM version {ladim.__version__}")
+    logging.info(f"LADiM path: {ladim.__file__.strip('__init.py__')}")
+    logging.info(f"python version:  {sys.version.split()[0]}\n")
+    logging.info("Parsing command line")
+    args = parser.parse_args()
+    logging.info(f"  Configuration file: {args.config_file}")
+    logging.info(f"  loglevel = {logging.getLevelName(args.loglevel)}")
+
+    # =============
+    # Sanity check
+    # =============
+
+    if not Path(args.config_file).exists():
+        logging.critical(f'Configuration file {args.config_file} not found')
+        raise SystemExit(1)
+
+    # ===================
+    # Run the simulation
+    # ===================
+
+    # Start message
+    now = datetime.datetime.now().replace(microsecond=0)
+    logging.info(f'LADiM simulation starting, wall time={now}')
+
+    fp = open(args.config_file, encoding='utf8')
+    ladim.main(config_stream=fp, loglevel=args.loglevel)
+
+    # Reset logging and print final message
+    logging.getLogger().setLevel(logging.INFO)
+    now = datetime.datetime.now().replace(microsecond=0)
+    logging.info(f'LADiM simulation finished, wall time={now}')
