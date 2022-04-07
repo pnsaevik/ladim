@@ -1,6 +1,7 @@
 # Python stuff
 *.pyc
 build/
+*.egg-info/
 
 # Hidden directories
 .*/
