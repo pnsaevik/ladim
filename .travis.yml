@@ -16,4 +16,4 @@ install:
   - pip list
 
 script:
-  - ladim --help
+  - pytest -Wignore

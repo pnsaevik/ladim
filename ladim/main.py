@@ -112,6 +112,8 @@ def run():
         action="store_const", dest="loglevel", const=logging.WARNING)
     parser.add_argument('config_file', nargs='?', default='ladim.yaml')
 
+    args = parser.parse_args()
+
     logging.info(" ================================================")
     logging.info(" === Lagrangian Advection and Diffusion Model ===")
     logging.info(" ================================================\n")
@@ -119,8 +121,7 @@ def run():
     logging.info(f"LADiM version {ladim.__version__}")
     logging.info(f"LADiM path: {ladim.__file__.strip('__init.py__')}")
     logging.info(f"python version:  {sys.version.split()[0]}\n")
-    logging.info("Parsing command line")
-    args = parser.parse_args()
+
     logging.info(f"  Configuration file: {args.config_file}")
     logging.info(f"  loglevel = {logging.getLevelName(args.loglevel)}")
 
