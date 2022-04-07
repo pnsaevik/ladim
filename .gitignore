@@ -14,9 +14,6 @@ examples/data/*
 *.npy
 *.wkb
 
-# Release files
-*.rls
-
 # Documentation stuff
 doc/build
 
