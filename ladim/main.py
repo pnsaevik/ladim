@@ -34,19 +34,13 @@ def main(config_stream, loglevel=logging.INFO):
     # --- Configuration ---
     config = configure(config_stream)
 
-    # --- Initiate the grid and the forcing ---
-    grid = Grid(config)
-    forcing = Forcing(config, grid)
-
-    # --- Initiate particle releaser ---
-    releaser = ParticleReleaser(config, grid)
-
-    #  --- Initiate the model state ---
-    state = State(config, grid)
-
-    # --- Initiate the output ---
-    out = OutPut(config, releaser)
-    # out.write_particle_variables(releaser)
+    # --- Initiate modules ---
+    modules = dict()
+    modules['grid'] = Grid(config)
+    modules['forcing'] = Forcing(config, modules['grid'])
+    modules['release'] = ParticleReleaser(config, modules['grid'])
+    modules['state'] = State(config, modules['grid'])
+    modules['output'] = OutPut(config, modules['release'])
 
     # ==============
     # Main time loop
@@ -56,27 +50,26 @@ def main(config_stream, loglevel=logging.INFO):
     for step in range(config["numsteps"] + 1):
 
         # --- Particle release ---
-        if step in releaser.steps:
-            V = next(releaser)
-            state.append(V, forcing)
+        if step in modules['release'].steps:
+            V = next(modules['release'])
+            modules['state'].append(V, modules['forcing'])
 
         # --- Update forcing ---
-        forcing.update(step)
+        modules['forcing'].update(step)
 
         # --- Save to file ---
-        # Save before or after update ???
         if step % config["output_period"] == 0:
-            out.write(state, grid)
+            modules['output'].write(modules['state'], modules['grid'])
 
         # --- Update the model state ---
-        state.update(grid, forcing)
+        modules['state'].update(modules['grid'], modules['forcing'])
 
     # ========
     # Clean up
     # ========
 
     # TODO: should also close the releaser
-    forcing.close()
+    modules['forcing'].close()
     # out.close()
 
 
@@ -118,7 +111,6 @@ def run():
     logging.info(" === Lagrangian Advection and Diffusion Model ===")
     logging.info(" ================================================\n")
 
-    logging.info(f"LADiM version {ladim.__version__}")
     logging.info(f"LADiM path: {ladim.__file__.strip('__init.py__')}")
     logging.info(f"python version:  {sys.version.split()[0]}\n")
 
