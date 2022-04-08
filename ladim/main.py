@@ -108,7 +108,8 @@ def run():
     logging.info(" === Lagrangian Advection and Diffusion Model ===")
     logging.info(" ================================================\n")
 
-    logging.info(f"LADiM path: {ladim.__file__.strip('__init.py__')}")
+    logging.info(f"ladim path: {ladim.__file__.strip('__init.py__')}")
+    logging.info(f"ladim version:  {ladim.__version__}\n")
     logging.info(f"python version:  {sys.version.split()[0]}\n")
 
     logging.info(f"  Configuration file: {args.config_file}")
