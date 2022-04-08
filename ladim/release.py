@@ -41,7 +41,10 @@ def mylen(df: pd.DataFrame) -> int:
 class ParticleReleaser(Iterator):
     """Particle Release Class"""
 
-    def __init__(self, config: Config, grid) -> None:
+    def __init__(self, modules) -> None:
+        self.modules = modules
+        config = modules['config']
+        grid = modules['grid']
 
         start_time = pd.to_datetime(config["start_time"])
         stop_time = pd.to_datetime(config["stop_time"])
@@ -232,6 +235,12 @@ class ParticleReleaser(Iterator):
         # Reset the counter after the particle counting
         self._index = 0  # Index of next release
         self._particle_count = warm_particle_count
+
+    def update(self):
+        step = self.modules['timestepper']['step']
+        if step in self.steps:
+            V = next(self)
+            self.modules['state'].append(V, self.modules['forcing'])
 
     def __next__(self) -> pd.DataFrame:
         """Perform the next particle release

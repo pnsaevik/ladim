@@ -31,34 +31,32 @@ def main(config_stream, loglevel=logging.INFO):
     # Logging
     logging.getLogger().setLevel(loglevel)
 
-    # --- Configuration ---
-    config = configure(config_stream)
-
     # --- Initiate modules ---
     modules = dict()
-    modules['grid'] = Grid(config)
-    modules['forcing'] = Forcing(config, modules['grid'])
-    modules['release'] = ParticleReleaser(config, modules['grid'])
-    modules['state'] = State(config, modules['grid'])
-    modules['output'] = OutPut(config, modules['release'])
+    modules['config'] = configure(config_stream)
+    modules['grid'] = Grid(modules['config'])
+    modules['forcing'] = Forcing(modules['config'], modules['grid'])
+    modules['release'] = ParticleReleaser(modules)
+    modules['state'] = State(modules['config'], modules['grid'])
+    modules['output'] = OutPut(modules['config'], modules['release'])
+    modules['timestepper'] = dict()
 
     # ==============
     # Main time loop
     # ==============
 
     logging.info("Starting time loop")
-    for step in range(config["numsteps"] + 1):
+    for step in range(modules['config']["numsteps"] + 1):
+        modules['timestepper']['step'] = step
 
         # --- Particle release ---
-        if step in modules['release'].steps:
-            V = next(modules['release'])
-            modules['state'].append(V, modules['forcing'])
+        modules['release'].update()
 
         # --- Update forcing ---
         modules['forcing'].update(step)
 
         # --- Save to file ---
-        if step % config["output_period"] == 0:
+        if step % modules['config']["output_period"] == 0:
             modules['output'].write(modules['state'], modules['grid'])
 
         # --- Update the model state ---
