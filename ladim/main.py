@@ -38,7 +38,7 @@ def main(config_stream, loglevel=logging.INFO):
     modules['forcing'] = Forcing(modules['config'], modules['grid'])
     modules['release'] = ParticleReleaser(modules)
     modules['state'] = State(modules['config'], modules['grid'])
-    modules['output'] = OutPut(modules['config'], modules['release'])
+    modules['output'] = OutPut(modules)
     modules['timestepper'] = dict()
 
     # ==============
@@ -56,8 +56,7 @@ def main(config_stream, loglevel=logging.INFO):
         modules['forcing'].update(step)
 
         # --- Save to file ---
-        if step % modules['config']["output_period"] == 0:
-            modules['output'].write(modules['state'], modules['grid'])
+        modules['output'].update()
 
         # --- Update the model state ---
         modules['state'].update(modules['grid'], modules['forcing'])
