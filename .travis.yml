@@ -12,7 +12,9 @@ before_install:
 
 install:
   - pip install -v .
+  - pip install git+https://github.com/pnsaevik/ladim_plugins
   - pip list
 
 script:
   - pytest -Wignore
+  - pytest -Wignore --pyargs ladim_plugins
