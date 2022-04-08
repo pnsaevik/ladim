@@ -9,13 +9,10 @@ before_install:
   - python --version
   - pip --version
   - pip install --upgrade setuptools numpy pip
-  - git clone --depth=1 https://github.com/pnsaevik/ladim.git pnsaevik/ladim_plugins
 
 install:
   - pip install -v .
-  - pip install git+https://github.com/pnsaevik/ladim_plugins
   - pip list
 
 script:
   - pytest -Wignore
-  - pytest -Wignore ../ladim_plugins/
