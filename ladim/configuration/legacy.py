@@ -19,6 +19,11 @@ from netCDF4 import Dataset, num2date
 Config = Dict[str, Any]  # type of the config dictionary
 
 
+def configure(conf):
+    config = read_configuration(conf)
+    config = to_modularized_conf(config)
+    return config
+
 def configure_ibm(conf: Dict[str, Any]) -> Config:
     """Configure the IBM module
 
@@ -109,7 +114,7 @@ def configure_gridforce(conf: Dict[str, Any]) -> Config:
 # ---------------------------------------
 
 
-def configure(conf) -> Config:
+def read_configuration(conf) -> Config:
     """The main configuration handling function
 
     Input: Name of configuration file in yaml format
@@ -316,3 +321,58 @@ def configure(conf) -> Config:
         logging.info("    no diffusion")
 
     return config
+
+
+def to_modularized_conf(c):
+    mconf = dict(
+        release=dict(
+            release_type=c['release_type'],
+            release_format=c['release_format'],
+            release_dtype=c['release_dtype'],
+        ),
+        state=dict(
+            particle_variables=c['particle_variables'],
+        ),
+        grid=dict(
+            module=c['gridforce']['module'],
+            input_file=c['gridforce']['input_file'],
+        ),
+        forcing=dict(
+            module=c['gridforce']['module'],
+            ibm_forcing=c['gridforce'].get('ibm_forcing', []),
+            input_file=c['gridforce']['input_file'],
+        ),
+        output=dict(
+            output_format=c['output_format'],
+            skip_initial=c['skip_initial'],
+            output_numrec=c['output_numrec'],
+            output_period=c['output_period'],
+            num_output=c['num_output'],
+            output_particle=c['output_particle'],
+            output_instance=c['output_instance'],
+            nc_attributes=c['nc_attributes'],
+        ),
+        timestepper=dict(
+            dt=c['dt'],
+            simulation_time=c['simulation_time'],
+            numsteps=c['numsteps'],
+        ),
+        tracker=dict(
+            advection=c['advection'],
+            diffusion=c['diffusion'],
+        ),
+        ibm=c['ibm'],
+    )
+    return c
+
+
+def strdict(d, ind=0):
+    s = ""
+    for k, v in d.items():
+        if isinstance(v, dict):
+            s += (" " * ind) + f"{k}:\n"
+            s += strdict(v, ind + 2)
+        else:
+            s += (" " * ind) + f"{k}: {v}\n"
+
+    return s
