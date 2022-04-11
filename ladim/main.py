@@ -53,13 +53,13 @@ def main(config_stream, loglevel=logging.INFO):
         modules['release'].update()
 
         # --- Update forcing ---
-        modules['forcing'].update(step)
+        modules['forcing'].update()
 
         # --- Save to file ---
         modules['output'].update()
 
         # --- Update the model state ---
-        modules['state'].update(modules['grid'], modules['forcing'])
+        modules['state'].update()
 
     # ========
     # Clean up

@@ -25,6 +25,7 @@ class State(Sized):
     def __init__(self, modules):
         config = modules['config']
         grid = modules['grid']
+        self.modules = modules
 
         logging.info("Initializing the model state")
 
@@ -93,8 +94,11 @@ class State(Sized):
                 self[name] = np.concatenate((self[name], np.zeros(nnew)))
         self.nnew = nnew
 
-    def update(self, grid: Grid, forcing: Forcing) -> None:
+    def update(self):
         """Update the model state to the next timestep"""
+
+        grid = self.modules['grid']
+        forcing = self.modules['forcing']
 
         # From physics all particles are alive
         # self.alive = np.ones(len(self), dtype="bool")

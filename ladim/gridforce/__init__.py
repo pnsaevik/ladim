@@ -60,6 +60,7 @@ class Forcing:
     def __init__(self, modules):
         config = modules['config']
         grid = modules['grid']
+        self.modules = modules
 
         # Allow gridforce module in current directory
         sys.path.insert(0, os.getcwd())
@@ -70,7 +71,8 @@ class Forcing:
         # self.U = self.forcing.U
         # self.V = self.forcing.V
 
-    def update(self, t):
+    def update(self):
+        t = self.modules['timestepper']['step']
         return self.forcing.update(t)
 
     def velocity(self, X, Y, Z, tstep=0.0):
