@@ -50,18 +50,7 @@ class State(Sized):
         for name in self.particle_variables:
             setattr(self, name, np.array([], dtype=config["release_dtype"][name]))
 
-        self.track = Tracker(modules)
         self.dt = config["dt"]
-
-        if config["ibm_module"]:
-            # Import the module
-            logging.info("Initializing the IBM")
-            sys.path.insert(0, os.getcwd())
-            ibm_module = importlib.import_module(config["ibm_module"])
-            # Initiate the IBM object
-            self.ibm = ibm_module.IBM(config)
-        else:
-            self.ibm = None
 
         # self.num_particles = len(self.X)
         self.nnew = 0  # Modify with warm start?
@@ -98,7 +87,8 @@ class State(Sized):
         """Update the model state to the next timestep"""
 
         grid = self.modules['grid']
-        forcing = self.modules['forcing']
+        tracker = self.modules['tracker']
+        ibm = self.modules['ibm']
 
         # From physics all particles are alive
         # self.alive = np.ones(len(self), dtype="bool")
@@ -106,15 +96,14 @@ class State(Sized):
 
         self.timestep += 1
         self.timestamp += np.timedelta64(self.dt, "s")
-        self.track.move_particles(grid, forcing, self)
+        tracker.update()
         # logging.info(
         #        "Model time = {}".format(self.timestamp.astype('M8[h]')))
         if self.timestamp.astype("int") % 3600 == 0:  # New hour
             logging.info("Model time = {}".format(self.timestamp.astype("M8[h]")))
 
         # Update the IBM
-        if self.ibm:
-            self.ibm.update_ibm(grid, self, forcing)
+        ibm.update()
 
         # Extension, allow inactive particles (not moved next time)
         if "active" in self.ibm_variables:

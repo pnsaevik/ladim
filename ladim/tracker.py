@@ -40,6 +40,13 @@ class Tracker:
             self.D = config["diffusion_coefficient"]  # [m2.s-1]
         self.active_check = 'active' in config['ibm_variables']
 
+    def update(self):
+        self.move_particles(
+            self.modules['grid'],
+            self.modules['forcing'],
+            self.modules['state'],
+        )
+
     def move_particles(self, grid: Grid, forcing: Forcing, state: State) -> None:
         """Move the particles"""
 
