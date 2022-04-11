@@ -13,7 +13,7 @@ class Grid:
     def __init__(self, modules, **conf):
         legacy_conf = dict(
             gridforce=conf,
-            start_time=conf['start_time'],
+            start_time=conf.get('start_time', None),
         )
 
         # Allow gridforce module in current directory
@@ -67,9 +67,9 @@ class Forcing:
         legacy_conf = dict(
             gridforce=conf,
             ibm_forcing=conf.get('ibm_forcing', []),
-            start_time=conf['start_time'],
-            stop_time=conf['stop_time'],
-            dt=conf['dt'],
+            start_time=conf.get('start_time', None),
+            stop_time=conf.get('stop_time', None),
+            dt=conf.get('dt', None),
         )
 
         # Allow gridforce module in current directory
