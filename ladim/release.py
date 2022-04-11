@@ -242,6 +242,12 @@ class ParticleReleaser(Iterator):
             V = next(self)
             self.modules['state'].append(V, self.modules['forcing'])
 
+        # From physics all particles are alive
+        # self.alive = np.ones(len(self), dtype="bool")
+        grid = self.modules['grid']
+        state = self.modules['state']
+        state.alive = grid.ingrid(state.X, state.Y)
+
     def __next__(self) -> pd.DataFrame:
         """Perform the next particle release
 

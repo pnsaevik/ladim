@@ -90,10 +90,6 @@ class State(Sized):
         tracker = self.modules['tracker']
         ibm = self.modules['ibm']
 
-        # From physics all particles are alive
-        # self.alive = np.ones(len(self), dtype="bool")
-        self.alive = grid.ingrid(self.X, self.Y)
-
         self.timestep += 1
         self.timestamp += np.timedelta64(self.dt, "s")
         tracker.update()
