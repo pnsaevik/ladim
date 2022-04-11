@@ -51,18 +51,9 @@ def main(config_stream, loglevel=logging.INFO):
 
     logging.info("Starting time loop")
     for step in range(modules['config']["numsteps"] + 1):
-        modules['timestepper']['step'] = step
-
-        # --- Particle release ---
         modules['release'].update()
-
-        # --- Update forcing ---
         modules['forcing'].update()
-
-        # --- Save to file ---
         modules['output'].update()
-
-        # --- Update the model state ---
         modules['tracker'].update()
         modules['ibm'].update()
         modules['state'].update()

@@ -237,7 +237,7 @@ class ParticleReleaser(Iterator):
         self._particle_count = warm_particle_count
 
     def update(self):
-        step = self.modules['timestepper']['step']
+        step = self.modules['state'].timestep
         grid = self.modules['grid']
         state = self.modules['state']
 

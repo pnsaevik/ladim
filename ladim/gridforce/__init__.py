@@ -72,7 +72,7 @@ class Forcing:
         # self.V = self.forcing.V
 
     def update(self):
-        t = self.modules['timestepper']['step']
+        t = self.modules['state'].timestep
         return self.forcing.update(t)
 
     def velocity(self, X, Y, Z, tstep=0.0):

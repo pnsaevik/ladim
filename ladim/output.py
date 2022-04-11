@@ -238,6 +238,6 @@ class OutPut:
         return nc
 
     def update(self):
-        step = self.modules['timestepper']['step']
+        step = self.modules['state'].timestep
         if step % self.modules['config']["output_period"] == 0:
             self.write()
