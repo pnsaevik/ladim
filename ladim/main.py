@@ -19,6 +19,8 @@ from .gridforce import Grid, Forcing
 from .release import ParticleReleaser
 from .state import State
 from .output import OutPut
+from .ibms.legacy_ibm import Legacy_IBM
+from .tracker import Tracker
 
 
 def main(config_stream, loglevel=logging.INFO):
@@ -39,6 +41,8 @@ def main(config_stream, loglevel=logging.INFO):
     modules['release'] = ParticleReleaser(modules)
     modules['state'] = State(modules)
     modules['output'] = OutPut(modules)
+    modules['ibm'] = Legacy_IBM(modules)
+    modules['tracker'] = Tracker(modules)
     modules['timestepper'] = dict()
 
     # ==============

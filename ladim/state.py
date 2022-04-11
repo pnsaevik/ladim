@@ -50,7 +50,7 @@ class State(Sized):
         for name in self.particle_variables:
             setattr(self, name, np.array([], dtype=config["release_dtype"][name]))
 
-        self.track = Tracker(config)
+        self.track = Tracker(modules)
         self.dt = config["dt"]
 
         if config["ibm_module"]:

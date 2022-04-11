@@ -24,7 +24,10 @@ State = Any  # Could not find any better
 class Tracker:
     """The physical particle tracking kernel"""
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, modules) -> None:
+        self.modules = modules
+        config = modules['config']
+
         logging.info("Initiating the particle tracking")
         self.dt = config["dt"]
         if config["advection"]:
