@@ -66,7 +66,7 @@ class Forcing:
         grid_ref = GridReference(modules)
         legacy_conf = dict(
             gridforce=conf,
-            ibm_forcing=conf['ibm_forcing'],
+            ibm_forcing=conf.get('ibm_forcing', []),
             start_time=conf['start_time'],
             stop_time=conf['stop_time'],
             dt=conf['dt'],

@@ -349,17 +349,16 @@ def to_modularized_conf(c):
             ibm_forcing=c['ibm_forcing'],
         ),
         grid=dict(
-            module=c['gridforce']['module'],
-            input_file=c['gridforce']['input_file'],
-            start_time=c['start_time'],
+            **c['gridforce'],
+            **dict(start_time=c['start_time']),
         ),
         forcing=dict(
-            module=c['gridforce']['module'],
-            ibm_forcing=c['gridforce'].get('ibm_forcing', []),
-            input_file=c['gridforce']['input_file'],
-            start_time=c['start_time'],
-            stop_time=c['stop_time'],
-            dt=c['dt'],
+            **c['gridforce'],
+            **dict(
+                start_time=c['start_time'],
+                stop_time=c['stop_time'],
+                dt=c['dt'],
+            ),
         ),
         output=dict(
             output_format=c['output_format'],
