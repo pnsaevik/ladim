@@ -16,20 +16,11 @@ import logging
 import ladim
 
 from .configuration import configure
-from .gridforce import Grid, Forcing
-from .release import ParticleReleaser
-from .state import State
-from .output import OutPut
-from .ibms.legacy_ibm import Legacy_IBM
-from .tracker import Tracker
+from .model import Model
 
 
 def main(config_stream, loglevel=logging.INFO):
     """Main function for LADiM"""
-
-    # ==================
-    # Initiate the model
-    # ==================
 
     # Logging
     logging.getLogger().setLevel(loglevel)
@@ -37,36 +28,9 @@ def main(config_stream, loglevel=logging.INFO):
     # Read configuration
     config = configure(config_stream)
 
-    # --- Initiate modules ---
-    modules = dict()
-    modules['grid'] = Grid(modules, **config['grid'])
-    modules['forcing'] = Forcing(modules, **config['forcing'])
-    modules['release'] = ParticleReleaser(modules, **config['release'])
-    modules['state'] = State(modules, **config['state'])
-    modules['output'] = OutPut(modules, **config['output'])
-    modules['ibm'] = Legacy_IBM(modules, **config['ibm'])
-    modules['tracker'] = Tracker(modules, **config['tracker'])
-
-    # ==============
-    # Main time loop
-    # ==============
-
-    logging.info("Starting time loop")
-    for step in range(config['timestepper']["numsteps"] + 1):
-        modules['release'].update()
-        modules['forcing'].update()
-        modules['output'].update()
-        modules['tracker'].update()
-        modules['ibm'].update()
-        modules['state'].update()
-
-    # ========
-    # Clean up
-    # ========
-
-    for m in modules.values():
-        if hasattr(m, 'close') and callable(m.close):
-            m.close()
+    model = Model(config)
+    model.run()
+    model.close()
 
 
 def run():

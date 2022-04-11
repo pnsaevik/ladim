@@ -10,7 +10,7 @@ class Legacy_IBM:
             nc_attributes=config['nc_attributes'],
         )
 
-        if config.get("module", None):
+        if config["legacy_module"] is not None:
             # Import the module
             import logging
             import sys
@@ -18,7 +18,7 @@ class Legacy_IBM:
             import importlib
             logging.info("Initializing the IBM")
             sys.path.insert(0, os.getcwd())
-            ibm_module = importlib.import_module(config["module"])
+            ibm_module = importlib.import_module(config["legacy_module"])
             # Initiate the IBM object
             self.ibm = ibm_module.IBM(legacy_conf)
 

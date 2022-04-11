@@ -12,13 +12,8 @@ import datetime
 import re
 
 # from pathlib import Path
-from typing import Any, Dict
 import numpy as np
 from netCDF4 import Dataset
-
-from .gridforce import Grid  # For mypy
-from .state import State  # For mypy
-from .release import ParticleReleaser  # For mypy
 
 
 # Gjør til en iterator

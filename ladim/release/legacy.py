@@ -18,7 +18,7 @@ from typing import Iterator, List
 
 from netCDF4 import Dataset
 
-from .utilities import ingrid
+from ladim.utilities import ingrid
 
 
 # from .gridforce import Grid
