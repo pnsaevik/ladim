@@ -1,4 +1,3 @@
-import logging
 import importlib
 
 
@@ -10,15 +9,17 @@ DEFAULT_MODULES = dict(
     output='ladim.output.Output',
     ibm='ladim.ibms.IBM',
     tracker='ladim.tracker.Tracker',
+    timestepper='ladim.timestepper.TimeStepper',
 )
 
 
 class Model:
     def __init__(self, config):
-        module_names = ('grid', 'forcing', 'release', 'state', 'output', 'ibm', 'tracker')
+        module_names = (
+            'grid', 'forcing', 'release', 'state', 'output', 'ibm', 'tracker',
+            'timestepper',
+        )
 
-        self.numsteps = config['timestepper']['numsteps']
-        self.timestep_order = ('release', 'forcing', 'output', 'tracker', 'ibm', 'state')
         self.modules = dict()
         for name in module_names:
             self.add_module(name, config[name])
@@ -29,11 +30,7 @@ class Model:
         self.modules[name] = Module(self.modules, **conf)
 
     def run(self):
-        modules = self.modules
-        logging.info("Starting time loop")
-        for step in range(self.numsteps + 1):
-            for name in self.timestep_order:
-                modules[name].update()
+        self.modules['timestepper'].run()
 
     def close(self):
         for m in self.modules.values():

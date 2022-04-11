@@ -383,11 +383,10 @@ def to_modularized_conf(c):
             dt=c['dt'],
         ),
         timestepper=dict(
-            start_time=c['start_time'],
-            stop_time=c['stop_time'],
-            dt=c['dt'],
-            simulation_time=c['simulation_time'],
-            numsteps=c['numsteps'],
+            start=c['start_time'],
+            stop=c['stop_time'],
+            step=c['dt'],
+            order=('release', 'forcing', 'output', 'tracker', 'ibm', 'state'),
         ),
         tracker=dict(
             module='ladim.tracker.legacy.Tracker',
