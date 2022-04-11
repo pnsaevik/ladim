@@ -22,9 +22,7 @@ Config = Dict[str, Any]
 class State(Sized):
     """The model variables at a given time"""
 
-    def __init__(self, modules):
-        config = modules['config']
-        grid = modules['grid']
+    def __init__(self, modules, **config):
         self.modules = modules
 
         logging.info("Initializing the model state")
@@ -57,7 +55,7 @@ class State(Sized):
         self.nnew = 0  # Modify with warm start?
 
         if config["warm_start_file"]:
-            self.warm_start(config, grid)
+            self.warm_start(config, self.modules['grid'])
 
     def __getitem__(self, name: str) -> None:
         return getattr(self, name)

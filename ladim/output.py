@@ -23,9 +23,8 @@ from .release import ParticleReleaser  # For mypy
 
 # Gjør til en iterator
 class OutPut:
-    def __init__(self, modules):
+    def __init__(self, modules, **config):
         self.modules = modules
-        config = self.modules['config']
 
         logging.info("Initializing output")
 
@@ -36,6 +35,16 @@ class OutPut:
         self.file_counter = -1  # No file yer
         self.skip_output = config["skip_initial"]
         self.numrec = config["output_numrec"]
+
+        self.outconf = dict(
+            output_period=config['output_period'],
+            output_format=config['output_format'],
+            reference_time=config['reference_time'],
+            output_particle=config['output_particle'],
+            nc_attributes=config['nc_attributes'].copy(),
+            output_instance=config['output_instance'],
+        )
+
         if self.numrec == 0:
             self.multi_file = False
             self.numrec = 999999  # A large number
@@ -62,7 +71,7 @@ class OutPut:
 
     # ----------------------------------------------
     def write(self) -> None:
-        config = self.modules['config']
+        config = self.outconf
         state = self.modules['state']
         grid = self.modules['grid']
 
@@ -133,7 +142,7 @@ class OutPut:
     def _define_netcdf(self) -> Dataset:
         """Define a NetCDF output file"""
 
-        config = self.modules['config']
+        config = self.outconf
         release = self.modules['release']
 
         # Generate file name
@@ -239,5 +248,5 @@ class OutPut:
 
     def update(self):
         step = self.modules['state'].timestep
-        if step % self.modules['config']["output_period"] == 0:
+        if step % self.outconf['output_period'] == 0:
             self.write()

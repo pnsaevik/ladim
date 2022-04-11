@@ -10,15 +10,18 @@ import importlib
 
 
 class Grid:
-    def __init__(self, modules):
-        config = modules['config']
+    def __init__(self, modules, **conf):
+        legacy_conf = dict(
+            gridforce=conf,
+            start_time=conf['start_time'],
+        )
 
         # Allow gridforce module in current directory
         sys.path.insert(0, os.getcwd())
         # Import correct gridforce_module
         # gridforce_module = importlib.import_module(config["gridforce_module"])
-        gridforce_module = importlib.import_module(config["gridforce"]["module"])
-        self.grid = gridforce_module.Grid(config)
+        gridforce_module = importlib.import_module(conf["module"])
+        self.grid = gridforce_module.Grid(legacy_conf)
         self.xmin = self.grid.xmin
         self.xmax = self.grid.xmax
         self.ymin = self.grid.ymin
@@ -57,16 +60,23 @@ class Grid:
 
 
 class Forcing:
-    def __init__(self, modules):
-        config = modules['config']
-        grid = modules['grid']
+    def __init__(self, modules, **conf):
         self.modules = modules
+
+        grid_ref = GridReference(modules)
+        legacy_conf = dict(
+            gridforce=conf,
+            ibm_forcing=conf['ibm_forcing'],
+            start_time=conf['start_time'],
+            stop_time=conf['stop_time'],
+            dt=conf['dt'],
+        )
 
         # Allow gridforce module in current directory
         sys.path.insert(0, os.getcwd())
         # Import correct gridforce_module
-        gridforce_module = importlib.import_module(config["gridforce"]["module"])
-        self.forcing = gridforce_module.Forcing(config, grid.grid)
+        gridforce_module = importlib.import_module(conf["module"])
+        self.forcing = gridforce_module.Forcing(legacy_conf, grid_ref)
         # self.steps = self.forcing.steps
         # self.U = self.forcing.U
         # self.V = self.forcing.V
@@ -83,3 +93,11 @@ class Forcing:
 
     def close(self):
         return self.forcing.close()
+
+
+class GridReference:
+    def __init__(self, modules):
+        self.modules = modules
+
+    def __getattr__(self, item):
+        return getattr(self.modules['grid'].grid, item)

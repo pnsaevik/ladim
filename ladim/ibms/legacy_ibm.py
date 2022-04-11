@@ -1,9 +1,16 @@
 class Legacy_IBM:
-    def __init__(self, modules):
+    def __init__(self, modules, **config):
         self.modules = modules
-        config = modules['config']
 
-        if config["ibm_module"]:
+        legacy_conf = dict(
+            ibm=config,
+            dt=config['dt'],
+            start_time=config['start_time'],
+            output_instance=config['output_instance'],
+            nc_attributes=config['nc_attributes'],
+        )
+
+        if config.get("module", None):
             # Import the module
             import logging
             import sys
@@ -11,9 +18,9 @@ class Legacy_IBM:
             import importlib
             logging.info("Initializing the IBM")
             sys.path.insert(0, os.getcwd())
-            ibm_module = importlib.import_module(config["ibm_module"])
+            ibm_module = importlib.import_module(config["module"])
             # Initiate the IBM object
-            self.ibm = ibm_module.IBM(config)
+            self.ibm = ibm_module.IBM(legacy_conf)
 
         else:
             self.ibm = None

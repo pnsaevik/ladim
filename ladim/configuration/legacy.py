@@ -329,18 +329,36 @@ def to_modularized_conf(c):
             release_type=c['release_type'],
             release_format=c['release_format'],
             release_dtype=c['release_dtype'],
+            start_time=c['start_time'],
+            stop_time=c['stop_time'],
+            particle_release_file=c['particle_release_file'],
+            start=c['start'],
+            dt=c['dt'],
+            warm_start_file=c['warm_start_file'],
+            particle_variables=c['particle_variables'],
+            reference_time=c['reference_time'],
+            release_frequency=c.get("release_frequency", None),
         ),
         state=dict(
             particle_variables=c['particle_variables'],
+            start_time=c['start_time'],
+            dt=c['dt'],
+            ibm=dict(variables=c['ibm'].get('variables', [])),
+            release_dtype=c['release_dtype'],
+            warm_start_file=c['warm_start_file'],
         ),
         grid=dict(
             module=c['gridforce']['module'],
             input_file=c['gridforce']['input_file'],
+            start_time=c['start_time'],
         ),
         forcing=dict(
             module=c['gridforce']['module'],
             ibm_forcing=c['gridforce'].get('ibm_forcing', []),
             input_file=c['gridforce']['input_file'],
+            start_time=c['start_time'],
+            stop_time=c['stop_time'],
+            dt=c['dt'],
         ),
         output=dict(
             output_format=c['output_format'],
@@ -351,8 +369,13 @@ def to_modularized_conf(c):
             output_particle=c['output_particle'],
             output_instance=c['output_instance'],
             nc_attributes=c['nc_attributes'],
+            reference_time=c['reference_time'],
+            output_file=c['output_file'],
+            dt=c['dt'],
         ),
         timestepper=dict(
+            start_time=c['start_time'],
+            stop_time=c['stop_time'],
             dt=c['dt'],
             simulation_time=c['simulation_time'],
             numsteps=c['numsteps'],
@@ -360,10 +383,21 @@ def to_modularized_conf(c):
         tracker=dict(
             advection=c['advection'],
             diffusion=c['diffusion'],
+            dt=c['dt'],
+            ibm_variables=c['ibm_variables'],
+            diffusion_coefficient=c.get('diffusion_coefficient', 0),
         ),
-        ibm=c['ibm'],
+        ibm={
+            **c['ibm'],
+            **dict(
+                dt=c['dt'],
+                start_time=c['start_time'],
+                nc_attributes=c['nc_attributes'],
+                output_instance=c['output_instance'],
+            ),
+        },
     )
-    return c
+    return mconf
 
 
 def strdict(d, ind=0):

@@ -39,21 +39,20 @@ def main(config_stream, loglevel=logging.INFO):
 
     # --- Initiate modules ---
     modules = dict()
-    modules['config'] = config
-    modules['grid'] = Grid(modules)
-    modules['forcing'] = Forcing(modules)
-    modules['release'] = ParticleReleaser(modules)
-    modules['state'] = State(modules)
-    modules['output'] = OutPut(modules)
-    modules['ibm'] = Legacy_IBM(modules)
-    modules['tracker'] = Tracker(modules)
+    modules['grid'] = Grid(modules, **config['grid'])
+    modules['forcing'] = Forcing(modules, **config['forcing'])
+    modules['release'] = ParticleReleaser(modules, **config['release'])
+    modules['state'] = State(modules, **config['state'])
+    modules['output'] = OutPut(modules, **config['output'])
+    modules['ibm'] = Legacy_IBM(modules, **config['ibm'])
+    modules['tracker'] = Tracker(modules, **config['tracker'])
 
     # ==============
     # Main time loop
     # ==============
 
     logging.info("Starting time loop")
-    for step in range(modules['config']["numsteps"] + 1):
+    for step in range(config['timestepper']["numsteps"] + 1):
         modules['release'].update()
         modules['forcing'].update()
         modules['output'].update()

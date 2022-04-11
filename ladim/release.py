@@ -40,10 +40,8 @@ def mylen(df: pd.DataFrame) -> int:
 class ParticleReleaser(Iterator):
     """Particle Release Class"""
 
-    def __init__(self, modules) -> None:
+    def __init__(self, modules, **config) -> None:
         self.modules = modules
-        config = modules['config']
-        grid = modules['grid']
 
         start_time = pd.to_datetime(config["start_time"])
         stop_time = pd.to_datetime(config["stop_time"])
@@ -71,7 +69,7 @@ class ParticleReleaser(Iterator):
                 logging.critical("Particle release mush have position")
                 raise SystemExit(3)
             # else
-            X, Y = grid.ll2xy(A["lon"], A["lat"])
+            X, Y = modules['grid'].ll2xy(A["lon"], A["lat"])
             A["lon"] = X
             A["lat"] = Y
             A.rename(columns={"lon": "X", "lat": "Y"}, inplace=True)
