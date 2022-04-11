@@ -109,7 +109,7 @@ def configure_gridforce(conf: Dict[str, Any]) -> Config:
 # ---------------------------------------
 
 
-def configure(config_stream) -> Config:
+def configure(conf) -> Config:
     """The main configuration handling function
 
     Input: Name of configuration file in yaml format
@@ -120,12 +120,6 @@ def configure(config_stream) -> Config:
 
     config: Config = dict()
 
-    # --- Read the configuration file ---
-    try:
-        conf = yaml.safe_load(config_stream)
-    except yaml.parser.ParserError:
-        logging.critical("Can not parse configuration")
-        raise SystemExit(2)
 
     # ----------------
     # Time control
@@ -144,7 +138,7 @@ def configure(config_stream) -> Config:
     # Files
     # -------------
     logging.info("Configuration: Files")
-    logging.info(f'    {"config_stream":15s}: {config_stream}')
+    #logging.info(f'    {"config_stream":15s}: {config_stream}')
     for name in ["particle_release_file", "output_file"]:
         config[name] = conf["files"][name]
         logging.info(f"    {name:15s}: {config[name]}")

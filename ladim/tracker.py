@@ -15,7 +15,6 @@ import numpy as np
 from .gridforce import Grid, Forcing
 
 # from .state import State   # Circular import
-from .configuration import Config
 
 Velocity = Tuple[np.ndarray, np.ndarray]
 State = Any  # Could not find any better

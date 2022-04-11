@@ -19,7 +19,6 @@ from typing import Iterator, List
 from netCDF4 import Dataset
 
 from .utilities import ingrid
-from .configuration import Config
 
 
 # from .gridforce import Grid

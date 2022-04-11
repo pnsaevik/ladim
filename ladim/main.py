@@ -14,6 +14,7 @@ Lagrangian Advection and Diffusion Model
 import logging
 
 import ladim
+
 from .configuration import configure
 from .gridforce import Grid, Forcing
 from .release import ParticleReleaser
@@ -33,9 +34,12 @@ def main(config_stream, loglevel=logging.INFO):
     # Logging
     logging.getLogger().setLevel(loglevel)
 
+    # Read configuration
+    config = configure(config_stream)
+
     # --- Initiate modules ---
     modules = dict()
-    modules['config'] = configure(config_stream)
+    modules['config'] = config
     modules['grid'] = Grid(modules)
     modules['forcing'] = Forcing(modules)
     modules['release'] = ParticleReleaser(modules)
