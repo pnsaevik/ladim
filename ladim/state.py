@@ -51,6 +51,7 @@ class State(Sized):
             setattr(self, name, np.array([], dtype=config["release_dtype"][name]))
 
         self.dt = config["dt"]
+        self.alive = []
 
         # self.num_particles = len(self.X)
         self.nnew = 0  # Modify with warm start?
@@ -101,27 +102,6 @@ class State(Sized):
         # Update the IBM
         ibm.update()
 
-        # Extension, allow inactive particles (not moved next time)
-        if "active" in self.ibm_variables:
-            pass
-            # self.active = self.ibm_variables['active']
-        else:  # Default = active
-            self.active = np.ones_like(self.pid)
-
-        # Surface/bottom boundary conditions
-        #     Reflective  at surface
-        I = self.Z < 0
-        self.Z[I] = -self.Z[I]
-        #     Keep just above bottom
-        H = grid.sample_depth(self.X, self.Y)
-        I = self.Z > H
-        self.Z[I] = 0.99 * H[I]
-
-        # Compactify by removing dead particles
-        # Could have a switch to avoid this if no deaths
-        self.pid = self.pid[self.alive]
-        for key in self.instance_variables:
-            self[key] = self[key][self.alive]
 
     def warm_start(self, config: Config, grid: Grid) -> None:
         """Perform a warm (re)start"""
