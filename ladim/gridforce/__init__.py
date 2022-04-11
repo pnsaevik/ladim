@@ -10,7 +10,9 @@ import importlib
 
 
 class Grid:
-    def __init__(self, config):
+    def __init__(self, modules):
+        config = modules['config']
+
         # Allow gridforce module in current directory
         sys.path.insert(0, os.getcwd())
         # Import correct gridforce_module
@@ -55,12 +57,15 @@ class Grid:
 
 
 class Forcing:
-    def __init__(self, config, grid, **args):
+    def __init__(self, modules):
+        config = modules['config']
+        grid = modules['grid']
+
         # Allow gridforce module in current directory
         sys.path.insert(0, os.getcwd())
         # Import correct gridforce_module
         gridforce_module = importlib.import_module(config["gridforce"]["module"])
-        self.forcing = gridforce_module.Forcing(config, grid.grid, **args)
+        self.forcing = gridforce_module.Forcing(config, grid.grid)
         # self.steps = self.forcing.steps
         # self.U = self.forcing.U
         # self.V = self.forcing.V

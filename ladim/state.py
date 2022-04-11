@@ -22,7 +22,9 @@ Config = Dict[str, Any]
 class State(Sized):
     """The model variables at a given time"""
 
-    def __init__(self, config: Config, grid: Grid) -> None:
+    def __init__(self, modules):
+        config = modules['config']
+        grid = modules['grid']
 
         logging.info("Initializing the model state")
 

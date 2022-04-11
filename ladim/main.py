@@ -34,10 +34,10 @@ def main(config_stream, loglevel=logging.INFO):
     # --- Initiate modules ---
     modules = dict()
     modules['config'] = configure(config_stream)
-    modules['grid'] = Grid(modules['config'])
-    modules['forcing'] = Forcing(modules['config'], modules['grid'])
+    modules['grid'] = Grid(modules)
+    modules['forcing'] = Forcing(modules)
     modules['release'] = ParticleReleaser(modules)
-    modules['state'] = State(modules['config'], modules['grid'])
+    modules['state'] = State(modules)
     modules['output'] = OutPut(modules)
     modules['timestepper'] = dict()
 
