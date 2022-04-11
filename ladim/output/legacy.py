@@ -12,18 +12,14 @@ import datetime
 import re
 
 # from pathlib import Path
-from typing import Any, Dict
 import numpy as np
 from netCDF4 import Dataset
-
-from .gridforce import Grid  # For mypy
-from .state import State  # For mypy
-from .release import ParticleReleaser  # For mypy
 
 
 # Gjør til en iterator
 class OutPut:
-    def __init__(self, config: Dict[str, Any], release: ParticleReleaser) -> None:
+    def __init__(self, modules, **config):
+        self.modules = modules
 
         logging.info("Initializing output")
 
@@ -34,6 +30,16 @@ class OutPut:
         self.file_counter = -1  # No file yer
         self.skip_output = config["skip_initial"]
         self.numrec = config["output_numrec"]
+
+        self.outconf = dict(
+            output_period=config['output_period'],
+            output_format=config['output_format'],
+            reference_time=config['reference_time'],
+            output_particle=config['output_particle'],
+            nc_attributes=config['nc_attributes'].copy(),
+            output_instance=config['output_instance'],
+        )
+
         if self.numrec == 0:
             self.multi_file = False
             self.numrec = 999999  # A large number
@@ -51,8 +57,6 @@ class OutPut:
                 self.file_counter = int(m.group(0)[1:]) - 1
 
         self.dt = config["dt"]
-        self.config = config  # Better to extract the things needed
-        self.release = release
         self.num_output = config["num_output"]
         self.nc = None  # No open netCD file yet
         # Indicator for lon/lat output
@@ -61,7 +65,11 @@ class OutPut:
         )
 
     # ----------------------------------------------
-    def write(self, state: State, grid: Grid) -> None:
+    def write(self) -> None:
+        config = self.outconf
+        state = self.modules['state']
+        grid = self.modules['grid']
+
         """Write the model state to NetCDF"""
 
         # May skip initial output
@@ -93,7 +101,7 @@ class OutPut:
 
         logging.debug(f"Writing {pcount} particles")
 
-        tdelta = state.timestamp - self.config["reference_time"]
+        tdelta = state.timestamp - config["reference_time"]
         seconds = tdelta.astype("m8[s]").astype("int")
         self.nc.variables["time"][t] = float(seconds)
 
@@ -129,6 +137,9 @@ class OutPut:
     def _define_netcdf(self) -> Dataset:
         """Define a NetCDF output file"""
 
+        config = self.outconf
+        release = self.modules['release']
+
         # Generate file name
         fname = self.filename
         if self.multi_file:
@@ -137,9 +148,9 @@ class OutPut:
             fname = f"{fname0}_{self.file_counter:04d}{ext}"
 
         logging.debug(f"Defining output netCDF file: {fname}")
-        nc = Dataset(fname, mode="w", format=self.config["output_format"])
+        nc = Dataset(fname, mode="w", format=config["output_format"])
         # --- Dimensions
-        nc.createDimension("particle", self.release.total_particle_count)
+        nc.createDimension("particle", release.total_particle_count)
         nc.createDimension("particle_instance", None)  # unlimited
         # Sett output-period i config (bruk naturlig enhet)
         # regne om til antall tidsteg og få inn under
@@ -151,7 +162,7 @@ class OutPut:
         v = nc.createVariable("time", "f8", ("time",))
         v.long_name = "time"
         v.standard_name = "time"
-        timeref = str(self.config["reference_time"]).replace("T", " ")
+        timeref = str(config["reference_time"]).replace("T", " ")
         v.units = f"seconds since {timeref}"
 
         # instance_offset
@@ -164,8 +175,8 @@ class OutPut:
         v.ragged_row_count = "particle count at nth timestep"
 
         # Particle variables
-        for name in self.config["output_particle"]:
-            confname = self.config["nc_attributes"][name]
+        for name in config["output_particle"]:
+            confname = config["nc_attributes"][name]
             if confname["ncformat"][0] == "S":  # text
                 length = int(confname["ncformat"][1:])
                 lendimname = "len_" + name
@@ -179,24 +190,24 @@ class OutPut:
             else:  # Numeric
                 v = nc.createVariable(
                     varname=name,
-                    datatype=self.config["nc_attributes"][name]["ncformat"],
+                    datatype=config["nc_attributes"][name]["ncformat"],
                     dimensions=("particle",),
                     zlib=True,
                 )
-            for attr, value in self.config["nc_attributes"][name].items():
+            for attr, value in config["nc_attributes"][name].items():
                 if attr != "ncformat":
                     setattr(v, attr, value)
 
         # Instance variables
-        for name in self.config["output_instance"]:
+        for name in config["output_instance"]:
             v = nc.createVariable(
                 varname=name,
-                datatype=self.config["nc_attributes"][name]["ncformat"],
+                datatype=config["nc_attributes"][name]["ncformat"],
                 dimensions=("particle_instance",),
                 zlib=True,
             )
 
-            for attr, value in self.config["nc_attributes"][name].items():
+            for attr, value in config["nc_attributes"][name].items():
                 if attr != "ncformat":
                     setattr(v, attr, value)
 
@@ -212,20 +223,25 @@ class OutPut:
         logging.debug("Netcdf output file defined")
 
         # Save particle variables
-        for name in self.config["output_particle"]:
+        for name in config["output_particle"]:
             var = nc.variables[name]
             if var.datatype == np.dtype("S1"):  # Text
                 n = len(nc.dimensions[var.dimensions[-1]])
                 A = [
                     list(s[:n].ljust(n))
-                    for s in self.release.particle_variables[name][:]
+                    for s in release.particle_variables[name][:]
                 ]
                 var[:] = np.array(A)
             else:  # Numeric
-                nc.variables[name][:] = self.release.particle_variables[name][:]
+                nc.variables[name][:] = release.particle_variables[name][:]
 
         # Set instance offset
         var = nc.variables["instance_offset"]
         var[:] = self.instance_count
 
         return nc
+
+    def update(self):
+        step = self.modules['state'].timestep
+        if step % self.outconf['output_period'] == 0:
+            self.write()

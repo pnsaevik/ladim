@@ -12,10 +12,9 @@ import logging
 from typing import Any, Tuple
 import numpy as np
 
-from .gridforce import Grid, Forcing
+from ladim.gridforce.legacy import Grid, Forcing
 
 # from .state import State   # Circular import
-from .configuration import Config
 
 Velocity = Tuple[np.ndarray, np.ndarray]
 State = Any  # Could not find any better
@@ -24,7 +23,9 @@ State = Any  # Could not find any better
 class Tracker:
     """The physical particle tracking kernel"""
 
-    def __init__(self, config: Config) -> None:
+    def __init__(self, modules, **config) -> None:
+        self.modules = modules
+
         logging.info("Initiating the particle tracking")
         self.dt = config["dt"]
         if config["advection"]:
@@ -36,6 +37,13 @@ class Tracker:
         if self.diffusion:
             self.D = config["diffusion_coefficient"]  # [m2.s-1]
         self.active_check = 'active' in config['ibm_variables']
+
+    def update(self):
+        self.move_particles(
+            self.modules['grid'],
+            self.modules['forcing'],
+            self.modules['state'],
+        )
 
     def move_particles(self, grid: Grid, forcing: Forcing, state: State) -> None:
         """Move the particles"""

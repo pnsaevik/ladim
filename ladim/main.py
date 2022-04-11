@@ -14,70 +14,23 @@ Lagrangian Advection and Diffusion Model
 import logging
 
 import ladim
+
 from .configuration import configure
-from .gridforce import Grid, Forcing
-from .release import ParticleReleaser
-from .state import State
-from .output import OutPut
+from .model import Model
 
 
 def main(config_stream, loglevel=logging.INFO):
     """Main function for LADiM"""
 
-    # ==================
-    # Initiate the model
-    # ==================
-
     # Logging
     logging.getLogger().setLevel(loglevel)
 
-    # --- Configuration ---
+    # Read configuration
     config = configure(config_stream)
 
-    # --- Initiate the grid and the forcing ---
-    grid = Grid(config)
-    forcing = Forcing(config, grid)
-
-    # --- Initiate particle releaser ---
-    releaser = ParticleReleaser(config, grid)
-
-    #  --- Initiate the model state ---
-    state = State(config, grid)
-
-    # --- Initiate the output ---
-    out = OutPut(config, releaser)
-    # out.write_particle_variables(releaser)
-
-    # ==============
-    # Main time loop
-    # ==============
-
-    logging.info("Starting time loop")
-    for step in range(config["numsteps"] + 1):
-
-        # --- Particle release ---
-        if step in releaser.steps:
-            V = next(releaser)
-            state.append(V, forcing)
-
-        # --- Update forcing ---
-        forcing.update(step)
-
-        # --- Save to file ---
-        # Save before or after update ???
-        if step % config["output_period"] == 0:
-            out.write(state, grid)
-
-        # --- Update the model state ---
-        state.update(grid, forcing)
-
-    # ========
-    # Clean up
-    # ========
-
-    # TODO: should also close the releaser
-    forcing.close()
-    # out.close()
+    model = Model(config)
+    model.run()
+    model.close()
 
 
 def run():
@@ -118,8 +71,8 @@ def run():
     logging.info(" === Lagrangian Advection and Diffusion Model ===")
     logging.info(" ================================================\n")
 
-    logging.info(f"LADiM version {ladim.__version__}")
-    logging.info(f"LADiM path: {ladim.__file__.strip('__init.py__')}")
+    logging.info(f"ladim path: {ladim.__file__.strip('__init.py__')}")
+    logging.info(f"ladim version:  {ladim.__version__}\n")
     logging.info(f"python version:  {sys.version.split()[0]}\n")
 
     logging.info(f"  Configuration file: {args.config_file}")

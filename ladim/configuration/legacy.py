@@ -19,6 +19,11 @@ from netCDF4 import Dataset, num2date
 Config = Dict[str, Any]  # type of the config dictionary
 
 
+def configure(conf):
+    config = read_configuration(conf)
+    config = to_modularized_conf(config)
+    return config
+
 def configure_ibm(conf: Dict[str, Any]) -> Config:
     """Configure the IBM module
 
@@ -109,7 +114,7 @@ def configure_gridforce(conf: Dict[str, Any]) -> Config:
 # ---------------------------------------
 
 
-def configure(config_stream) -> Config:
+def read_configuration(conf) -> Config:
     """The main configuration handling function
 
     Input: Name of configuration file in yaml format
@@ -120,12 +125,6 @@ def configure(config_stream) -> Config:
 
     config: Config = dict()
 
-    # --- Read the configuration file ---
-    try:
-        conf = yaml.safe_load(config_stream)
-    except yaml.parser.ParserError:
-        logging.critical("Can not parse configuration")
-        raise SystemExit(2)
 
     # ----------------
     # Time control
@@ -144,7 +143,7 @@ def configure(config_stream) -> Config:
     # Files
     # -------------
     logging.info("Configuration: Files")
-    logging.info(f'    {"config_stream":15s}: {config_stream}')
+    #logging.info(f'    {"config_stream":15s}: {config_stream}')
     for name in ["particle_release_file", "output_file"]:
         config[name] = conf["files"][name]
         logging.info(f"    {name:15s}: {config[name]}")
@@ -322,3 +321,103 @@ def configure(config_stream) -> Config:
         logging.info("    no diffusion")
 
     return config
+
+
+def to_modularized_conf(c):
+    mconf = dict(
+        release=dict(
+            module='ladim.release.legacy.ParticleReleaser',
+            release_type=c['release_type'],
+            release_format=c['release_format'],
+            release_dtype=c['release_dtype'],
+            start_time=c['start_time'],
+            stop_time=c['stop_time'],
+            particle_release_file=c['particle_release_file'],
+            start=c['start'],
+            dt=c['dt'],
+            warm_start_file=c['warm_start_file'],
+            particle_variables=c['particle_variables'],
+            reference_time=c['reference_time'],
+            release_frequency=c.get("release_frequency", None),
+        ),
+        state=dict(
+            module='ladim.state.legacy.State',
+            particle_variables=c['particle_variables'],
+            start_time=c['start_time'],
+            dt=c['dt'],
+            ibm=dict(variables=c['ibm'].get('variables', [])),
+            release_dtype=c['release_dtype'],
+            warm_start_file=c['warm_start_file'],
+            ibm_forcing=c['ibm_forcing'],
+        ),
+        grid={
+            **c['gridforce'],
+            **dict(
+                start_time=c['start_time'],
+                legacy_module=c['gridforce']['module'],
+                module='ladim.gridforce.legacy.Grid',
+            ),
+        },
+        forcing={
+            **c['gridforce'],
+            **dict(
+                start_time=c['start_time'],
+                stop_time=c['stop_time'],
+                dt=c['dt'],
+                legacy_module=c['gridforce']['module'],
+                module='ladim.gridforce.legacy.Forcing',
+            ),
+        },
+        output=dict(
+            module='ladim.output.legacy.OutPut',
+            output_format=c['output_format'],
+            skip_initial=c['skip_initial'],
+            output_numrec=c['output_numrec'],
+            output_period=c['output_period'],
+            num_output=c['num_output'],
+            output_particle=c['output_particle'],
+            output_instance=c['output_instance'],
+            nc_attributes=c['nc_attributes'],
+            reference_time=c['reference_time'],
+            output_file=c['output_file'],
+            dt=c['dt'],
+        ),
+        timestepper=dict(
+            start=c['start_time'],
+            stop=c['stop_time'],
+            step=c['dt'],
+            order=('release', 'forcing', 'output', 'tracker', 'ibm', 'state'),
+        ),
+        tracker=dict(
+            module='ladim.tracker.legacy.Tracker',
+            advection=c['advection'],
+            diffusion=c['diffusion'],
+            dt=c['dt'],
+            ibm_variables=c['ibm_variables'],
+            diffusion_coefficient=c.get('diffusion_coefficient', 0),
+        ),
+        ibm={
+            **c['ibm'],
+            **dict(
+                module='ladim.ibms.legacy.Legacy_IBM',
+                dt=c['dt'],
+                start_time=c['start_time'],
+                nc_attributes=c['nc_attributes'],
+                output_instance=c['output_instance'],
+                legacy_module=c['ibm'].get('module', None),
+            ),
+        },
+    )
+    return mconf
+
+
+def strdict(d, ind=0):
+    s = ""
+    for k, v in d.items():
+        if isinstance(v, dict):
+            s += (" " * ind) + f"{k}:\n"
+            s += strdict(v, ind + 2)
+        else:
+            s += (" " * ind) + f"{k}: {v}\n"
+
+    return s

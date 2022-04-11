@@ -18,8 +18,7 @@ from typing import Iterator, List
 
 from netCDF4 import Dataset
 
-from .utilities import ingrid
-from .configuration import Config
+from ladim.utilities import ingrid
 
 
 # from .gridforce import Grid
@@ -41,7 +40,8 @@ def mylen(df: pd.DataFrame) -> int:
 class ParticleReleaser(Iterator):
     """Particle Release Class"""
 
-    def __init__(self, config: Config, grid) -> None:
+    def __init__(self, modules, **config) -> None:
+        self.modules = modules
 
         start_time = pd.to_datetime(config["start_time"])
         stop_time = pd.to_datetime(config["stop_time"])
@@ -69,7 +69,7 @@ class ParticleReleaser(Iterator):
                 logging.critical("Particle release mush have position")
                 raise SystemExit(3)
             # else
-            X, Y = grid.ll2xy(A["lon"], A["lat"])
+            X, Y = modules['grid'].ll2xy(A["lon"], A["lat"])
             A["lon"] = X
             A["lat"] = Y
             A.rename(columns={"lon": "X", "lat": "Y"}, inplace=True)
@@ -232,6 +232,41 @@ class ParticleReleaser(Iterator):
         # Reset the counter after the particle counting
         self._index = 0  # Index of next release
         self._particle_count = warm_particle_count
+
+    def update(self):
+        step = self.modules['state'].timestep
+        grid = self.modules['grid']
+        state = self.modules['state']
+
+        # Extension, allow inactive particles (not moved next time)
+        if "active" in state.ibm_variables:
+            pass
+            # self.active = self.ibm_variables['active']
+        else:  # Default = active
+            state.active = np.ones_like(state.pid)
+
+        # Surface/bottom boundary conditions
+        #     Reflective  at surface
+        I = state.Z < 0
+        state.Z[I] = -state.Z[I]
+        #     Keep just above bottom
+        H = grid.sample_depth(state.X, state.Y)
+        I = state.Z > H
+        state.Z[I] = 0.99 * H[I]
+
+        # Compactify by removing dead particles
+        # Could have a switch to avoid this if no deaths
+        state.pid = state.pid[state.alive]
+        for key in state.instance_variables:
+            state[key] = state[key][state.alive]
+
+        if step in self.steps:
+            V = next(self)
+            self.modules['state'].append(V, self.modules['forcing'])
+
+        # From physics all particles are alive
+        # self.alive = np.ones(len(self), dtype="bool")
+        state.alive = grid.ingrid(state.X, state.Y)
 
     def __next__(self) -> pd.DataFrame:
         """Perform the next particle release
