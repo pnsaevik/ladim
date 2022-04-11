@@ -43,7 +43,6 @@ def main(config_stream, loglevel=logging.INFO):
     modules['output'] = OutPut(modules)
     modules['ibm'] = Legacy_IBM(modules)
     modules['tracker'] = Tracker(modules)
-    modules['timestepper'] = dict()
 
     # ==============
     # Main time loop
@@ -62,9 +61,9 @@ def main(config_stream, loglevel=logging.INFO):
     # Clean up
     # ========
 
-    # TODO: should also close the releaser
-    modules['forcing'].close()
-    # out.close()
+    for m in modules.values():
+        if hasattr(m, 'close') and callable(m.close):
+            m.close()
 
 
 def run():
