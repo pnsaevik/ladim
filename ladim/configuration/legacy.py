@@ -346,6 +346,7 @@ def to_modularized_conf(c):
             ibm=dict(variables=c['ibm'].get('variables', [])),
             release_dtype=c['release_dtype'],
             warm_start_file=c['warm_start_file'],
+            ibm_forcing=c['ibm_forcing'],
         ),
         grid=dict(
             module=c['gridforce']['module'],
