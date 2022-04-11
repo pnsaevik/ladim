@@ -86,22 +86,11 @@ class State(Sized):
 
     def update(self):
         """Update the model state to the next timestep"""
-
-        grid = self.modules['grid']
-        tracker = self.modules['tracker']
-        ibm = self.modules['ibm']
-
         self.timestep += 1
         self.timestamp += np.timedelta64(self.dt, "s")
-        tracker.update()
-        # logging.info(
-        #        "Model time = {}".format(self.timestamp.astype('M8[h]')))
+
         if self.timestamp.astype("int") % 3600 == 0:  # New hour
             logging.info("Model time = {}".format(self.timestamp.astype("M8[h]")))
-
-        # Update the IBM
-        ibm.update()
-
 
     def warm_start(self, config: Config, grid: Grid) -> None:
         """Perform a warm (re)start"""

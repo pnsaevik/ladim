@@ -63,6 +63,8 @@ def main(config_stream, loglevel=logging.INFO):
         modules['output'].update()
 
         # --- Update the model state ---
+        modules['tracker'].update()
+        modules['ibm'].update()
         modules['state'].update()
 
     # ========
