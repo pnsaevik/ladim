@@ -10,15 +10,22 @@ Surface ligth module
 
 import numpy as np
 
-PI = np.pi
-RAD = PI / 180.0
-DEG = 180 / PI
-sin = np.sin
-cos = np.cos
+
+def light(time, lon, lat, depth=0, extinction_coef=0.2):
+    light_0 = surface_light(time, lon, lat)
+    return light_0 * np.exp(-extinction_coef * depth)
 
 
 def surface_light(dtime, lon, lat):
     """Surface light in absence of clouds"""
+
+    RAD = np.pi / 180.0
+    DEG = 180 / np.pi
+    sin = np.sin
+    cos = np.cos
+    lat = np.array(lat)
+    lon = np.array(lon)
+    dtime = np.datetime64(dtime)
 
     maxlight = 1500  # value between 200 and 2000
     twilight = 5.76
@@ -83,14 +90,3 @@ def surface_light(dtime, lon, lat):
     slight[I4] = 1.15e-5
 
     return slight
-
-
-if __name__ == "__main__":
-
-    dtime = np.datetime64("2014-06-23 12")
-    lon, lat = 0, 60
-    print(surface_light(dtime, lon, lat))
-
-    dtime = np.datetime64("2014-06-23 18")
-    lon, lat = 0, 60
-    print(surface_light(dtime, lon, lat))
