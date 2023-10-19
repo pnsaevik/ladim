@@ -8,6 +8,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ## [1.3.1] - 2022-10-19
 ### Changed
 - Moved to GitHub Actions CI
+### Fixed
+- ROMS module no longer produces masked arrays
 
 ## [1.3] - 2022-06-23
 ### Added
