@@ -3,8 +3,8 @@
 build/
 *.egg-info/
 
-# Hidden directories
-.*/
+# IDE files
+.idea/
 
 # Data files
 examples/data/*
