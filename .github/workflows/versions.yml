@@ -1,6 +1,6 @@
 name: Check version
 
-on: pull_request
+on: workflow_call
 
 jobs:
   test:
@@ -12,4 +12,5 @@ jobs:
       - name: Echo version
         run: |
           VERSION_LINE=$(grep -E "__version__ = '([0-9]+\.[0-9]+\.[0-9]+)'" "ladim/__init__.py")
-          echo "$VERSION_LINE"
+          VERSION_STRING=$(echo "$VERSION_LINE" | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          echo "$VERSION_STRING"

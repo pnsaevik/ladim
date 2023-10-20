@@ -11,4 +11,5 @@ jobs:
     uses: ./.github/workflows/testing.yml
   build_sphinx:
     uses: ./.github/workflows/sphinx.yml
-
+  test_versions:
+    uses: ./.github/workflows/versions.yml
