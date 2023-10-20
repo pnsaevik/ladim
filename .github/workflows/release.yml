@@ -21,9 +21,9 @@ jobs:
     # Specify runner + deployment step
     runs-on: ubuntu-latest
     steps:
-      - name: Build sphinx
+      - name: Testing
         id: build_sphinx
-        uses: "Test workflow"
+        uses: ./.github/workflows/testing.yml
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
