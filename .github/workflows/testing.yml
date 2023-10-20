@@ -19,11 +19,6 @@ jobs:
         run: pip install pytest
       - name: Testing
         run: pytest
-      - name: Current tree
-        run: ls -a
-      - name: Subtreee
-        run: ls -a ./.github/
-      - name: SubSubtree
-        run: ls -a ./.github/workflows/
-      - name: Build sphinx
-        uses: ./.github/workflows/sphinx.yml
+  sphinx:
+    uses: ./.github/workflows/sphinx.yml
+    needs: test
