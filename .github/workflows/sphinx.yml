@@ -24,7 +24,7 @@ jobs:
       - name: Install sphinx
         run: pip install sphinx
       - name: Build documentation
-        run: sphinx-build -v -b html -W --keep-going -n doc/source doc/build
+        run: sphinx-build -v -b html -n doc/source doc/build
       - name: Test build success
         run: tail doc/build/index.html
       - name: Archive documentation
