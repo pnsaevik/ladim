@@ -1,6 +1,11 @@
 name: Test workflow
 
-on: push
+on:
+  push:
+    branches:
+      - "**"
+      - "!master"
+  workflow_call: {}
 
 jobs:
   test:
