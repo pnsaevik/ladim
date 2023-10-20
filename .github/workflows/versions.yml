@@ -38,4 +38,9 @@ jobs:
         run: |
           IFS='.' read -ra a <<< "$VERSION_LINE"
           IFS='.' read -ra a <<< "$DEV_VERSION_LINE"
-          (a[0] > b[0]) || (a[1] > b[1]) || (a[2] > b[2])
+          if ((a[0] > b[0]) || (a[1] > b[1]) || (a[2] > b[2])); then
+            echo "Success"
+          else
+            echo "Failure"
+            exit 1
+          fi
