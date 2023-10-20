@@ -5,7 +5,6 @@ on:
     branches:
       - "**"
       - "!master"
-  workflow_call: {}
 
 jobs:
   test:
@@ -20,11 +19,5 @@ jobs:
         run: pip install pytest
       - name: Testing
         run: pytest
-      - name: Install sphinx
-        run: pip install sphinx
-      - name: Build documentation
-        run: sphinx-build -v -b html -n doc/source doc/build
-      - name: Upload documentation
-        uses: actions/upload-pages-artifact@v2
-        with:
-          path: doc/build/
+      - name: Build sphinx
+        uses: ./.github/workflows/sphinx.yml

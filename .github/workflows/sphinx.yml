@@ -1,0 +1,18 @@
+name: Build sphinx
+
+on:
+  workflow_call: {}
+
+jobs:
+  sphinx:
+    runs-on: ubuntu-latest
+    name: Build sphinx
+    steps:
+      - name: Install sphinx
+        run: pip install sphinx
+      - name: Build documentation
+        run: sphinx-build -v -b html -n doc/source doc/build
+      - name: Upload documentation
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: doc/build/
