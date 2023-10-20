@@ -1,19 +1,13 @@
 name: Release workflow
 
 on:
-  workflow_run:
+  push:
     branches:
-      - 'master'
-    workflows:
-    - Test workflow
-    types:
-    - completed
+      - "master"
 
 jobs:
   # Deploy job
   deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
       pages: write      # to deploy to Pages
@@ -27,6 +21,9 @@ jobs:
     # Specify runner + deployment step
     runs-on: ubuntu-latest
     steps:
+      - name: Build sphinx
+        id: build_sphinx
+        uses: "Test workflow"
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
