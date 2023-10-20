@@ -1,16 +1,36 @@
 name: Check version
 
-on: workflow_call
+on:
+  push:
+    branches:
+      - "**"
+      - "!master"
+      - "!devel"
 
 jobs:
   test:
     runs-on: ubuntu-latest
     name: Check version statements
     steps:
+      - name: Checkout development version
+        uses: actions/checkout@v4
+        with:
+          ref: 'devel'
+      - name: Echo devel version
+        run: |
+          DEV_VERSION_LINE=$(grep -E "__version__ = '([0-9]+\.[0-9]+\.[0-9]+)'" "ladim/__init__.py")
+          DEV_VERSION_STRING=$(echo "$DEV_VERSION_LINE" | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          DEV_MAJOR_VERSION=$(echo "$DEV_VERSION_STRING" | cut -d'.' -f1)
+          DEV_MINOR_VERSION=$(echo "$DEV_VERSION_STRING" | cut -d'.' -f2)
+          DEV_PATCH_VERSION=$(echo "$DEV_VERSION_STRING" | cut -d'.' -f3)
+          echo "$DEV_VERSION_STRING"
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Echo version
+        uses: actions/checkout@v4
+      - name: Echo this version
         run: |
           VERSION_LINE=$(grep -E "__version__ = '([0-9]+\.[0-9]+\.[0-9]+)'" "ladim/__init__.py")
           VERSION_STRING=$(echo "$VERSION_LINE" | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          MAJOR_VERSION=$(echo "$VERSION_STRING" | cut -d'.' -f1)
+          MINOR_VERSION=$(echo "$VERSION_STRING" | cut -d'.' -f2)
+          PATCH_VERSION=$(echo "$VERSION_STRING" | cut -d'.' -f3)
           echo "$VERSION_STRING"
