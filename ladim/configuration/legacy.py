@@ -319,6 +319,7 @@ def read_configuration(conf) -> Config:
     else:
         config["diffusion"] = False
         logging.info("    no diffusion")
+    config["seed"] = conf['numerics'].get('seed', None)
 
     return config
 
@@ -387,6 +388,7 @@ def to_modularized_conf(c):
             stop=c['stop_time'],
             step=c['dt'],
             order=('release', 'forcing', 'output', 'tracker', 'ibm', 'state'),
+            seed=c.get("seed", None),
         ),
         tracker=dict(
             module='ladim.tracker.legacy.Tracker',

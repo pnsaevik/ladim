@@ -86,4 +86,5 @@ numerics:
     dt: [60, s]     # Format = [value, unit]
     # Advection method, EF, RK2, or RK4
     advection: RK4
-    diffusion: 0    # [m/s**2]
+    diffusion: 0.1    # [m/s**2]
+    seed: 0
