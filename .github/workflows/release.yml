@@ -6,12 +6,12 @@ on:
       - "master"
 
 jobs:
-  build:
+  build_sphinx:
     uses: ./.github/workflows/sphinx.yml
 
   # Deploy job
-  deploy:
-    needs: build
+  deploy_sphinx:
+    needs: build_sphinx
 
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:

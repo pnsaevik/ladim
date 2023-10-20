@@ -1,24 +1,16 @@
-name: Test workflow
+name: Test package
 
 on:
-  push:
-    branches:
-      - "**"
-      - "!master"
+  workflow_call: {}
 
 jobs:
-  test:
+  sphinx:
     runs-on: ubuntu-latest
-    name: Run tests
+    name: Run pytest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Installation
+      - name: Install package
         run: pip install .
-      - name: Install test framework
+      - name: Install pytest
         run: pip install pytest
-      - name: Testing
-        run: pytest
-  sphinx:
-    uses: ./.github/workflows/sphinx.yml
-    needs: test
