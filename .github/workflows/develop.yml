@@ -1,0 +1,14 @@
+name: Test workflow
+
+on:
+  push:
+    branches:
+      - "**"
+      - "!master"
+
+jobs:
+  run_pytest:
+    uses: ./.github/workflows/testing.yml
+  build_sphinx:
+    uses: ./.github/workflows/sphinx.yml
+
