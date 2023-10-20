@@ -1,7 +1,9 @@
+name: Test workflow
+
 on: push
 
 jobs:
-  run_tests:
+  test:
     runs-on: ubuntu-latest
     name: Run tests
     steps:
