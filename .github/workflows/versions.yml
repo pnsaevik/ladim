@@ -34,3 +34,8 @@ jobs:
           MINOR_VERSION=$(echo "$VERSION_STRING" | cut -d'.' -f2)
           PATCH_VERSION=$(echo "$VERSION_STRING" | cut -d'.' -f3)
           echo "$VERSION_STRING"
+      - name: Compare versions
+        run: |
+          IFS='.' read -ra a <<< "$VERSION_LINE"
+          IFS='.' read -ra a <<< "$DEV_VERSION_LINE"
+          (a[0] > b[0]) || (a[1] > b[1]) || (a[2] > b[2])
