@@ -8,11 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     name: Build sphinx
     steps:
-      - name: Debug log
-        run: |
-          pwd
-          ls
-          ls ..
       - name: Install sphinx
         run: pip install sphinx
       - name: Build documentation
