@@ -1,9 +1,21 @@
 {
     "coords": {
         "time": {
-            "dims": ["time"],
-            "attrs": {"long_name": "time", "standard_name": "time"},
-            "data": ["2015-09-07 01:00:00", "2015-09-07 01:01:00", "2015-09-07 01:02:00", "2015-09-07 01:03:00", "2015-09-07 01:04:00", "2015-09-07 01:05:00"]
+            "dims": [
+                "time"
+            ],
+            "attrs": {
+                "long_name": "time",
+                "standard_name": "time"
+            },
+            "data": [
+                "2015-09-07 01:00:00",
+                "2015-09-07 01:01:00",
+                "2015-09-07 01:02:00",
+                "2015-09-07 01:03:00",
+                "2015-09-07 01:04:00",
+                "2015-09-07 01:05:00"
+            ]
         }
     },
     "attrs": {
@@ -11,20 +23,175 @@
         "institution": "Institute of Marine Research",
         "source": "Lagrangian Advection and Diffusion Model, python version",
         "history": "Created by pyladim",
-        "date": "2022-04-07"
+        "date": "2023-10-20"
     },
     "dims": {
         "time": 6,
-        "particle": 1,
-        "particle_instance": 6
+        "particle": 5,
+        "particle_instance": 20
     },
     "data_vars": {
-        "instance_offset": {"dims": [], "attrs": {"long_name": "particle instance offset for file"}, "data": 0},
-        "particle_count": {"dims": ["time"], "attrs": {"long_name": "number of particles in a given timestep", "ragged_row_count": "particle count at nth timestep"}, "data": [1, 1, 1, 1, 1, 1]},
-        "release_time": {"dims": ["particle"], "attrs": {"long_name": "particle release time"}, "data": ["2015-09-07 01:00:00"]},
-        "pid": {"dims": ["particle_instance"], "attrs": {"long_name": "particle identifier"}, "data": [0, 0, 0, 0, 0, 0]},
-        "X": {"dims": ["particle_instance"], "attrs": {"long_name": "particle X-coordinate"}, "data": [0.0, 60.0, 120.0, 180.0, 240.0, 300.0]},
-        "Y": {"dims": ["particle_instance"], "attrs": {"long_name": "particle Y-coordinate"}, "data": [0.0, 60.0, 120.0, 180.0, 240.0, 300.0]},
-        "Z": {"dims": ["particle_instance"], "attrs": {"long_name": "particle depth", "standard_name": "depth_below_surface", "units": "m", "positive": "down"}, "data": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}
+        "instance_offset": {
+            "dims": [],
+            "attrs": {
+                "long_name": "particle instance offset for file"
+            },
+            "data": 0
+        },
+        "particle_count": {
+            "dims": [
+                "time"
+            ],
+            "attrs": {
+                "long_name": "number of particles in a given timestep",
+                "ragged_row_count": "particle count at nth timestep"
+            },
+            "data": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                5
+            ]
+        },
+        "release_time": {
+            "dims": [
+                "particle"
+            ],
+            "attrs": {
+                "long_name": "particle release time"
+            },
+            "data": [
+                "2015-09-07 01:00:00",
+                "2015-09-07 01:01:00",
+                "2015-09-07 01:02:00",
+                "2015-09-07 01:03:00",
+                "2015-09-07 01:04:00"
+            ]
+        },
+        "pid": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle identifier"
+            },
+            "data": [
+                0,
+                0,
+                1,
+                0,
+                1,
+                2,
+                0,
+                1,
+                2,
+                3,
+                0,
+                1,
+                2,
+                3,
+                4,
+                0,
+                1,
+                2,
+                3,
+                4
+            ]
+        },
+        "X": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle X-coordinate"
+            },
+            "data": [
+                5.0,
+                4.997,
+                5.0,
+                4.997,
+                4.997,
+                5.0,
+                4.998,
+                4.996,
+                4.997,
+                5.0,
+                5.001,
+                4.997,
+                4.995,
+                4.996,
+                5.0,
+                5.006,
+                5.0,
+                4.996,
+                4.995,
+                4.996
+            ]
+        },
+        "Y": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle Y-coordinate"
+            },
+            "data": [
+                4.0,
+                3.947,
+                4.0,
+                3.894,
+                3.947,
+                4.0,
+                3.841,
+                3.893,
+                3.946,
+                4.0,
+                3.787,
+                3.839,
+                3.892,
+                3.946,
+                4.0,
+                3.733,
+                3.785,
+                3.838,
+                3.891,
+                3.945
+            ]
+        },
+        "Z": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle depth",
+                "standard_name": "depth_below_surface",
+                "units": "m",
+                "positive": "down"
+            },
+            "data": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ]
+        }
     }
 }

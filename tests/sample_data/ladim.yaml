@@ -12,10 +12,13 @@ files:
 
 
 gridforce:
-    module: ladim.gridforce.analytical
+    module: ladim.gridforce.ROMS
+    input_file: ./forcing*.nc  # Use wildcards (*) to select a range of files
 
 
 particle_release:
+    release_type: 'continuous'
+    release_frequency: [1, m]
     variables: [release_time, X, Y, Z, group_id]
     release_time: time   # np.datetime64[s]
 
@@ -36,7 +39,7 @@ output_variables:
 
     # Output format for the particle release time
     release_time:
-        ncformat: f8
+        ncformat: i4
         long_name: particle release time
         units: seconds since reference_time
 

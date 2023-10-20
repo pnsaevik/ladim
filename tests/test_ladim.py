@@ -5,6 +5,7 @@ import os
 import xarray as xr
 import json
 import io
+import numpy as np
 
 
 class Test_ladim_script:
@@ -34,6 +35,9 @@ class Test_ladim_script:
                 obj=dset.to_dict(),
                 default=str,
             ))
+            for v in ['X', 'Y']:
+                d = dset_dict['data_vars'][v]['data']
+                dset_dict['data_vars'][v]['data'] = np.round(d, 3).tolist()
 
         finally:
             try:
