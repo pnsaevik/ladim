@@ -1,0 +1,15 @@
+name: Check version
+
+on: pull_request
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Check version statements
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Echo version
+        run: |
+          VERSION_LINE=$(grep -E "__version__ = '([0-9]+\.[0-9]+\.[0-9]+)'" "ladim/__init__.py")
+          echo "$VERSION_LINE"
