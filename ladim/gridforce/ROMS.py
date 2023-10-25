@@ -319,12 +319,17 @@ class Forcing:
     @staticmethod
     def find_files(force_config):
         """Find (and sort) the forcing file(s)"""
-        files = glob.glob(force_config["input_file"])
+
+        # Use unix-style filenames to provide consistency between windows and linux
+        first_file = force_config.get("first_file", "").replace("\\", "/")
+        last_file = force_config.get("last_file", "").replace("\\", "/")
+        files = [f.replace("\\", "/") for f in glob.glob(force_config["input_file"])]
+
         files.sort()
-        if force_config.get("first_file", None):
-            files = [f for f in files if f >= force_config["first_file"]]
-        if force_config.get("last_file", None):
-            files = [f for f in files if f <= force_config["last_file"]]
+        if first_file:
+            files = [f for f in files if f >= first_file]
+        if last_file:
+            files = [f for f in files if f <= last_file]
         return files
 
     @staticmethod
