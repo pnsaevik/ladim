@@ -7,7 +7,7 @@ solver:
     seed: 0
 
 grid:
-    module: 'ladim.plugins.roms.Grid'
+    module: 'ladim.grid.RomsGrid'
     dataset: './forcing.nc'
 
 release:
@@ -31,7 +31,7 @@ release:
     release_frequency: [1, 'm']
 
 forcing:
-    module: 'ladim.plugins.roms.Forcing'
+    module: 'ladim.forcing.RomsForcing'
     input_file: './forcing*.nc'
     start_time: '2015-09-07T01:00:00'
     stop_time: '2015-09-07T01:05:00'

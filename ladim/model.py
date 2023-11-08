@@ -1,12 +1,15 @@
 import importlib
 
-import ladim.gridforce
-import ladim.ibms
-import ladim.output
-import ladim.release
-import ladim.state
-import ladim.tracker
-import ladim.solver
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from ladim.grid import Grid
+    from ladim.forcing import Forcing
+    import ladim.ibms
+    import ladim.output
+    import ladim.release
+    import ladim.state
+    import ladim.tracker
+    import ladim.solver
 
 DEFAULT_MODULES = dict(
     grid='ladim.gridforce.Grid',
@@ -42,35 +45,35 @@ class Model:
         self.modules[name] = cls(self, **conf_without_module)
 
     @property
-    def grid(self) -> ladim.gridforce.Grid:
+    def grid(self) -> "Grid":
         return self.modules.get('grid', None)
 
     @property
-    def forcing(self) -> ladim.gridforce.Forcing:
+    def forcing(self) -> "Forcing":
         return self.modules.get('forcing', None)
 
     @property
-    def release(self) -> ladim.release.Releaser:
+    def release(self) -> "ladim.release.Releaser":
         return self.modules.get('release', None)
 
     @property
-    def state(self) -> ladim.state.State:
+    def state(self) -> "ladim.state.State":
         return self.modules.get('state', None)
 
     @property
-    def output(self) -> ladim.output.Output:
+    def output(self) -> "ladim.output.Output":
         return self.modules.get('output', None)
 
     @property
-    def ibm(self) -> ladim.ibms.IBM:
+    def ibm(self) -> "ladim.ibms.IBM":
         return self.modules.get('ibm', None)
 
     @property
-    def tracker(self) -> ladim.tracker.Tracker:
+    def tracker(self) -> "ladim.tracker.Tracker":
         return self.modules.get('tracker', None)
 
     @property
-    def solver(self) -> ladim.solver.Solver:
+    def solver(self) -> "ladim.solver.Solver":
         return self.modules.get('solver', None)
 
     def __getitem__(self, item):
@@ -100,13 +103,3 @@ class Module:
     @property
     def model(self):
         return self._model
-
-
-class Grid(Module):
-    def __init__(self, model: Model):
-        super().__init__(model)
-
-
-class Forcing(Module):
-    def __init__(self, model: Model):
-        super().__init__(model)
