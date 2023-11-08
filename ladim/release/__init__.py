@@ -1,1 +1,1 @@
-from .legacy import ParticleReleaser as Releaser
+from ..legacy.release import ParticleReleaser as Releaser

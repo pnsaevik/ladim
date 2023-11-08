@@ -11,8 +11,8 @@ from typing import Any, Dict, Sized  # mypy
 import numpy as np
 from netCDF4 import Dataset, num2date
 
-from ladim.tracker.legacy import Tracker
-from ladim.gridforce.legacy import Grid, Forcing
+from ladim.legacy.tracker import Tracker
+from ladim.legacy.gridforce import Grid, Forcing
 
 # ------------------------
 

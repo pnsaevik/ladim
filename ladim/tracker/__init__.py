@@ -1,1 +1,1 @@
-from .legacy import Tracker
+from ..legacy.tracker import Tracker

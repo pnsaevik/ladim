@@ -328,7 +328,7 @@ def read_configuration(conf) -> Config:
 def to_modularized_conf(c):
     mconf = dict(
         release=dict(
-            module='ladim.release.legacy.ParticleReleaser',
+            module='ladim.legacy.release.ParticleReleaser',
             release_type=c['release_type'],
             release_format=c['release_format'],
             release_dtype=c['release_dtype'],
@@ -343,7 +343,7 @@ def to_modularized_conf(c):
             release_frequency=c.get("release_frequency", None),
         ),
         state=dict(
-            module='ladim.state.legacy.State',
+            module='ladim.legacy.state.State',
             particle_variables=c['particle_variables'],
             start_time=c['start_time'],
             dt=c['dt'],
@@ -357,7 +357,7 @@ def to_modularized_conf(c):
             **dict(
                 start_time=c['start_time'],
                 legacy_module=c['gridforce']['module'],
-                module='ladim.gridforce.legacy.Grid',
+                module='ladim.legacy.gridforce.Grid',
             ),
         },
         forcing={
@@ -367,11 +367,11 @@ def to_modularized_conf(c):
                 stop_time=c['stop_time'],
                 dt=c['dt'],
                 legacy_module=c['gridforce']['module'],
-                module='ladim.gridforce.legacy.Forcing',
+                module='ladim.legacy.gridforce.Forcing',
             ),
         },
         output=dict(
-            module='ladim.output.legacy.OutPut',
+            module='ladim.legacy.output.OutPut',
             output_format=c['output_format'],
             skip_initial=c['skip_initial'],
             output_numrec=c['output_numrec'],
@@ -392,7 +392,7 @@ def to_modularized_conf(c):
             seed=c.get("seed", None),
         ),
         tracker=dict(
-            module='ladim.tracker.legacy.Tracker',
+            module='ladim.legacy.tracker.Tracker',
             advection=c['advection'],
             diffusion=c['diffusion'],
             dt=c['dt'],
@@ -402,7 +402,7 @@ def to_modularized_conf(c):
         ibm={
             **c['ibm'],
             **dict(
-                module='ladim.ibms.legacy.Legacy_IBM',
+                module='ladim.legacy.ibm.Legacy_IBM',
                 dt=c['dt'],
                 start_time=c['start_time'],
                 nc_attributes=c['nc_attributes'],

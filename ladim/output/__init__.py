@@ -1,1 +1,1 @@
-from .legacy import OutPut as Output
+from ..legacy.output import OutPut as Output

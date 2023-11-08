@@ -1,1 +1,1 @@
-from .legacy import Grid, Forcing
+from ..legacy.gridforce import Grid, Forcing

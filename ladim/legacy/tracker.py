@@ -12,7 +12,7 @@ import logging
 from typing import Any, Tuple
 import numpy as np
 
-from ladim.gridforce.legacy import Grid, Forcing
+from ladim.legacy.gridforce import Grid, Forcing
 
 # from .state import State   # Circular import
 

@@ -24,7 +24,7 @@ def _versioned_configure(config_dict):
 
 
 def _convert_1_to_2(config_dict):
-    from .legacy import configure as legacy_configure
+    from ..legacy.configuration import configure as legacy_configure
     config_dict = legacy_configure(config_dict)
     config_dict['version'] = 2
     return config_dict

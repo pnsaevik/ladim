@@ -1,1 +1,1 @@
-from .legacy import State
+from ..legacy.state import State
