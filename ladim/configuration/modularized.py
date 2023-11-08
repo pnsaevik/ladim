@@ -7,10 +7,11 @@ def configure(module_conf):
     else:
         config_dict = yaml.safe_load(module_conf)
 
-    if 'particle_release' in config_dict:
-        config_dict['version'] = 1
-    else:
-        config_dict['version'] = 2
+    if 'version' not in config_dict:
+        if 'particle_release' in config_dict:
+            config_dict['version'] = 1
+        else:
+            config_dict['version'] = 2
 
     return _versioned_configure(config_dict)
 

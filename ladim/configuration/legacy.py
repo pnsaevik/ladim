@@ -384,7 +384,7 @@ def to_modularized_conf(c):
             output_file=c['output_file'],
             dt=c['dt'],
         ),
-        timestepper=dict(
+        solver=dict(
             start=c['start_time'],
             stop=c['stop_time'],
             step=c['dt'],

@@ -6,7 +6,7 @@ import ladim.output
 import ladim.release
 import ladim.state
 import ladim.tracker
-import ladim.timestepper
+import ladim.solver
 
 DEFAULT_MODULES = dict(
     grid='ladim.gridforce.Grid',
@@ -16,7 +16,7 @@ DEFAULT_MODULES = dict(
     output='ladim.output.Output',
     ibm='ladim.ibms.IBM',
     tracker='ladim.tracker.Tracker',
-    timestepper='ladim.timestepper.TimeStepper',
+    solver='ladim.solver.Solver',
 )
 
 
@@ -24,7 +24,7 @@ class Model:
     def __init__(self, config):
         module_names = (
             'grid', 'forcing', 'release', 'state', 'output', 'ibm', 'tracker',
-            'timestepper',
+            'solver',
         )
 
         self.modules = dict()
@@ -65,8 +65,8 @@ class Model:
         return self.modules.get('tracker', None)
 
     @property
-    def timestepper(self) -> ladim.timestepper.TimeStepper:
-        return self.modules.get('timestepper', None)
+    def solver(self) -> ladim.solver.Solver:
+        return self.modules.get('solver', None)
 
     def __getitem__(self, item):
         return self.modules[item]
@@ -75,7 +75,7 @@ class Model:
         return item in self.modules
 
     def run(self):
-        self.timestepper.run()
+        self.solver.run()
 
     def close(self):
         for m in self.modules.values():

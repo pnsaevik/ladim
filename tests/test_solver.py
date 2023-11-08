@@ -1,4 +1,4 @@
-from ladim import timestepper
+from ladim import solver
 import numpy as np
 
 
@@ -45,7 +45,7 @@ class Test_Solver_run:
         modules['tracker'] = MockTransport(modules)
         modules['release'] = MockSource(modules)
         modules['state'] = MockParticles(modules)
-        modules['solver'] = timestepper.TimeStepper(
+        modules['solver'] = solver.Solver(
             modules,
             start="2020-01-01",
             stop="2020-01-03",
