@@ -4,14 +4,11 @@ solver:
     start: '2015-09-07T01:00:00'
     stop: '2015-09-07T01:05:00'
     step: 60
-    order: ['release', 'forcing', 'output', 'tracker', 'ibm', 'state']
     seed: 0
 
 grid:
-    module: 'ladim.legacy.gridforce.Grid'
-    input_file: './forcing*.nc'
-    start_time: '2015-09-07T01:00:00'
-    legacy_module: 'ladim.gridforce.ROMS'
+    module: 'ladim.plugins.roms.Grid'
+    dataset: './forcing.nc'
 
 release:
     module: ladim.legacy.release.ParticleReleaser
@@ -34,12 +31,11 @@ release:
     release_frequency: [1, 'm']
 
 forcing:
-    module: 'ladim.legacy.gridforce.Forcing'
+    module: 'ladim.plugins.roms.Forcing'
     input_file: './forcing*.nc'
     start_time: '2015-09-07T01:00:00'
     stop_time: '2015-09-07T01:05:00'
     dt: 60
-    legacy_module: 'ladim.gridforce.ROMS'
 
 output:
     module: 'ladim.legacy.output.OutPut'

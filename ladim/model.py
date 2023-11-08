@@ -33,8 +33,13 @@ class Model:
 
     def add_module(self, name, conf):
         module_name = conf.get('module', DEFAULT_MODULES[name])
-        Module = load_module(module_name)
-        self.modules[name] = Module(self, **conf)
+        conf_without_module = {
+            k: v for k, v in conf.items()
+            if k != 'module'
+        }
+
+        cls = load_class(module_name)
+        self.modules[name] = cls(self, **conf_without_module)
 
     @property
     def grid(self) -> ladim.gridforce.Grid:
@@ -83,6 +88,25 @@ class Model:
                 m.close()
 
 
-def load_module(name):
+def load_class(name):
     pkg, cls = name.rsplit(sep='.', maxsplit=1)
     return getattr(importlib.import_module(pkg), cls)
+
+
+class Module:
+    def __init__(self, model: Model):
+        self._model = model
+
+    @property
+    def model(self):
+        return self._model
+
+
+class Grid(Module):
+    def __init__(self, model: Model):
+        super().__init__(model)
+
+
+class Forcing(Module):
+    def __init__(self, model: Model):
+        super().__init__(model)
