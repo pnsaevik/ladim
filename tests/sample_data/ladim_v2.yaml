@@ -11,7 +11,7 @@ grid:
     dataset: './forcing.nc'
 
 release:
-    module: ladim.legacy.release.ParticleReleaser
+    module: ladim.release.TextFileReleaser
     release_type: continuous
     release_format: ['release_time', 'X', 'Y', 'Z', 'group_id']
     release_dtype:
