@@ -10,7 +10,7 @@ class Legacy_IBM:
             nc_attributes=config['nc_attributes'],
         )
 
-        if config["legacy_module"] is not None:
+        if config["legacy_module"]:
             # Import the module
             import logging
             import sys

@@ -24,6 +24,7 @@ def configure(conf):
     config = to_modularized_conf(config)
     return config
 
+
 def configure_ibm(conf: Dict[str, Any]) -> Config:
     """Configure the IBM module
 
