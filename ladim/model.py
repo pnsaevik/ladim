@@ -5,8 +5,8 @@ if TYPE_CHECKING:
     from ladim.grid import Grid
     from ladim.forcing import Forcing
     import ladim.ibms
-    import ladim.output
-    import ladim.release
+    from ladim.output import Output
+    from ladim.release import Releaser
     import ladim.state
     import ladim.tracker
     import ladim.solver
@@ -53,7 +53,7 @@ class Model:
         return self.modules.get('forcing', None)
 
     @property
-    def release(self) -> "ladim.release.Releaser":
+    def release(self) -> "Releaser":
         return self.modules.get('release', None)
 
     @property
@@ -61,7 +61,7 @@ class Model:
         return self.modules.get('state', None)
 
     @property
-    def output(self) -> "ladim.output.Output":
+    def output(self) -> "Output":
         return self.modules.get('output', None)
 
     @property

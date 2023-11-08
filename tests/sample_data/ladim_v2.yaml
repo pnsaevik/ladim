@@ -38,7 +38,7 @@ forcing:
     dt: 60
 
 output:
-    module: 'ladim.legacy.output.OutPut'
+    module: 'ladim.output.NetCDFOutput'
     output_format: 'NETCDF3_64BIT_OFFSET'
     skip_initial: False
     output_numrec: 0
