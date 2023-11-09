@@ -8,11 +8,12 @@ solver:
 
 grid:
     module: 'ladim.grid.RomsGrid'
-    dataset: './forcing.nc'
+    dataset: '../forcing.nc'
 
 release:
     module: ladim.release.TextFileReleaser
     release_type: continuous
+    release_frequency: [1, 'm']
     release_format: ['release_time', 'X', 'Y', 'Z', 'group_id']
     release_dtype:
         release_time: time
@@ -28,11 +29,10 @@ release:
     warm_start_file: ''
     particle_variables: ['release_time', 'group_id']
     reference_time: 2015-09-07T01:00:00
-    release_frequency: [1, 'm']
 
 forcing:
     module: 'ladim.forcing.RomsForcing'
-    input_file: './forcing*.nc'
+    input_file: '../forcing*.nc'
     start_time: '2015-09-07T01:00:00'
     stop_time: '2015-09-07T01:05:00'
     dt: 60
