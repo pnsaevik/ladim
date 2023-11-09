@@ -1,0 +1,83 @@
+# New version of configuration file
+
+solver:
+    start: '2015-09-07T01:00:00'
+    stop: '2015-09-07T01:05:00'
+    step: 60
+    seed: 0
+
+grid:
+    module: 'ladim.grid.RomsGrid'
+    dataset: '../forcing.nc'
+
+release:
+    module: ladim.release.TextFileReleaser
+    release_type: continuous
+    release_frequency: [1, 'm']
+    release_format: ['release_time', 'X', 'Y', 'Z', 'group_id']
+    release_dtype:
+        release_time: time
+        X: float
+        Y: float
+        Z: float
+        group_id: float
+    start_time: 2015-09-07T01:00:00
+    stop_time: 2015-09-07T01:05:00
+    particle_release_file: particles.rls
+    start: cold
+    dt: 60
+    warm_start_file: ''
+    particle_variables: ['release_time', 'group_id']
+    reference_time: 2015-09-07T01:00:00
+
+forcing:
+    module: 'ladim.forcing.RomsForcing'
+    input_file: '../forcing*.nc'
+    start_time: '2015-09-07T01:00:00'
+    stop_time: '2015-09-07T01:05:00'
+    dt: 60
+
+output:
+    module: ladim.output.RaggedOutput
+    output_format: 'NETCDF3_64BIT_OFFSET'
+    skip_initial: False
+    output_numrec: 0
+    output_period: 1
+    num_output: 6
+    output_particle: ['release_time']
+    output_instance: ['pid', 'X', 'Y', 'Z']
+    nc_attributes:
+        release_time: {'ncformat': 'i4', 'long_name': 'particle release time', 'units': 'seconds since 2015-09-07 01:00:00'}
+        pid: {'ncformat': 'i4', 'long_name': 'particle identifier'}
+        X: {'ncformat': 'f4', 'long_name': 'particle X-coordinate'}
+        Y: {'ncformat': 'f4', 'long_name': 'particle Y-coordinate'}
+        Z: {'ncformat': 'f4', 'long_name': 'particle depth', 'standard_name': 'depth_below_surface', 'units': 'm', 'positive': 'down'}
+    reference_time: '2015-09-07T01:00:00'
+    output_file: 'out.nc'
+    dt: 60
+
+tracker:
+    module: ladim.tracker.HorizontalTracker
+    advection: 'RK4'
+    diffusion: True
+    dt: 60
+    ibm_variables: []
+    diffusion_coefficient: 0.1
+
+ibm:
+    module: ladim.ibms.IBM
+
+state:
+    module: ladim.state.WarmStartState
+    particle_variables: ['release_time', 'group_id']
+    start_time: 2015-09-07T01:00:00
+    dt: 60
+    ibm: {variables: []}
+    release_dtype:
+        release_time: time
+        X: float
+        Y: float
+        Z: float
+        group_id: float
+    warm_start_file: ''
+    ibm_forcing: []

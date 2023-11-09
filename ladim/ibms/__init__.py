@@ -1,6 +1,6 @@
-class IBM:
-    def __init__(self, *_, **__):
-        pass
+from ..model import Model, Module
 
-    def update(self):
-        pass
+
+class IBM(Module):
+    def __init__(self, model: Model):
+        super().__init__(model)

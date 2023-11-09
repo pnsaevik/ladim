@@ -11,8 +11,8 @@ from typing import Any, Dict, Sized  # mypy
 import numpy as np
 from netCDF4 import Dataset, num2date
 
-from ladim.tracker.legacy import Tracker
-from ladim.gridforce.legacy import Grid, Forcing
+from ladim.legacy.tracker import Tracker
+from ladim.legacy.gridforce import Grid, Forcing
 
 # ------------------------
 
@@ -28,7 +28,7 @@ class State(Sized):
         logging.info("Initializing the model state")
 
         self.timestep = 0
-        self.timestamp = config["start_time"].astype("datetime64[s]")
+        self.timestamp = np.datetime64(config["start_time"], 's')
         self.dt = np.timedelta64(config["dt"], "s")
         self.position_variables = ["X", "Y", "Z"]
         if "ibm" in config and "variables" in config["ibm"]:
@@ -45,8 +45,11 @@ class State(Sized):
         for name in self.instance_variables:
             setattr(self, name, np.array([], dtype=float))
 
+        type_mapping = dict(int=int, float=float, time=np.datetime64, str=str)
         for name in self.particle_variables:
-            setattr(self, name, np.array([], dtype=config["release_dtype"][name]))
+            dtype = config["release_dtype"][name]
+            dtype = type_mapping.get(dtype, dtype)
+            setattr(self, name, np.array([], dtype=dtype))
 
         self.dt = config["dt"]
         self.alive = []

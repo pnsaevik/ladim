@@ -13,7 +13,7 @@ files:
 
 gridforce:
     module: ladim.gridforce.ROMS
-    input_file: ./forcing*.nc  # Use wildcards (*) to select a range of files
+    input_file: ../forcing*.nc  # Use wildcards (*) to select a range of files
 
 
 particle_release:

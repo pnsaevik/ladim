@@ -101,7 +101,7 @@ class OutPut:
 
         logging.debug(f"Writing {pcount} particles")
 
-        tdelta = state.timestamp - config["reference_time"]
+        tdelta = state.timestamp - np.datetime64(config["reference_time"])
         seconds = tdelta.astype("m8[s]").astype("int")
         self.nc.variables["time"][t] = float(seconds)
 

@@ -1,9 +1,9 @@
 import numpy as np
 
 
-class TimeStepper:
+class Solver:
     def __init__(self, modules, start, stop, step, order=None, seed=None):
-        self.order = order or ('forcing', 'release', 'output', 'ibm', 'tracker')
+        self.order = order or ('release', 'forcing', 'output', 'tracker', 'ibm', 'state')
         self.modules = modules
         self.start = np.datetime64(start)
         self.stop = np.datetime64(stop)

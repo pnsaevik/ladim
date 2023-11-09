@@ -239,6 +239,10 @@ class Forcing:
         # self.config = config["gridforce"]
         self.ibm_forcing = config["ibm_forcing"]
 
+        config = config.copy()
+        config["start_time"] = np.datetime64(config["start_time"])
+        config["stop_time"] = np.datetime64(config["stop_time"])
+
         files = self.find_files(config["gridforce"])
         numfiles = len(files)
         if numfiles == 0:

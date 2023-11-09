@@ -15,7 +15,7 @@ import logging
 
 import ladim
 
-from .configuration import configure
+from .config import configure
 from .model import Model
 
 

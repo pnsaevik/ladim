@@ -6,6 +6,7 @@ import xarray as xr
 import json
 import io
 import numpy as np
+import pytest
 
 
 class Test_ladim_script:
@@ -15,10 +16,12 @@ class Test_ladim_script:
         assert output.stderr.decode('latin1') == ""
         assert output.stdout.decode('latin1').startswith("usage: ladim")
 
-    def test_can_advect_particles_when_old_version(self):
+    @pytest.mark.parametrize("example_num", range(1, 3))
+    def test_run_examples(self, example_num):
         curdir = Path.cwd()
         outfile = Path('out.nc')
-        testpath = Path(__file__).parent / 'sample_data'
+        name = f"ex{example_num}"
+        testpath = Path(__file__).parent / 'sample_data' / name
 
         with open(testpath / 'ladim.yaml') as f:
             conf_str = f.read()
