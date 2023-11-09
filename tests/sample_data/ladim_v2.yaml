@@ -57,7 +57,7 @@ output:
     dt: 60
 
 tracker:
-    module: 'ladim.legacy.tracker.Tracker'
+    module: ladim.tracker.HorizontalTracker
     advection: 'RK4'
     diffusion: True
     dt: 60
@@ -78,7 +78,7 @@ ibm:
     legacy_module: ''
 
 state:
-    module: 'ladim.legacy.state.State'
+    module: ladim.state.WarmStartState
     particle_variables: ['release_time', 'group_id']
     start_time: 2015-09-07T01:00:00
     dt: 60
