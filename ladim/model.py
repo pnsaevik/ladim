@@ -4,12 +4,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ladim.grid import Grid
     from ladim.forcing import Forcing
-    import ladim.ibms
+    from ladim.ibms import IBM
     from ladim.output import Output
     from ladim.release import Releaser
-    import ladim.state
-    import ladim.tracker
-    import ladim.solver
+    from ladim.state import State
+    from ladim.tracker import Tracker
+    from ladim.solver import Solver
 
 DEFAULT_MODULES = dict(
     grid='ladim.gridforce.Grid',
@@ -57,7 +57,7 @@ class Model:
         return self.modules.get('release', None)
 
     @property
-    def state(self) -> "ladim.state.State":
+    def state(self) -> "State":
         return self.modules.get('state', None)
 
     @property
@@ -65,15 +65,15 @@ class Model:
         return self.modules.get('output', None)
 
     @property
-    def ibm(self) -> "ladim.ibms.IBM":
+    def ibm(self) -> "IBM":
         return self.modules.get('ibm', None)
 
     @property
-    def tracker(self) -> "ladim.tracker.Tracker":
+    def tracker(self) -> "Tracker":
         return self.modules.get('tracker', None)
 
     @property
-    def solver(self) -> "ladim.solver.Solver":
+    def solver(self) -> "Solver":
         return self.modules.get('solver', None)
 
     def __getitem__(self, item):
@@ -103,3 +103,9 @@ class Module:
     @property
     def model(self):
         return self._model
+
+    def update(self):
+        pass
+
+    def close(self):
+        pass

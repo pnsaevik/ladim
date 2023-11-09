@@ -6,7 +6,7 @@ class Output(Module):
         super().__init__(model)
 
 
-class NetCDFOutput(Output):
+class RaggedOutput(Output):
     def __init__(self, model: Model, **conf):
         super().__init__(model)
         from .legacy.output import OutPut as LegacyOutput
