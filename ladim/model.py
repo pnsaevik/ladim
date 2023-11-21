@@ -101,8 +101,12 @@ class Module:
         self._model = model
 
     @property
-    def model(self):
+    def model(self) -> Model:
         return self._model
+
+    @model.setter
+    def model(self, value: Model):
+        self._model = value
 
     def update(self):
         pass

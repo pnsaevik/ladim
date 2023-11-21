@@ -5,8 +5,8 @@ class Solver:
     def __init__(self, modules, start, stop, step, order=None, seed=None):
         self.order = order or ('release', 'forcing', 'output', 'tracker', 'ibm', 'state')
         self.modules = modules
-        self.start = np.datetime64(start)
-        self.stop = np.datetime64(stop)
+        self.start = np.datetime64(start, 's')
+        self.stop = np.datetime64(stop, 's')
         self.step = np.timedelta64(step, 's')
         self.time = None
 
