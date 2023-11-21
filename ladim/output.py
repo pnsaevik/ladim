@@ -12,16 +12,19 @@ class RaggedOutput(Output):
     def __init__(self, model: Model, **conf):
         super().__init__(model)
 
-        self._fname = conf['output_file']
-        self._init_vars = conf['output_particle']
-        self._instance_vars = conf['output_instance']
-        self._write_frequency = conf['output_period']
-
         # Convert output format specification from ladim.yaml config to OutputFormat
         self._formats = {
-            k: OutputFormat.from_ladim_conf(k, self._init_vars, v)
-            for k, v in conf['nc_attributes'].items()
+            k: OutputFormat.from_ladim_conf(v)
+            for k, v in conf['variables'].items()
         }
+
+        self._init_vars = {k for k, v in self._formats.items() if v.is_initial()}
+        self._inst_vars = {k for k, v in self._formats.items() if v.is_instance()}
+
+        self._fname = conf['file']
+
+        freq_num, freq_unit = conf['frequency']
+        self._write_frequency = np.timedelta64(freq_num, freq_unit)
 
         self._dset = None
         self._num_writes = 0
@@ -57,10 +60,9 @@ class RaggedOutput(Output):
             data[pid - part_size] = data_raw
             self._dset.variables[v][part_size:part_size + num_new] = data
 
-        if 'release_time' in self._init_vars:
-            data = np.broadcast_to(self.model.solver.time, shape=(num_new, ))
-            v = 'release_time'
-            self._dset.variables[v][part_size:part_size + num_new] = data
+        # Write release time variable
+        data = np.broadcast_to(self.model.solver.time, shape=(num_new, ))
+        self._dset.variables['release_time'][part_size:part_size + num_new] = data
 
     def _write_instance_vars(self):
         """
@@ -69,9 +71,8 @@ class RaggedOutput(Output):
 
         # Check if this is a write time step
         current_time = self.model.solver.time
-        write_frequency = self._write_frequency * self.model.solver.step
         elapsed_since_last_write = current_time - self._last_write_time
-        if elapsed_since_last_write < write_frequency:
+        if elapsed_since_last_write < self._write_frequency:
             return
         self._last_write_time = current_time
 
@@ -83,7 +84,7 @@ class RaggedOutput(Output):
         # Write variable values
         inst_size = self._dset.dimensions['particle_instance'].size
         inst_num = self.model.state.size
-        for v in self._instance_vars:
+        for v in self._inst_vars:
             data = self.model.state[v]
             self._dset.variables[v][inst_size:inst_size + inst_num] = data
 
@@ -113,6 +114,14 @@ class RaggedOutput(Output):
                     long_name='number of particles in a given timestep',
                     ragged_row_count='particle count at nth timestep',
                 ),
+            ),
+            release_time=OutputFormat(
+                ncformat='i8',
+                dimensions='particle',
+                attributes=dict(
+                    long_name='particle release time',
+                    units='seconds since 1970-01-01',
+                )
             )
         )
 
@@ -130,22 +139,40 @@ class RaggedOutput(Output):
 
 
 class OutputFormat:
-    def __init__(self, ncformat, dimensions, attributes):
+    def __init__(self, ncformat, dimensions, attributes, kind=None):
         self.ncformat = ncformat
         self.dimensions = dimensions
         self.attributes = attributes
+        self.kind = kind
+
+    def is_initial(self):
+        return self.kind == 'initial'
+
+    def is_instance(self):
+        return self.kind == 'instance'
 
     @staticmethod
-    def from_ladim_conf(varname, init_vars, attrs):
-        if varname in init_vars:
+    def from_ladim_conf(conf) -> "OutputFormat":
+        def get_keywords(ncformat='f4', kind='instance', **kwargs):
+            return dict(
+                props=dict(ncformat=ncformat, kind=kind),
+                attrs=kwargs,
+            )
+
+        keywords = get_keywords(**conf)
+        vkind = keywords['props']['kind']
+        if vkind == 'initial':
             dims = 'particle'
-        else:
+        elif vkind == 'instance':
             dims = 'particle_instance'
+        else:
+            raise ValueError(f"Unknown kind: {vkind}")
 
         return OutputFormat(
-            ncformat=attrs.get('ncformat', 'f4'),
+            ncformat=keywords['props']['ncformat'],
             dimensions=dims,
-            attributes={k: v for k, v in attrs.items() if k != 'ncformat'},
+            attributes=keywords['attrs'],
+            kind=vkind,
         )
 
 
