@@ -5,6 +5,19 @@ class State(Module):
     def __init__(self, model: Model):
         super().__init__(model)
 
+    @property
+    def size(self):
+        raise NotImplementedError
+
+    def __getitem__(self, item):
+        raise NotImplementedError
+
+    def __setitem__(self, key, value):
+        raise NotImplementedError
+
+    def __len__(self):
+        return self.size
+
 
 class WarmStartState(State):
     def __init__(self, model: Model, **conf):
@@ -20,6 +33,10 @@ class WarmStartState(State):
 
     def warm_start(self, config, grid):
         self._state.warm_start(self, config, grid)
+
+    @property
+    def size(self):
+        return len(self._state)
 
     @property
     def timestep(self):
@@ -42,9 +59,6 @@ class WarmStartState(State):
 
     def __setitem__(self, item, value):
         self._state[item] = value
-
-    def __len__(self):
-        return len(self._state)
 
     @property
     def pid(self):

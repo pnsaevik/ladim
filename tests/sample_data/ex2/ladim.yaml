@@ -47,7 +47,7 @@ output:
     output_particle: ['release_time']
     output_instance: ['pid', 'X', 'Y', 'Z']
     nc_attributes:
-        release_time: {'ncformat': 'i4', 'long_name': 'particle release time', 'units': 'seconds since 2015-09-07 01:00:00'}
+        release_time: {'ncformat': 'i4', 'long_name': 'particle release time', 'units': 'seconds since 1970-01-01'}
         pid: {'ncformat': 'i4', 'long_name': 'particle identifier'}
         X: {'ncformat': 'f4', 'long_name': 'particle X-coordinate'}
         Y: {'ncformat': 'f4', 'long_name': 'particle Y-coordinate'}
