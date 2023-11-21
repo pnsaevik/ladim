@@ -15,6 +15,9 @@ class State(Module):
     def __setitem__(self, key, value):
         raise NotImplementedError
 
+    def __contains__(self, item):
+        raise NotImplementedError
+
     def __len__(self):
         return self.size
 
