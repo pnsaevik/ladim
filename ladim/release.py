@@ -11,23 +11,25 @@ class Releaser(Module):
 
 class TextFileReleaser(Releaser):
     def __init__(
-            self, model: Model, file: str, colnames: list, formats: dict = None,
+            self, model: Model, file: str, colnames: list = None, formats: dict = None,
             frequency=(0, 's')
     ):
         """
         Release module which reads from a text file
 
-        The text file must be a whitespace-separated csv file, with column
-        names and data formats given as parameters to the release module.
+        The text file must be a whitespace-separated csv file
 
         :param model: Parent model
         :param file: Release file
-        :param colnames: Column names
+
+        :param colnames: Column names, if the release file does not contain any
+
         :param formats: Data column formats, one dict entry per column. If any column
         is missing, the default format is used. Keys should correspond to column names.
         Values should be either ``"float"``, ``"int"`` or ``"time"``. Default value
         is ``"float"`` for all columns except ``release_time``, which has default
         value ``"time"``.
+
         :param frequency: A two-element list with entries ``[value, unit]``, where
         ``unit`` can be any numpy-compatible timedelta unit (such as "s", "m", "h", "D").
         """
@@ -44,37 +46,6 @@ class TextFileReleaser(Releaser):
         self._frequency = read_timedelta(frequency)
         self._last_release_dataframe = pd.DataFrame()
         self._last_release_time = np.datetime64('NaT')
-
-    @staticmethod
-    def _get_converters(varnames: list, conf: dict) -> dict:
-        """
-        Given a list of varnames and config keywords, return a dict of converters
-
-        Returns a dict where the keys are ``varnames`` and the values are
-        callables.
-
-        :param varnames: For instance, ['release_time', 'X', 'Y']
-        :param conf: For instance, {'release_time': 'time', 'X': 'float'}
-        :return: A mapping of varnames to converters
-        """
-        dtype_funcs = dict(
-            time=np.datetime64,
-            int=int,
-            float=float,
-        )
-
-        dtype_defaults = dict(
-            release_time='time',
-        )
-
-        converters = {}
-        for varname in varnames:
-            dtype_default = dtype_defaults.get(varname, 'float')
-            dtype_str = conf.get(varname, dtype_default)
-            dtype_func = dtype_funcs[dtype_str]
-            converters[varname] = dtype_func
-
-        return converters
 
     def update(self):
         # Get the portion of the release dataset that corresponds to
@@ -115,15 +86,12 @@ class TextFileReleaser(Releaser):
     @property
     def dataframe(self):
         if self._dataframe is None:
-            converters = self._get_converters(
-                varnames=self._csv_column_names,
-                conf=self._csv_column_formats,
-            )
-            self._dataframe = load_release_file(
-                fname=self._csv_fname,
-                names=self._csv_column_names,
-                formats=converters,
-            )
+            with open(self._csv_fname, 'r', encoding='utf-8') as fp:
+                self._dataframe = load_release_file(
+                    stream=fp,
+                    names=self._csv_column_names,
+                    formats=self._csv_column_formats,
+                )
         return self._dataframe
 
 
@@ -136,11 +104,18 @@ def release_data_subset(dataframe, start_time, stop_time):
     return dataframe.iloc[start_idx:stop_idx]
 
 
-def load_release_file(fname: str, names: list, formats: dict) -> pd.DataFrame:
+def load_release_file(stream, names: list, formats: dict) -> pd.DataFrame:
+    if names is None:
+        import re
+        first_line = stream.readline()
+        names = re.split(pattern=r'\s+', string=first_line.strip())
+
+    converters = get_converters(varnames=names, conf=formats)
+
     df = pd.read_csv(
-        fname,
+        stream,
         names=names,
-        converters=formats,
+        converters=converters,
         delim_whitespace=True,
     )
     df = df.sort_values(by='release_time')
@@ -164,3 +139,33 @@ def sorted_interval(v, a, b):
     start = np.searchsorted(v, a, side='left')
     stop = np.searchsorted(v, b, side='left')
     return start, stop
+
+def get_converters(varnames: list, conf: dict) -> dict:
+    """
+    Given a list of varnames and config keywords, return a dict of converters
+
+    Returns a dict where the keys are ``varnames`` and the values are
+    callables.
+
+    :param varnames: For instance, ['release_time', 'X', 'Y']
+    :param conf: For instance, {'release_time': 'time', 'X': 'float'}
+    :return: A mapping of varnames to converters
+    """
+    dtype_funcs = dict(
+        time=np.datetime64,
+        int=int,
+        float=float,
+    )
+
+    dtype_defaults = dict(
+        release_time='time',
+    )
+
+    converters = {}
+    for varname in varnames:
+        dtype_default = dtype_defaults.get(varname, 'float')
+        dtype_str = conf.get(varname, dtype_default)
+        dtype_func = dtype_funcs[dtype_str]
+        converters[varname] = dtype_func
+
+    return converters

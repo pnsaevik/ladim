@@ -14,7 +14,6 @@ release:
     module: ladim.release.TextFileReleaser
     file: particles.rls
     frequency: [1, 'm']
-    colnames: ['release_time', 'X', 'Y', 'Z', 'group_id']
 
 forcing:
     module: 'ladim.forcing.RomsForcing'
