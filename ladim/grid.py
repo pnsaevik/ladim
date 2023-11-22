@@ -5,6 +5,9 @@ class Grid(Module):
     def __init__(self, model: Model):
         super().__init__(model)
 
+    def ingrid(self, X, Y):
+        raise NotImplementedError
+
 
 class RomsGrid(Grid):
     def __init__(self, model: Model, **conf):

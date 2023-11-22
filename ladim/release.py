@@ -146,6 +146,7 @@ def sorted_interval(v, a, b):
     stop = np.searchsorted(v, b, side='left')
     return start, stop
 
+
 def get_converters(varnames: list, conf: dict) -> dict:
     """
     Given a list of varnames and config keywords, return a dict of converters
