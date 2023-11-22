@@ -15,8 +15,6 @@ release:
     file: particles.rls
     frequency: [1, 'm']
     colnames: ['release_time', 'X', 'Y', 'Z', 'group_id']
-    formats:
-        release_time: time
 
 forcing:
     module: 'ladim.forcing.RomsForcing'

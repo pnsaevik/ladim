@@ -11,7 +11,7 @@ class Releaser(Module):
 
 class TextFileReleaser(Releaser):
     def __init__(
-            self, model: Model, file: str, colnames: list, formats: dict,
+            self, model: Model, file: str, colnames: list, formats: dict = None,
             frequency=(0, 's')
     ):
         """
@@ -25,7 +25,9 @@ class TextFileReleaser(Releaser):
         :param colnames: Column names
         :param formats: Data column formats, one dict entry per column. If any column
         is missing, the default format is used. Keys should correspond to column names.
-        Values should be either ``"float"`` (default), ``"int"`` or ``"time"``.
+        Values should be either ``"float"``, ``"int"`` or ``"time"``. Default value
+        is ``"float"`` for all columns except ``release_time``, which has default
+        value ``"time"``.
         :param frequency: A two-element list with entries ``[value, unit]``, where
         ``unit`` can be any numpy-compatible timedelta unit (such as "s", "m", "h", "D").
         """
@@ -35,8 +37,8 @@ class TextFileReleaser(Releaser):
         # Release file
         self._csv_fname = file   # Path name
         self._csv_column_names = colnames   # Column headers
-        self._csv_column_formats = formats  # Column data formats
-        self._dataframe = None                            # Loaded dataframe
+        self._csv_column_formats = formats or dict()
+        self._dataframe = None
 
         # Continuous release variables
         self._frequency = read_timedelta(frequency)
@@ -57,12 +59,18 @@ class TextFileReleaser(Releaser):
         """
         dtype_funcs = dict(
             time=np.datetime64,
+            int=int,
             float=float,
+        )
+
+        dtype_defaults = dict(
+            release_time='time',
         )
 
         converters = {}
         for varname in varnames:
-            dtype_str = conf.get(varname, 'float')
+            dtype_default = dtype_defaults.get(varname, 'float')
+            dtype_str = conf.get(varname, dtype_default)
             dtype_func = dtype_funcs[dtype_str]
             converters[varname] = dtype_func
 
