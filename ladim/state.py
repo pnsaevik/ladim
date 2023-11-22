@@ -63,14 +63,6 @@ class DynamicState(State):
     def size(self):
         return len(self._state)
 
-    @property
-    def ibm_variables(self):
-        return self._state.ibm_variables
-
-    @property
-    def instance_variables(self):
-        return self._state.instance_variables
-
     def __getitem__(self, item):
         return self._state[item]
 
