@@ -53,7 +53,7 @@ class RaggedOutput(Output):
 
         # Check if there are any new particles
         part_size = self._dset.dimensions['particle'].size
-        num_new = self.model.state['pid'].max() - part_size + 1
+        num_new = self.model.state.num_released - part_size
         if num_new == 0:
             return
 
