@@ -81,7 +81,13 @@ class TextFileReleaser(Releaser):
 
         # Add new particles
         new_particles = df.to_dict(orient='list')
-        self.model.state.append(new_particles)
+        state = self.model.state
+        state.append(new_particles)
+
+        # Remove dead particles
+        alive = state['alive']
+        alive &= self.model.grid.ingrid(state['X'], state['Y'])
+        state.kill(~alive)
 
     @property
     def dataframe(self):
