@@ -48,7 +48,7 @@ class Tracker:
     def move_particles(self, grid: Grid, forcing: Forcing, state: State) -> None:
         """Move the particles"""
 
-        X, Y = state.X, state.Y
+        X, Y = state['X'], state['Y']
         dx, dy = grid.sample_metric(X, Y)
         self.dx, self.dy = dx, dy
         dt = self.dt
@@ -86,7 +86,7 @@ class Tracker:
         X1[I] = X[I]
         Y1[I] = Y[I]
         # Kill particles trying to move out of the grid
-        state.alive[I] = False
+        state['alive'][I] = False
 
         if self.active_check:
             # Do not move inactive particles
@@ -102,8 +102,8 @@ class Tracker:
         X[I] = X1[I]
         Y[I] = Y1[I]
 
-        state.X = X
-        state.Y = Y
+        state['X'] = X
+        state['Y'] = Y
 
     def EF(self, forcing: Forcing, state: State) -> Velocity:
         """Euler-Forward advection"""
