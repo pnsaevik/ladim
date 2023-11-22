@@ -44,9 +44,6 @@ class DynamicState(State):
     def num_released(self):
         return self._num_released
 
-    def update(self):
-        pass
-
     def append(self, particles):
         num_new_particles = next(len(v) for v in particles.values())
         particles['pid'] = np.arange(num_new_particles) + self._num_released
