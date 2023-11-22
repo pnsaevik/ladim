@@ -244,7 +244,8 @@ class ParticleReleaser(Iterator):
         self._particle_count = warm_particle_count
 
     def update(self):
-        step = self.modules['state'].timestep
+        solver = self.modules['solver']
+        step = np.round((solver.time - solver.start) / solver.step).astype(int).item()
         grid = self.modules['grid']
         state = self.modules['state']
 

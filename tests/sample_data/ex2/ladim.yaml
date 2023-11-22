@@ -1,6 +1,7 @@
 # New version of configuration file
 
 solver:
+    module: 'ladim.solver.Solver'
     start: '2015-09-07T01:00:00'
     stop: '2015-09-07T01:05:00'
     step: 60
@@ -12,23 +13,8 @@ grid:
 
 release:
     module: ladim.release.TextFileReleaser
-    release_type: continuous
-    release_frequency: [1, 'm']
-    release_format: ['release_time', 'X', 'Y', 'Z', 'group_id']
-    release_dtype:
-        release_time: time
-        X: float
-        Y: float
-        Z: float
-        group_id: float
-    start_time: 2015-09-07T01:00:00
-    stop_time: 2015-09-07T01:05:00
-    particle_release_file: particles.rls
-    start: cold
-    dt: 60
-    warm_start_file: ''
-    particle_variables: ['release_time', 'group_id']
-    reference_time: 2015-09-07T01:00:00
+    file: particles.rls
+    frequency: [1, 'm']
 
 forcing:
     module: 'ladim.forcing.RomsForcing'
@@ -70,16 +56,4 @@ ibm:
     module: ladim.ibms.IBM
 
 state:
-    module: ladim.state.WarmStartState
-    particle_variables: ['release_time', 'group_id']
-    start_time: 2015-09-07T01:00:00
-    dt: 60
-    ibm: {variables: []}
-    release_dtype:
-        release_time: time
-        X: float
-        Y: float
-        Z: float
-        group_id: float
-    warm_start_file: ''
-    ibm_forcing: []
+    module: ladim.state.DynamicState

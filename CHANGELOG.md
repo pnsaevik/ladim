@@ -10,6 +10,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Allow mixture of unix and windows path slash in config file
 ### Added
 - New output module
+- New release module
+### Changed
+- Output module is now called at the end of each timestep
 
 ## [1.3.2] - 2022-10-20
 ### Added

@@ -9,21 +9,30 @@ class Output(Module):
 
 
 class RaggedOutput(Output):
-    def __init__(self, model: Model, **conf):
+    def __init__(self, model: Model, variables: dict, file: str, frequency):
+        """
+        Writes simulation output to netCDF file in ragged array format
+
+        :param model: Parent model
+        :param variables: Simulation variables to include in output, and their formatting
+        :param file: Name of output file
+        :param frequency: Output frequency, as a two-element tuple (freq_value,
+        freq_unit) where freq_unit can be any numpy-compatible time unit.
+        """
         super().__init__(model)
 
         # Convert output format specification from ladim.yaml config to OutputFormat
         self._formats = {
             k: OutputFormat.from_ladim_conf(v)
-            for k, v in conf['variables'].items()
+            for k, v in variables.items()
         }
 
         self._init_vars = {k for k, v in self._formats.items() if v.is_initial()}
         self._inst_vars = {k for k, v in self._formats.items() if v.is_instance()}
 
-        self._fname = conf['file']
+        self._fname = file
 
-        freq_num, freq_unit = conf['frequency']
+        freq_num, freq_unit = frequency
         self._write_frequency = np.timedelta64(freq_num, freq_unit)
 
         self._dset = None
@@ -44,7 +53,7 @@ class RaggedOutput(Output):
 
         # Check if there are any new particles
         part_size = self._dset.dimensions['particle'].size
-        num_new = self.model.state['pid'].max() - part_size + 1
+        num_new = self.model.state.released - part_size
         if num_new == 0:
             return
 
