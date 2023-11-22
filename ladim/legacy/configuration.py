@@ -385,6 +385,7 @@ def to_modularized_conf(c):
             dt=c['dt'],
         ),
         solver=dict(
+            module='ladim.legacy.solver.Solver',
             start=c['start_time'],
             stop=c['stop_time'],
             step=c['dt'],
