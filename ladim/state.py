@@ -40,17 +40,18 @@ class State(Module):
 class DynamicState(State):
     def __init__(self, model: Model, **conf):
         super().__init__(model)
-        from .legacy.state import State as LegacyState
-        self._state = LegacyState(model, **conf)
+
         self._num_released = 0
         self._varnames = set()
+
+        self._data = pd.DataFrame()
 
     @property
     def num_released(self):
         return self._num_released
 
     def update(self):
-        self._state.update()
+        pass
 
     def variables(self):
         return self._varnames
@@ -58,32 +59,32 @@ class DynamicState(State):
     def append(self, particles):
         num_new_particles = next(len(v) for v in particles.values())
         particles['pid'] = np.arange(num_new_particles) + self._num_released
+        particles['alive'] = np.ones(num_new_particles, dtype=bool)
 
-        df = pd.DataFrame(data=particles)
-        self._state.append(df, self.model.forcing)
+        new_particles = pd.DataFrame(data=particles)
+        self._data = pd.concat(
+            objs=[self._data, new_particles],
+            axis='index',
+            ignore_index=True,
+            join='outer',
+        )
+
         self._num_released += num_new_particles
         self._varnames.update(particles.keys())
-
-        # Set alive status of new particles
-        self._state.alive = self.model.grid.ingrid(self['X'], self['Y'])
 
     def kill(self, particles):
         if not np.any(particles):
             return
 
         keep = ~particles
-        for v in self._state.instance_variables:
-            self._state[v] = self._state[v][keep]
-
-    def warm_start(self, config, grid):
-        self._state.warm_start(self, config, grid)
+        self._data = self._data.iloc[keep]
 
     @property
     def size(self):
-        return len(self._state)
+        return len(self._data)
 
     def __getitem__(self, item):
-        return self._state[item]
+        return self._data[item].values
 
     def __setitem__(self, item, value):
-        self._state[item] = value
+        self._data[item] = value
