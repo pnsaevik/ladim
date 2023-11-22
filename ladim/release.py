@@ -17,14 +17,6 @@ class TextFileReleaser(Releaser):
     def update(self):
         self._releaser.update()
 
-    @property
-    def total_particle_count(self):
-        return self._releaser.total_particle_count
-
-    @property
-    def particle_variables(self):
-        return self._releaser.particle_variables
-
 
 def sorted_interval(v, a, b):
     """
