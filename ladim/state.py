@@ -21,17 +21,11 @@ class State(Module):
     def kill(self, particles):
         raise NotImplementedError
 
-    def variables(self):
-        raise NotImplementedError
-
     def __getitem__(self, item):
         raise NotImplementedError
 
     def __setitem__(self, key, value):
         raise NotImplementedError
-
-    def __contains__(self, item):
-        return item in self.variables()
 
     def __len__(self):
         return self.size
@@ -53,9 +47,6 @@ class DynamicState(State):
     def update(self):
         pass
 
-    def variables(self):
-        return self._varnames
-
     def append(self, particles):
         num_new_particles = next(len(v) for v in particles.values())
         particles['pid'] = np.arange(num_new_particles) + self._num_released
@@ -70,7 +61,6 @@ class DynamicState(State):
         )
 
         self._num_released += num_new_particles
-        self._varnames.update(particles.keys())
 
     def kill(self, particles):
         if not np.any(particles):
