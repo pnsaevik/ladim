@@ -34,10 +34,8 @@ class Test_ladim_script:
             os.chdir(testpath)
             ladim.main(io.StringIO(conf_str))
             dset = xr.load_dataset(str(outfile))
-            dset_dict = json.loads(json.dumps(
-                obj=dset.to_dict(),
-                default=str,
-            ))
+            dset_txt = json.dumps(obj=dset.to_dict(), default=str, indent=4)
+            dset_dict = json.loads(dset_txt)
             for v in ['X', 'Y']:
                 d = dset_dict['data_vars'][v]['data']
                 dset_dict['data_vars'][v]['data'] = np.round(d, 3).tolist()
@@ -49,6 +47,11 @@ class Test_ladim_script:
                 pass
             os.chdir(curdir)
 
-        del expected['attrs']['date']
         del dset_dict['attrs']['date']
+        del dset_dict['attrs']['history']
+
+        if dset_dict != expected:
+            with open(testpath / 'out.nc_txt', 'w', encoding='utf-8', newline='\n') as fp:
+                json.dump(obj=dset_dict, fp=fp, default=str, indent=4)
+
         assert dset_dict == expected
