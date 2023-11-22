@@ -5,20 +5,50 @@ from .model import Model, Module
 
 class State(Module):
     def __init__(self, model: Model):
+        """
+        The state module contains static and dynamic particle properties
+
+        The other modules interact with the state module mostly through
+        the getitem and setitem methods. For instance, to increase the
+        depth of all particles by 1, use
+
+        >>> model.state['Z'] += 1
+
+        :param model: Parent model
+        """
         super().__init__(model)
 
     @property
     def size(self):
+        """
+        Current number of particles
+        """
         raise NotImplementedError
 
     @property
-    def num_released(self):
+    def released(self):
+        """
+        Total number of released particles
+        """
         raise NotImplementedError
 
-    def append(self, particles):
+    def append(self, particles: dict):
+        """
+        Add new particles
+
+        Missing variables are assigned a default value of 0.
+
+        :param particles: A mapping from variable names to values
+        """
         raise NotImplementedError
 
     def remove(self, particles):
+        """
+        Remove particles
+
+        :param particles: Boolean index of particles to remove
+        :return:
+        """
         raise NotImplementedError
 
     def __getitem__(self, item):
@@ -41,10 +71,10 @@ class DynamicState(State):
         self._data = pd.DataFrame()
 
     @property
-    def num_released(self):
+    def released(self):
         return self._num_released
 
-    def append(self, particles):
+    def append(self, particles: dict):
         num_new_particles = next(len(v) for v in particles.values())
         particles['pid'] = np.arange(num_new_particles) + self._num_released
         particles['alive'] = np.ones(num_new_particles, dtype=bool)
