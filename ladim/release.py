@@ -87,7 +87,7 @@ class TextFileReleaser(Releaser):
         # Remove dead particles
         alive = state['alive']
         alive &= self.model.grid.ingrid(state['X'], state['Y'])
-        state.kill(~alive)
+        state.remove(~alive)
 
     @property
     def dataframe(self):

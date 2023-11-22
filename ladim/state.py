@@ -18,7 +18,7 @@ class State(Module):
     def append(self, particles):
         raise NotImplementedError
 
-    def kill(self, particles):
+    def remove(self, particles):
         raise NotImplementedError
 
     def __getitem__(self, item):
@@ -59,7 +59,7 @@ class DynamicState(State):
 
         self._num_released += num_new_particles
 
-    def kill(self, particles):
+    def remove(self, particles):
         if not np.any(particles):
             return
 
