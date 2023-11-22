@@ -57,15 +57,3 @@ ibm:
 
 state:
     module: ladim.state.DynamicState
-    particle_variables: ['release_time', 'group_id']
-    start_time: 2015-09-07T01:00:00
-    dt: 60
-    ibm: {variables: []}
-    release_dtype:
-        release_time: time
-        X: float
-        Y: float
-        Z: float
-        group_id: float
-    warm_start_file: ''
-    ibm_forcing: []

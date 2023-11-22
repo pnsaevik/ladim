@@ -38,7 +38,7 @@ class State(Module):
 
 
 class DynamicState(State):
-    def __init__(self, model: Model, **conf):
+    def __init__(self, model: Model):
         super().__init__(model)
 
         self._num_released = 0
