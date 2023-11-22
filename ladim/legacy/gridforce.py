@@ -82,7 +82,10 @@ class Forcing:
         # self.V = self.forcing.V
 
     def update(self):
-        t = self.modules['state'].timestep
+        elapsed = self.modules['solver'].time - self.modules['solver'].start
+        elapsed_posix = elapsed.astype('datetime64[s]').astype('i4')
+        step_posix = self.modules['solver'].step.astype('datetime64[s]').astype('i4')
+        t = elapsed_posix // step_posix
         return self.forcing.update(t)
 
     def velocity(self, X, Y, Z, tstep=0.0):

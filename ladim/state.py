@@ -64,14 +64,6 @@ class DynamicState(State):
         return len(self._state)
 
     @property
-    def timestep(self):
-        return self._state.timestep
-
-    @property
-    def timestamp(self):
-        return self._state.timestamp
-
-    @property
     def ibm_variables(self):
         return self._state.ibm_variables
 

@@ -34,7 +34,10 @@ class RomsForcing(Forcing):
         # self.V = self.forcing.V
 
     def update(self):
-        t = self.model.state.timestep
+        elapsed = self.model.solver.time - self.model.solver.start
+        elapsed_posix = elapsed.astype('datetime64[s]').astype('i4')
+        step_posix = self.model.solver.step.astype('datetime64[s]').astype('i4')
+        t = elapsed_posix // step_posix
 
         return self.forcing.update(t)
 
