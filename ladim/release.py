@@ -10,17 +10,36 @@ class Releaser(Module):
 
 
 class TextFileReleaser(Releaser):
-    def __init__(self, model: Model, **conf):
+    def __init__(
+            self, model: Model, file: str, colnames: list, formats: dict,
+            frequency=(0, 's')
+    ):
+        """
+        Release module which reads from a text file
+
+        The text file must be a whitespace-separated csv file, with column
+        names and data formats given as parameters to the release module.
+
+        :param model: Parent model
+        :param file: Release file
+        :param colnames: Column names
+        :param formats: Data column formats, one dict entry per column. If any column
+        is missing, the default format is used. Keys should correspond to column names.
+        Values should be either ``"float"`` (default), ``"int"`` or ``"time"``.
+        :param frequency: A two-element list with entries ``[value, unit]``, where
+        ``unit`` can be any numpy-compatible timedelta unit (such as "s", "m", "h", "D").
+        """
+
         super().__init__(model)
 
         # Release file
-        self._csv_fname = conf['particle_release_file']   # Path name
-        self._csv_column_names = conf['release_format']   # Column headers
-        self._csv_column_formats = conf['release_dtype']  # Column data formats
+        self._csv_fname = file   # Path name
+        self._csv_column_names = colnames   # Column headers
+        self._csv_column_formats = formats  # Column data formats
         self._dataframe = None                            # Loaded dataframe
 
         # Continuous release variables
-        self._frequency = read_timedelta(conf.get('release_frequency', [0, 's']))
+        self._frequency = read_timedelta(frequency)
         self._last_release_dataframe = pd.DataFrame()
         self._last_release_time = np.datetime64('NaT')
 

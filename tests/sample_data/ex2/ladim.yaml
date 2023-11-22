@@ -12,23 +12,11 @@ grid:
 
 release:
     module: ladim.release.TextFileReleaser
-    release_type: continuous
-    release_frequency: [1, 'm']
-    release_format: ['release_time', 'X', 'Y', 'Z', 'group_id']
-    release_dtype:
+    file: particles.rls
+    frequency: [1, 'm']
+    colnames: ['release_time', 'X', 'Y', 'Z', 'group_id']
+    formats:
         release_time: time
-        X: float
-        Y: float
-        Z: float
-        group_id: float
-    start_time: 2015-09-07T01:00:00
-    stop_time: 2015-09-07T01:05:00
-    particle_release_file: particles.rls
-    start: cold
-    dt: 60
-    warm_start_file: ''
-    particle_variables: ['release_time', 'group_id']
-    reference_time: 2015-09-07T01:00:00
 
 forcing:
     module: 'ladim.forcing.RomsForcing'
