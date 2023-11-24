@@ -45,7 +45,7 @@ class TextFileReleaser(Releaser):
         # Continuous release variables
         self._frequency = read_timedelta(frequency)
         self._last_release_dataframe = pd.DataFrame()
-        self._last_release_time = np.datetime64('NaT')
+        self._last_release_time = np.int64(-4611686018427387904)
 
     def update(self):
         # Get the portion of the release dataset that corresponds to
@@ -159,7 +159,7 @@ def get_converters(varnames: list, conf: dict) -> dict:
     :return: A mapping of varnames to converters
     """
     dtype_funcs = dict(
-        time=np.datetime64,
+        time=lambda item: np.datetime64(item, 's').astype('int64'),
         int=int,
         float=float,
     )

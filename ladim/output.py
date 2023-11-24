@@ -37,7 +37,7 @@ class RaggedOutput(Output):
 
         self._dset = None
         self._num_writes = 0
-        self._last_write_time = np.datetime64('NaT')
+        self._last_write_time = np.int64(-4611686018427387904)
 
     def update(self):
         if self._dset is None:
