@@ -5,6 +5,9 @@ class Forcing(Module):
     def __init__(self, model: Model):
         super().__init__(model)
 
+    def velocity(self, X, Y, Z, tstep=0.0):
+        raise NotImplementedError
+
 
 class RomsForcing(Forcing):
     def __init__(self, model: Model, **conf):
