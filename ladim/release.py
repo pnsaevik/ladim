@@ -2,6 +2,10 @@ from .model import Model, Module
 import numpy as np
 import pandas as pd
 from .utilities import read_timedelta
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class Releaser(Module):
@@ -78,6 +82,17 @@ class TextFileReleaser(Releaser):
                 df = self._last_release_dataframe
             self._last_release_dataframe = df  # Update release dataframe
             self._last_release_time = current_time
+
+        # If positions are given as lat/lon coordinates, we should convert
+        if "X" not in df.columns or "Y" not in df.columns:
+            if "lon" not in df.columns or "lat" not in df.columns:
+                logger.critical("Particle release must have position")
+                raise ValueError()
+            # else
+            X, Y = self.model.grid.ll2xy(df["lon"].values, df["lat"].values)
+            df.rename(columns=dict(lon="X", lat="Y"), inplace=True)
+            df["X"] = X
+            df["Y"] = Y
 
         # Add new particles
         new_particles = df.to_dict(orient='list')

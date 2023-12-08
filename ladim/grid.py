@@ -14,6 +14,9 @@ class Grid(Module):
     def atsea(self, X, Y):
         raise NotImplementedError
 
+    def ll2xy(self, lon, lat):
+        raise NotImplementedError
+
 
 class RomsGrid(Grid):
     def __init__(self, model: Model, **conf):
