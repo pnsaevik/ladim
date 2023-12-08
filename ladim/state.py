@@ -60,6 +60,9 @@ class State(Module):
     def __len__(self):
         return self.size
 
+    def __contains__(self, item):
+        raise NotImplementedError
+
 
 class DynamicState(State):
     def __init__(self, model: Model):
@@ -111,3 +114,6 @@ class DynamicState(State):
 
     def __setitem__(self, item, value):
         self._data[item] = value
+
+    def __contains__(self, item):
+        return item in self._data

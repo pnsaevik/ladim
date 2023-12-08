@@ -1,7 +1,13 @@
+import contextlib
+
 from .model import Model, Module
 import numpy as np
 import pandas as pd
 from .utilities import read_timedelta
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class Releaser(Module):
@@ -11,7 +17,7 @@ class Releaser(Module):
 
 class TextFileReleaser(Releaser):
     def __init__(
-            self, model: Model, file: str, colnames: list = None, formats: dict = None,
+            self, model: Model, file, colnames: list = None, formats: dict = None,
             frequency=(0, 's')
     ):
         """
@@ -79,6 +85,17 @@ class TextFileReleaser(Releaser):
             self._last_release_dataframe = df  # Update release dataframe
             self._last_release_time = current_time
 
+        # If positions are given as lat/lon coordinates, we should convert
+        if "X" not in df.columns or "Y" not in df.columns:
+            if "lon" not in df.columns or "lat" not in df.columns:
+                logger.critical("Particle release must have position")
+                raise ValueError()
+            # else
+            X, Y = self.model.grid.ll2xy(df["lon"].values, df["lat"].values)
+            df.rename(columns=dict(lon="X", lat="Y"), inplace=True)
+            df["X"] = X
+            df["Y"] = Y
+
         # Add new particles
         new_particles = df.to_dict(orient='list')
         state = self.model.state
@@ -91,13 +108,25 @@ class TextFileReleaser(Releaser):
 
     @property
     def dataframe(self):
+        @contextlib.contextmanager
+        def open_or_relay(file_or_buf, *args, **kwargs):
+            if hasattr(file_or_buf, 'read'):
+                yield file_or_buf
+            else:
+                with open(file_or_buf, *args, **kwargs) as f:
+                    yield f
+
         if self._dataframe is None:
-            with open(self._csv_fname, 'r', encoding='utf-8') as fp:
-                self._dataframe = load_release_file(
-                    stream=fp,
-                    names=self._csv_column_names,
-                    formats=self._csv_column_formats,
-                )
+            if isinstance(self._csv_fname, pd.DataFrame):
+                self._dataframe = self._csv_fname
+
+            else:
+                with open_or_relay(self._csv_fname, 'r', encoding='utf-8') as fp:
+                    self._dataframe = load_release_file(
+                        stream=fp,
+                        names=self._csv_column_names,
+                        formats=self._csv_column_formats,
+                    )
         return self._dataframe
 
 
