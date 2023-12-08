@@ -11,6 +11,9 @@ class Grid(Module):
     def sample_metric(self, X, Y):
         raise NotImplementedError
 
+    def atsea(self, X, Y):
+        raise NotImplementedError
+
 
 class RomsGrid(Grid):
     def __init__(self, model: Model, **conf):

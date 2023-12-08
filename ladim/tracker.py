@@ -10,12 +10,11 @@ class Tracker(Module):
 class HorizontalTracker:
     """The physical particle tracking kernel"""
 
-    def __init__(self, model: Model, **config) -> None:
+    def __init__(self, model: Model, method, diffusion) -> None:
         self.model = model
 
-        self.integrator = StochasticDifferentialEquationIntegrator.from_keyword(None)
-        self.D = config["diffusion_coefficient"]  # [m2.s-1]
-        self.active_check = 'active' in config['ibm_variables']
+        self.integrator = StochasticDifferentialEquationIntegrator.from_keyword(method)
+        self.D = diffusion  # [m2.s-1]
 
     def update(self):
         state = self.model.state
@@ -26,8 +25,9 @@ class HorizontalTracker:
         t0 = self.model.solver.time
         dt = self.model.solver.step
 
-        X, Y, z = state['X'], state['Y'], state['Z']
-        r0 = np.stack([state['X'], state['Y']])
+        act = state['active']
+        X, Y, Z = state['X'][act], state['Y'][act], state['Z'][act]
+        r0 = np.stack([X, Y])
 
         # Set diffusion function
         def mixing(t, r):
@@ -39,7 +39,7 @@ class HorizontalTracker:
         # Set advection function
         def velocity(t, r):
             x, y = r.reshape([2, -1])
-            u, v = forcing.velocity(x, y, state['Z'], tstep=(t - t0) / dt)
+            u, v = forcing.velocity(x, y, Z, tstep=(t - t0) / dt)
             return np.concatenate([u / dx, v / dy]).reshape(r.shape)
 
         X1, Y1 = self.integrator(velocity, mixing, t0, r0, dt)
@@ -47,18 +47,20 @@ class HorizontalTracker:
         # Land, boundary treatment. Do not move the particles
         # Consider a sequence of different actions
         # I = (grid.ingrid(X1, Y1)) & (grid.atsea(X1, Y1))
-        I = grid.atsea(X1, Y1)
+        should_move = grid.atsea(X1, Y1)
         # I = True
-        X[I] = X1[I]
-        Y[I] = Y1[I]
+        X[should_move] = X1[should_move]
+        Y[should_move] = Y1[should_move]
 
-        state['X'] = X
-        state['Y'] = Y
+        state['X'][act] = X
+        state['Y'][act] = Y
 
 
 class StochasticDifferentialEquationIntegrator:
     @staticmethod
     def from_keyword(kw):
+        if kw != "RK4":
+            raise NotImplementedError(f"Unknown integration method: {kw}")
         return RK4Integrator()
 
     def __call__(self, vel, mix, t0, r0, dt):

@@ -1,14 +1,14 @@
 # New version of configuration file
 
 solver:
-    module: 'ladim.solver.Solver'
+    module: ladim.solver.Solver
     start: '2015-09-07T01:00:00'
     stop: '2015-09-07T01:05:00'
     step: 60
     seed: 0
 
 grid:
-    module: 'ladim.grid.RomsGrid'
+    module: ladim.grid.RomsGrid
     dataset: '../forcing.nc'
 
 release:
@@ -17,7 +17,7 @@ release:
     frequency: [1, 'm']
 
 forcing:
-    module: 'ladim.forcing.RomsForcing'
+    module: ladim.forcing.RomsForcing
     input_file: '../forcing*.nc'
     start_time: '2015-09-07T01:00:00'
     stop_time: '2015-09-07T01:05:00'
@@ -46,11 +46,8 @@ output:
 
 tracker:
     module: ladim.tracker.HorizontalTracker
-    advection: 'RK4'
-    diffusion: True
-    dt: 60
-    ibm_variables: []
-    diffusion_coefficient: 0.1
+    method: 'RK4'
+    diffusion: 0.1
 
 ibm:
     module: ladim.ibms.IBM
