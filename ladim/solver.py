@@ -5,9 +5,9 @@ class Solver:
     def __init__(self, modules, start, stop, step, order=None, seed=None):
         self.order = order or ('release', 'forcing', 'tracker', 'ibm', 'output')
         self.modules = modules
-        self.start = np.datetime64(start, 's')
-        self.stop = np.datetime64(stop, 's')
-        self.step = np.timedelta64(step, 's')
+        self.start = np.datetime64(start, 's').astype('int64')
+        self.stop = np.datetime64(stop, 's').astype('int64')
+        self.step = np.int64(step)
         self.time = None
 
         if seed is not None:

@@ -75,9 +75,15 @@ class DynamicState(State):
         return self._num_released
 
     def append(self, particles: dict):
+        # If there are no new particles, do nothing
+        if not particles:
+            return
+
         num_new_particles = next(len(v) for v in particles.values())
         particles['pid'] = np.arange(num_new_particles) + self._num_released
         particles['alive'] = np.ones(num_new_particles, dtype=bool)
+        if 'active' not in particles:
+            particles['active'] = np.ones(num_new_particles, dtype=bool)
 
         new_particles = pd.DataFrame(data=particles)
         self._data = pd.concat(

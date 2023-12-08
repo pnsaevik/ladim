@@ -245,7 +245,7 @@ class ParticleReleaser(Iterator):
 
     def update(self):
         solver = self.modules['solver']
-        step = np.round((solver.time - solver.start) / solver.step).astype(int).item()
+        step = ((solver.time - solver.start) // solver.step).item()
         grid = self.modules['grid']
         state = self.modules['state']
 

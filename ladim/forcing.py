@@ -5,6 +5,9 @@ class Forcing(Module):
     def __init__(self, model: Model):
         super().__init__(model)
 
+    def velocity(self, X, Y, Z, tstep=0.0):
+        raise NotImplementedError
+
 
 class RomsForcing(Forcing):
     def __init__(self, model: Model, **conf):
@@ -35,9 +38,7 @@ class RomsForcing(Forcing):
 
     def update(self):
         elapsed = self.model.solver.time - self.model.solver.start
-        elapsed_posix = elapsed.astype('datetime64[s]').astype('i4')
-        step_posix = self.model.solver.step.astype('datetime64[s]').astype('i4')
-        t = elapsed_posix // step_posix
+        t = elapsed // self.model.solver.step
 
         return self.forcing.update(t)
 

@@ -5,14 +5,22 @@ All notable changes to the project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Issues]
+### Change
+- Velocity in forcing module should return "grid speed" velocity. Rescaling
+  should happen within the forcing module, not tracking module.
+- New grid and forcing module should have a clearer separation. Grid should
+  take care of coordinate system changes, while forcing should return static
+  fields.
+
 ## [Unreleased] - 
 ### Fixed
 - Allow mixture of unix and windows path slash in config file
-### Added
-- New output module
-- New release module
 ### Changed
 - Output module is now called at the end of each timestep
+- New output module
+- New release module
+- New tracker module
 
 ## [1.3.2] - 2022-10-20
 ### Added
