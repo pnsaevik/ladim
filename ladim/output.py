@@ -33,7 +33,7 @@ class RaggedOutput(Output):
         self._fname = file
 
         freq_num, freq_unit = frequency
-        self._write_frequency = np.timedelta64(freq_num, freq_unit)
+        self._write_frequency = np.timedelta64(freq_num, freq_unit).astype('timedelta64[s]').astype('int64')
 
         self._dset = None
         self._num_writes = 0
