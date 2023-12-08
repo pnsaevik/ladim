@@ -16,6 +16,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ## [Unreleased] - 
 ### Fixed
 - Allow mixture of unix and windows path slash in config file
+- Particles close to edge no longer causes errors
 ### Changed
 - Output module is now called at the end of each timestep
 - New output module
