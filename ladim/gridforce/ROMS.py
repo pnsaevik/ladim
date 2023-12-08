@@ -168,6 +168,10 @@ class Grid:
         I = X.round().astype(int) - self.i0
         J = Y.round().astype(int) - self.j0
 
+        # Constrain to valid indices
+        I = np.minimum(np.maximum(I, 0), self.dx.shape[-1] - 2)
+        J = np.minimum(np.maximum(J, 0), self.dx.shape[-2] - 2)
+
         # Metric is conform for PolarStereographic
         A = self.dx[J, I]
         return A, A
@@ -207,6 +211,11 @@ class Grid:
         """Returns True for points at sea"""
         I = X.round().astype(int) - self.i0
         J = Y.round().astype(int) - self.j0
+
+        # Constrain to valid indices
+        I = np.minimum(np.maximum(I, 0), self.M.shape[-1] - 1)
+        J = np.minimum(np.maximum(J, 0), self.M.shape[-2] - 1)
+
         return self.M[J, I] > 0
 
     def xy2ll(self, X, Y):
@@ -722,6 +731,10 @@ def z2s(z_rho, X, Y, Z):
     I = np.around(X).astype("int")
     J = np.around(Y).astype("int")
 
+    # Constrain to valid indices
+    I = np.minimum(np.maximum(I, 0), z_rho.shape[-1] - 1)
+    J = np.minimum(np.maximum(J, 0), z_rho.shape[-2] - 1)
+
     # Vectorized searchsorted
     K = np.sum(z_rho[:, J, I] < -Z, axis=0)
     K = K.clip(1, kmax - 1)
@@ -756,6 +769,11 @@ def sample3D(F, X, Y, K, A, method="bilinear"):
         # Find rho-point as lower left corner
         I = X.astype("int")
         J = Y.astype("int")
+
+        # Constrain to valid indices
+        I = np.minimum(np.maximum(I, 0), F.shape[-1] - 2)
+        J = np.minimum(np.maximum(J, 0), F.shape[-2] - 2)
+
         P = X - I
         Q = Y - J
         W000 = (1 - P) * (1 - Q) * (1 - A)
