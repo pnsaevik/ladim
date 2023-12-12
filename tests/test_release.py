@@ -55,6 +55,25 @@ class Test_TextFileReleaser_update:
         assert list(mock_model.state['X']) == [400, 500]
         assert list(mock_model.state['Y']) == [600, 610]
 
+    def test_adds_default_values(self, mock_model):
+        # Create mock release file
+        buf = io.StringIO(
+            'release_time X Y\n'
+            '2000-01-01 60 4\n'
+            '2000-01-01 61 5\n'
+        )
+
+        # Run releaser update
+        releaser = release.TextFileReleaser(
+            model=mock_model,
+            file=buf,
+            defaults=dict(myvar=23),
+        )
+        releaser.update()
+
+        # Confirm effect on release module
+        assert list(mock_model.state['myvar']) == [23, 23]
+
 
 class MockObj:
     pass

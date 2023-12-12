@@ -14,6 +14,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   fields.
 
 ## [Unreleased] - 
+### Added
+- Text releaser module can add default values other than zero
 ### Fixed
 - Allow mixture of unix and windows path slash in config file
 - Particles close to edge no longer causes errors
