@@ -18,7 +18,7 @@ class Releaser(Module):
 class TextFileReleaser(Releaser):
     def __init__(
             self, model: Model, file, colnames: list = None, formats: dict = None,
-            frequency=(0, 's')
+            frequency=(0, 's'), defaults=None,
     ):
         """
         Release module which reads from a text file
@@ -38,6 +38,10 @@ class TextFileReleaser(Releaser):
 
         :param frequency: A two-element list with entries ``[value, unit]``, where
         ``unit`` can be any numpy-compatible timedelta unit (such as "s", "m", "h", "D").
+
+        :param defaults: A dict of variables to be added to each particle. The keys
+            are the variable names, the values are the initial values at particle
+            release.
         """
 
         super().__init__(model)
@@ -52,6 +56,9 @@ class TextFileReleaser(Releaser):
         self._frequency = read_timedelta(frequency)
         self._last_release_dataframe = pd.DataFrame()
         self._last_release_time = np.int64(-4611686018427387904)
+
+        # Other parameters
+        self._defaults = defaults or dict()
 
     def update(self):
         # Get the portion of the release dataset that corresponds to
@@ -95,6 +102,11 @@ class TextFileReleaser(Releaser):
             df.rename(columns=dict(lon="X", lat="Y"), inplace=True)
             df["X"] = X
             df["Y"] = Y
+
+        # Add default variables, if any
+        for k, v in self._defaults.items():
+            if k not in df:
+                df[k] = v
 
         # Add new particles
         new_particles = df.to_dict(orient='list')
