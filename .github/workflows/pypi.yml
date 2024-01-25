@@ -1,14 +1,11 @@
 name: Publish python package
 
-on:
-  push:
-    branches:
-      - "master"
+on: workflow_dispatch
 
 jobs:
   build:
     name: Build distribution
-    if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
+    # if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
     runs-on: ubuntu-latest
 
     steps:
