@@ -1,3 +1,7 @@
+# Pre-import netCDF4 to avoid stupid warning
+# noinspection PyUnresolvedReferences
+import netCDF4
+
 import subprocess
 import ladim.main
 from pathlib import Path

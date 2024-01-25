@@ -67,7 +67,7 @@ class TextFileReleaser(Releaser):
             dataframe=self.dataframe,
             start_time=self.model.solver.time,
             stop_time=self.model.solver.time + self.model.solver.step,
-        )
+        ).copy(deep=True)
 
         # If there are no new particles and we don't use continuous release,
         # we are done.
