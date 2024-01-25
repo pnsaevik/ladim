@@ -53,7 +53,7 @@ class ParticleReleaser(Iterator):
             config["particle_release_file"],
             names=config["release_format"],
             converters=config["release_dtype"],
-            delim_whitespace=True,
+            sep='\\s+',
         )
 
         # If no mult column, add a column of ones
