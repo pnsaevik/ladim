@@ -26,7 +26,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - New tracker module
 
 
-## [1.3.3] - 2024-01-25
+## [1.3.4] - 2024-01-25
 ### Fixed
 - Package now works with pandas 2.2.0
 
