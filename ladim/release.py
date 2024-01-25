@@ -163,7 +163,7 @@ def load_release_file(stream, names: list, formats: dict) -> pd.DataFrame:
         stream,
         names=names,
         converters=converters,
-        delim_whitespace=True,
+        sep='\\s+',
     )
     df = df.sort_values(by='release_time')
     return df
