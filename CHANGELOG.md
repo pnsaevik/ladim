@@ -13,7 +13,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
-## [Unreleased] - 
+## [1.3.5] - 2024-01-30 
 ### Added
 - Text releaser module can add default values other than zero
 ### Fixed
