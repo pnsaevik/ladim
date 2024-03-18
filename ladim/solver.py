@@ -7,7 +7,7 @@ class Solver:
         self.modules = modules
         self.start = np.datetime64(start, 's').astype('int64')
         self.stop = np.datetime64(stop, 's').astype('int64')
-        self.step = np.int64(step)
+        self.step = np.timedelta64(step, 's').astype('int64')
         self.time = None
 
         if seed is not None:
