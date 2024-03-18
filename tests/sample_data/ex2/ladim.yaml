@@ -9,7 +9,7 @@ solver:
 
 grid:
     module: ladim.grid.RomsGrid
-    dataset: '../forcing.nc'
+    file: '../forcing.nc'
 
 release:
     module: ladim.release.TextFileReleaser
@@ -18,7 +18,7 @@ release:
 
 forcing:
     module: ladim.forcing.RomsForcing
-    input_file: '../forcing*.nc'
+    file: '../forcing*.nc'
     start_time: '2015-09-07T01:00:00'
     stop_time: '2015-09-07T01:05:00'
     dt: 60

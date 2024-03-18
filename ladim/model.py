@@ -12,13 +12,13 @@ if TYPE_CHECKING:
     from ladim.solver import Solver
 
 DEFAULT_MODULES = dict(
-    grid='ladim.gridforce.Grid',
-    forcing='ladim.gridforce.Forcing',
-    release='ladim.release.Releaser',
-    state='ladim.state.State',
-    output='ladim.output.Output',
+    grid='ladim.grid.RomsGrid',
+    forcing='ladim.forcing.RomsForcing',
+    release='ladim.release.TextFileReleaser',
+    state='ladim.state.DynamicState',
+    output='ladim.output.RaggedOutput',
     ibm='ladim.ibms.IBM',
-    tracker='ladim.tracker.Tracker',
+    tracker='ladim.tracker.HorizontalTracker',
     solver='ladim.solver.Solver',
 )
 
@@ -32,7 +32,7 @@ class Model:
 
         self.modules = dict()
         for name in module_names:
-            self.add_module(name, config[name])
+            self.add_module(name, config.get(name, dict()))
 
     def add_module(self, name, conf):
         module_name = conf.get('module', DEFAULT_MODULES[name])

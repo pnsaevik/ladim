@@ -13,18 +13,19 @@ class RomsForcing(Forcing):
     def __init__(self, model: Model, **conf):
         super().__init__(model)
 
-        from ladim.gridforce.ROMS import Forcing as LegacyForcing
-
         grid_ref = GridReference(model)
         legacy_conf = dict(
             gridforce=dict(
-                input_file=conf['input_file'],
+                input_file=conf['file'],
             ),
             ibm_forcing=conf.get('ibm_forcing', []),
             start_time=conf.get('start_time', None),
             stop_time=conf.get('stop_time', None),
             dt=conf.get('dt', None),
         )
+
+        from .model import load_class
+        LegacyForcing = load_class(conf.get('legacy_module', 'ladim.gridforce.ROMS.Forcing'))
 
         # Allow gridforce module in current directory
         import sys

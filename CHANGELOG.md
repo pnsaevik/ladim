@@ -12,6 +12,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - New grid and forcing module should have a clearer separation. Grid should
   take care of coordinate system changes, while forcing should return static
   fields.
+### Add
+- Multiplicity to the releaser module
+
+
+## [Unreleased] - 2024-xx-xx
+### Changed
+- Legacy modules are removed
+
 
 ## [1.3.5] - 2024-01-30 
 ### Added

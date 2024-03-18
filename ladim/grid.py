@@ -24,12 +24,13 @@ class RomsGrid(Grid):
 
         legacy_conf = dict(
             gridforce=dict(
-                input_file=conf['dataset'],
+                input_file=conf['file'],
             ),
             start_time=conf.get('start_time', None),
         )
 
-        from ladim.gridforce.ROMS import Grid as LegacyGrid
+        from .model import load_class
+        LegacyGrid = load_class(conf.get('legacy_module', 'ladim.gridforce.ROMS.Grid'))
 
         # Allow gridforce module in current directory
         import sys
