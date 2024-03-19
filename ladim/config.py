@@ -71,11 +71,17 @@ def _convert_1_to_2(c):
 
     # Read ibm config
     ibmconf_legacy = c.get('ibm', dict()).copy()
+    if 'module' in ibmconf_legacy:
+        ibmconf_legacy['ibm_module'] = ibmconf_legacy.pop('module')
     ibmconf = dict()
     if 'ibm_module' in ibmconf_legacy:
         ibmconf['module'] = 'ladim.ibms.LegacyIBM'
         ibmconf['legacy_module'] = ibmconf_legacy['ibm_module']
-        ibmconf['conf'] = dict(dt=dt_sec)
+        ibmconf['conf'] = dict(
+            dt=dt_sec,
+            output_instance=c.get('output_variables', {}).get('instance', []),
+            nc_attributes={k: v for k, v in outvars.items()}
+        )
         ibmconf['conf']['ibm'] = {
             k: v
             for k, v in ibmconf_legacy.items()
