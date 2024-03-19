@@ -39,6 +39,7 @@ class Test_RaggedOutput_update:
             # Confirm effect on output file
             dset = model.output.dataset
             assert 'release_time' in dset.variables
+            assert dset['release_time'].dimensions == ('particle', )
             assert dset['release_time'].units == "seconds since 1970-01-01"
             assert dset['release_time'].long_name == "particle release time"
             assert dset['release_time'][:].astype('datetime64[s]').astype(str).tolist() == [
@@ -56,6 +57,54 @@ class Test_RaggedOutput_update:
             assert dset['release_time'][:].astype('datetime64[s]').astype(str).tolist() == (
                 ['2000-01-01T00:00:00'] * 2 + ['2000-01-01T00:01:00'] * 3
             )
+
+        finally:
+            model.output.close()
+
+    def test_writes_time_and_particle_count_for_each_timestep(self):
+        # Define model
+        model = MockObj()  # type: typing.Any
+        model.state = MockObj()
+        model.state.released = 2
+        model.state.size = 2
+        model.state['pid'] = np.array([0, 1])
+        model.solver = MockObj()
+        model.solver.time = np.datetime64('2000-01-01', 's').astype('int64')
+        model.solver.step = 60
+        model.output = MockObj()
+        model.output = output.RaggedOutput(model, variables=dict(), file="", frequency=0)
+
+        try:
+            # Run update
+            model.output.update()
+
+            # Confirm effect on output file
+            dset = model.output.dataset
+            assert 'particle_count' in dset.variables
+            assert dset['particle_count'].dimensions == ('time',)
+            assert dset['particle_count'].long_name == "number of particles in a given timestep"
+            assert dset['particle_count'][:].tolist() == [2]
+
+            assert 'time' in dset.variables
+            assert dset['time'].dimensions == ('time',)
+            assert dset['time'].units == "seconds since 1970-01-01"
+            assert dset['time'].long_name == "time"
+            assert dset['time'][:].astype('datetime64[s]').astype(str).tolist() == [
+                '2000-01-01T00:00:00'
+            ]
+
+            # Add 3 new particles and kill 1 old
+            model.solver.time += model.solver.step
+            model.state.released = 5
+            model.state.size = 4
+            model.state['pid'] = np.array([0, 2, 3, 4])
+            model.output.update()
+
+            # Confirm effect on output file
+            assert dset['particle_count'][:].tolist() == [2, 4]
+            assert dset['time'][:].astype('datetime64[s]').astype(str).tolist() == [
+                '2000-01-01T00:00:00', '2000-01-01T00:01:00',
+            ]
 
         finally:
             model.output.close()
