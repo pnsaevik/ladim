@@ -61,12 +61,13 @@ def _convert_1_to_2(c):
     )
     if c['particle_release'].get('release_type', '') != 'continuous':
         del relconf['frequency']
-    if 'ibm_variables' in c.get('state', dict()):
-        relconf['defaults'] = {
-            k: np.float64(0)
-            for k in c['state']['ibm_variables']
-            if k not in relconf['colnames']
-        }
+    ibmvars = c.get('state', dict()).get('ibm_variables', [])
+    ibmvars += c.get('ibm', dict()).get('variables', [])
+    relconf['defaults'] = {
+        k: np.float64(0)
+        for k in ibmvars
+        if k not in relconf['colnames']
+    }
 
     # Read ibm config
     ibmconf_legacy = c.get('ibm', dict()).copy()
