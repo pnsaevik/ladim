@@ -1,7 +1,6 @@
 from .model import Model, Module
 import netCDF4 as nc
 import numpy as np
-from typing import Union
 
 
 class Output(Module):

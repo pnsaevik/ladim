@@ -109,7 +109,8 @@ class Test_RaggedOutput_update:
         finally:
             model.output.close()
 
-    def test_writes_instance_variables_if_given(self):
+    @pytest.mark.parametrize("kind", ['instance', 'initial'])
+    def test_writes_particles_as_instance_or_init_vars(self, kind):
         # Define model
         model = MockObj()  # type: typing.Any
         model.state = MockObj()
@@ -123,7 +124,7 @@ class Test_RaggedOutput_update:
         model.output = MockObj()
         model.output = output.RaggedOutput(
             model,
-            variables=dict(X=dict(units='m', long_name='x coord')),
+            variables=dict(X=dict(units='m', long_name='x coord', kind=kind)),
             file="",
             frequency=0,
         )
@@ -135,7 +136,6 @@ class Test_RaggedOutput_update:
             # Confirm effect on output file
             dset = model.output.dataset
             assert 'X' in dset.variables
-            assert dset['X'].dimensions == ('particle_instance',)
             assert dset['X'].units == "m"
             assert dset['X'].long_name == "x coord"
             assert dset['X'][:].tolist() == [10, 20]
@@ -149,7 +149,14 @@ class Test_RaggedOutput_update:
             model.output.update()
 
             # Confirm effect on output file
-            assert dset['X'][:].tolist() == [10, 20, 100, 200, 300, 400]
+            if kind == 'initial':
+                assert dset['X'].dimensions == ('particle',)
+                assert dset['X'][:].tolist() == [10, 20, 200, 300, 400]
+            elif kind == 'instance':
+                assert dset['X'].dimensions == ('particle_instance',)
+                assert dset['X'][:].tolist() == [10, 20, 100, 200, 300, 400]
+            else:
+                raise AssertionError(f'Wrong kind: {kind}')
 
         finally:
             model.output.close()
