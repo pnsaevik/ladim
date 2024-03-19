@@ -21,12 +21,12 @@ class HorizontalTracker:
         grid = self.model.grid
         forcing = self.model.forcing
 
-        dx, dy = grid.sample_metric(state['X'], state['Y'])
         t0 = self.model.solver.time
         dt = self.model.solver.step
 
         act = state['active']
         X, Y, Z = state['X'][act], state['Y'][act], state['Z'][act]
+        dx, dy = grid.sample_metric(X, Y)
         r0 = np.stack([X, Y])
 
         # Set diffusion function
