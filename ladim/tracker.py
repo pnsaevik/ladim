@@ -59,9 +59,13 @@ class HorizontalTracker:
 class StochasticDifferentialEquationIntegrator:
     @staticmethod
     def from_keyword(kw):
-        if kw != "RK4":
+        integrators = {
+            "RK4": RK4Integrator,
+            "EF": EFIntegrator,
+        }
+        if kw not in integrators:
             raise NotImplementedError(f"Unknown integration method: {kw}")
-        return RK4Integrator()
+        return integrators[kw]()
 
     def __call__(self, vel, mix, t0, r0, dt):
         """
@@ -112,6 +116,18 @@ class RK4Integrator(StochasticDifferentialEquationIntegrator):
 
         u_adv = (u1 + 2 * u2 + 2 * u3 + u4) / 6.0
         r_adv = r0 + u_adv * dt
+
+        # Diffusive velocity
+        u_diff = mixing(t0, r_adv)
+        dw = np.random.normal(size=np.size(r0)).reshape(r0.shape) * np.sqrt(dt)
+
+        return r_adv + u_diff * dw
+
+
+class EFIntegrator(StochasticDifferentialEquationIntegrator):
+    def __call__(self, velocity, mixing, t0, r0, dt):
+        u1 = velocity(t0, r0)
+        r_adv = r0 + u1 * dt
 
         # Diffusive velocity
         u_diff = mixing(t0, r_adv)
