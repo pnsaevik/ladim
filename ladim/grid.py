@@ -17,6 +17,9 @@ class Grid(Module):
     def ll2xy(self, lon, lat):
         raise NotImplementedError
 
+    def xy2ll(self, lon, lat):
+        raise NotImplementedError
+
 
 class RomsGrid(Grid):
     def __init__(self, model: Model, **conf):

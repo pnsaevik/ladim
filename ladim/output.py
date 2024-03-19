@@ -1,6 +1,7 @@
 from .model import Model, Module
 import netCDF4 as nc
 import numpy as np
+from typing import Union
 
 
 class Output(Module):
@@ -15,9 +16,11 @@ class RaggedOutput(Output):
 
         :param model: Parent model
         :param variables: Simulation variables to include in output, and their formatting
-        :param file: Name of output file
-        :param frequency: Output frequency, as a two-element tuple (freq_value,
-        freq_unit) where freq_unit can be any numpy-compatible time unit.
+        :param file: Name of output file, or empty if a diskless dataset is desired
+        :param frequency: Output frequency in seconds. Alternatively, as a two-element
+        tuple (freq_value, freq_unit) where freq_unit can be any numpy-compatible time
+        unit.
+
         """
         super().__init__(model)
 
@@ -30,14 +33,29 @@ class RaggedOutput(Output):
         self._init_vars = {k for k, v in self._formats.items() if v.is_initial()}
         self._inst_vars = {k for k, v in self._formats.items() if v.is_instance()}
 
-        self._fname = file
+        if not file:
+            from uuid import uuid4
+            self._fname = uuid4()
+            self._diskless = True
+        else:
+            self._fname = file
+            self._diskless = False
 
-        freq_num, freq_unit = frequency
+        try:
+            freq_num, freq_unit = frequency
+        except TypeError:
+            freq_num = frequency
+            freq_unit = 's'
         self._write_frequency = np.timedelta64(freq_num, freq_unit).astype('timedelta64[s]').astype('int64')
 
         self._dset = None
         self._num_writes = 0
         self._last_write_time = np.int64(-4611686018427387904)
+
+    @property
+    def dataset(self) -> nc.Dataset:
+        """Returns a handle to the netCDF dataset currently being written to"""
+        return self._dset
 
     def update(self):
         if self._dset is None:
@@ -137,6 +155,7 @@ class RaggedOutput(Output):
         self._dset = create_netcdf_file(
             fname=self._fname,
             formats={**default_formats, **self._formats},
+            diskless=self._diskless,
         )
 
         self._dset.variables['instance_offset'][:] = 0
@@ -185,7 +204,7 @@ class OutputFormat:
         )
 
 
-def create_netcdf_file(fname: str, formats: dict[OutputFormat], diskless=False) -> nc.Dataset:
+def create_netcdf_file(fname: str, formats: dict[str, OutputFormat], diskless=False) -> nc.Dataset:
     """
     Create new netCDF file
 
