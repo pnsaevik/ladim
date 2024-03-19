@@ -17,7 +17,7 @@ class Grid(Module):
     def ll2xy(self, lon, lat):
         raise NotImplementedError
 
-    def xy2ll(self, lon, lat):
+    def xy2ll(self, x, y):
         raise NotImplementedError
 
 

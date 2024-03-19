@@ -161,6 +161,41 @@ class Test_RaggedOutput_update:
         finally:
             model.output.close()
 
+    def test_can_output_lat_and_lon(self):
+        # Define model
+        model = MockObj()  # type: typing.Any
+        model.state = MockObj()
+        model.state.released = 2
+        model.state.size = 2
+        model.state['pid'] = np.array([0, 1])
+        model.state['X'] = np.array([1, 2])
+        model.state['Y'] = np.array([3, 4])
+        model.solver = MockObj()
+        model.solver.time = np.datetime64('2000-01-01', 's').astype('int64')
+        model.grid = MockObj()
+        model.grid.xy2ll = lambda x, y: (x + 10, y + 70)
+        model.output = MockObj()
+        model.output = output.RaggedOutput(
+            model,
+            variables=dict(lat=dict(), lon=dict()),
+            file="",
+            frequency=0,
+        )
+
+        try:
+            # Run update
+            model.output.update()
+
+            # Confirm effect on output file
+            dset = model.output.dataset
+            assert dset['lat'].dimensions == ('particle_instance',)
+            assert dset['lat'][:].tolist() == [73, 74]
+            assert dset['lon'].dimensions == ('particle_instance',)
+            assert dset['lon'][:].tolist() == [11, 12]
+
+        finally:
+            model.output.close()
+
 
 class MockObj:
     def __init__(self):

@@ -110,9 +110,12 @@ class RaggedOutput(Output):
         # Write variable values
         inst_size = self._dset.dimensions['particle_instance'].size
         inst_num = self.model.state.size
-        for v in self._inst_vars:
-            data = self.model.state[v]
-            self._dset.variables[v][inst_size:inst_size + inst_num] = data
+        inst_vars = {k: self.model.state[k] for k in set(self._inst_vars) - {'lat', 'lon'}}
+        if {'lat', 'lon'}.intersection(self._inst_vars):
+            x, y = self.model.state['X'], self.model.state['Y']
+            inst_vars['lon'], inst_vars['lat'] = self.model.grid.xy2ll(x, y)
+        for name, data in inst_vars.items():
+            self._dset.variables[name][inst_size:inst_size + inst_num] = data
 
         # Write particle count
         self._dset.variables['particle_count'][time_size] = inst_num
