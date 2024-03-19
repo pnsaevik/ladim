@@ -94,6 +94,10 @@ class TextFileReleaser(Releaser):
         if continuous_release and (len(df) == 0) and last_release_is_recent:
             return
 
+        # If we are at the final time step, we should not release any more particles
+        if continuous_release and self.model.solver.time >= self.model.solver.stop:
+            return
+
         # If we have continuous release, but there are no new particles and
         # the last release is NOT recent, we should replace the empty
         # dataframe with the previously released dataframe
