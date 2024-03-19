@@ -109,6 +109,51 @@ class Test_RaggedOutput_update:
         finally:
             model.output.close()
 
+    def test_writes_instance_variables_if_given(self):
+        # Define model
+        model = MockObj()  # type: typing.Any
+        model.state = MockObj()
+        model.state.released = 2
+        model.state.size = 2
+        model.state['pid'] = np.array([0, 1])
+        model.state['X'] = np.array([10, 20])
+        model.solver = MockObj()
+        model.solver.time = np.datetime64('2000-01-01', 's').astype('int64')
+        model.solver.step = 60
+        model.output = MockObj()
+        model.output = output.RaggedOutput(
+            model,
+            variables=dict(X=dict(units='m', long_name='x coord')),
+            file="",
+            frequency=0,
+        )
+
+        try:
+            # Run update
+            model.output.update()
+
+            # Confirm effect on output file
+            dset = model.output.dataset
+            assert 'X' in dset.variables
+            assert dset['X'].dimensions == ('particle_instance',)
+            assert dset['X'].units == "m"
+            assert dset['X'].long_name == "x coord"
+            assert dset['X'][:].tolist() == [10, 20]
+
+            # Add 3 new particles and kill 1 old
+            model.solver.time += model.solver.step
+            model.state.released = 5
+            model.state.size = 4
+            model.state['pid'] = np.array([0, 2, 3, 4])
+            model.state['X'] = np.array([100, 200, 300, 400])
+            model.output.update()
+
+            # Confirm effect on output file
+            assert dset['X'][:].tolist() == [10, 20, 100, 200, 300, 400]
+
+        finally:
+            model.output.close()
+
 
 class MockObj:
     def __init__(self):
