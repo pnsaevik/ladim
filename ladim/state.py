@@ -134,3 +134,9 @@ class DynamicState(State):
     def timestamp(self):
         """Backwards-compatibility function for returning solver time as numpy datetime"""
         return np.int64(self.model.solver.time).astype('datetime64[s]')
+
+    @property
+    def timestep(self):
+        """Backwards-compatibility function for returning solver time as timestep"""
+        elapsed = self.model.solver.time - self.model.solver.start
+        return elapsed // self.model.solver.step
