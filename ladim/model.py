@@ -46,34 +46,42 @@ class Model:
 
     @property
     def grid(self) -> "Grid":
+        # noinspection PyTypeChecker
         return self.modules.get('grid', None)
 
     @property
     def forcing(self) -> "Forcing":
+        # noinspection PyTypeChecker
         return self.modules.get('forcing', None)
 
     @property
     def release(self) -> "Releaser":
+        # noinspection PyTypeChecker
         return self.modules.get('release', None)
 
     @property
     def state(self) -> "State":
+        # noinspection PyTypeChecker
         return self.modules.get('state', None)
 
     @property
     def output(self) -> "Output":
+        # noinspection PyTypeChecker
         return self.modules.get('output', None)
 
     @property
     def ibm(self) -> "IBM":
+        # noinspection PyTypeChecker
         return self.modules.get('ibm', None)
 
     @property
     def tracker(self) -> "Tracker":
+        # noinspection PyTypeChecker
         return self.modules.get('tracker', None)
 
     @property
     def solver(self) -> "Solver":
+        # noinspection PyTypeChecker
         return self.modules.get('solver', None)
 
     def __getitem__(self, item):

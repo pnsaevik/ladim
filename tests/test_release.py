@@ -50,7 +50,7 @@ class Test_TextFileReleaser_update:
         releaser = release.TextFileReleaser(model=mock_model, file=buf)
         releaser.update()
 
-        # Confirm effect on release module
+        # Confirm effect on state module
         assert 'lat' not in mock_model.state
         assert list(mock_model.state['X']) == [400, 500]
         assert list(mock_model.state['Y']) == [600, 610]
@@ -71,8 +71,44 @@ class Test_TextFileReleaser_update:
         )
         releaser.update()
 
-        # Confirm effect on release module
+        # Confirm effect on state module
         assert list(mock_model.state['myvar']) == [23, 23]
+
+    def test_expands_multiplicity_variable(self, mock_model):
+        # Mock release file
+        buf = io.StringIO(
+            'mult release_time X Y\n'
+            '   1   2000-01-01 60 4\n'
+            '   2   2000-01-01 61 5\n'
+        )
+
+        # Run releaser update
+        releaser = release.TextFileReleaser(model=mock_model, file=buf)
+        releaser.update()
+
+        # Confirm effect on state module
+        assert list(mock_model.state['X']) == [60, 61, 61]
+
+    def test_removes_dead_particles(self, mock_model):
+        # Create mock release file
+        buf = io.StringIO(
+            'release_time X Y\n'
+            '2000-01-01 60 4\n'
+            '2000-01-01 61 5\n'
+        )
+
+        # Run releaser update
+        releaser = release.TextFileReleaser(model=mock_model, file=buf)
+        releaser.update()
+        assert list(mock_model.state['X']) == [60, 61]
+
+        # Mark particle 0 as dead and run releaser update
+        mock_model.state['alive'][0] = False
+        mock_model.solver.time += mock_model.solver.step
+        releaser.update()
+
+        # Confirm effect on state module
+        assert list(mock_model.state['X']) == [61]
 
 
 class MockObj:

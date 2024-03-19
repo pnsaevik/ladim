@@ -61,6 +61,17 @@ class TextFileReleaser(Releaser):
         self._defaults = defaults or dict()
 
     def update(self):
+        self._add_new()
+        self._kill_old()
+
+    def _kill_old(self):
+        state = self.model.state
+        if 'alive' in state:
+            alive = state['alive']
+            alive &= self.model.grid.ingrid(state['X'], state['Y'])
+            state.remove(~alive)
+
+    def _add_new(self):
         # Get the portion of the release dataset that corresponds to
         # current simulation time
         df = release_data_subset(
@@ -108,15 +119,15 @@ class TextFileReleaser(Releaser):
             if k not in df:
                 df[k] = v
 
+        # Expand multiplicity variable, if any
+        if 'mult' in df:
+            df = df.loc[np.repeat(df.index, df['mult'].values.astype('i4'))]
+            df = df.reset_index(drop=True).drop(columns='mult')
+
         # Add new particles
         new_particles = df.to_dict(orient='list')
         state = self.model.state
         state.append(new_particles)
-
-        # Remove dead particles
-        alive = state['alive']
-        alive &= self.model.grid.ingrid(state['X'], state['Y'])
-        state.remove(~alive)
 
     @property
     def dataframe(self):
