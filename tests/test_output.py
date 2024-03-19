@@ -161,6 +161,43 @@ class Test_RaggedOutput_update:
         finally:
             model.output.close()
 
+    def test_writes_only_at_output_points(self):
+        # Define model
+        model = MockObj()  # type: typing.Any
+        model.state = MockObj()
+        model.state.released = 2
+        model.state.size = 2
+        model.state['pid'] = np.array([0, 1])
+        model.state['X'] = np.array([10, 20])
+        model.solver = MockObj()
+        model.solver.time = np.datetime64('2000-01-01', 's').astype('int64')
+        model.solver.step = 60
+        model.output = MockObj()
+        model.output = output.RaggedOutput(
+            model,
+            variables=dict(X=dict(units='m', long_name='x coord')),
+            file="",
+            frequency=120,
+        )
+
+        try:
+            # Writes output on first step (0 sec)
+            model.output.update()
+            assert model.output.dataset['X'][:].tolist() == [10, 20]
+
+            # Does not write output on second step (60 sec)
+            model.solver.time += model.solver.step
+            model.output.update()
+            assert model.output.dataset['X'][:].tolist() == [10, 20]
+
+            # Writes output on third step (120 sec)
+            model.solver.time += model.solver.step
+            model.output.update()
+            assert model.output.dataset['X'][:].tolist() == [10, 20, 10, 20]
+
+        finally:
+            model.output.close()
+
     def test_can_output_lat_and_lon(self):
         # Define model
         model = MockObj()  # type: typing.Any
