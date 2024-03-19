@@ -85,7 +85,9 @@ class DynamicState(State):
         num_new_particles = next(len(v) for v in particles.values())
         particles['pid'] = np.arange(num_new_particles) + self._num_released
         particles['alive'] = np.ones(num_new_particles, dtype=bool)
-        if 'active' not in particles:
+        if 'active' in particles:
+            particles['active'] = np.array(particles['active'], dtype=bool)
+        else:
             particles['active'] = np.ones(num_new_particles, dtype=bool)
 
         new_particles = pd.DataFrame(data=particles)
