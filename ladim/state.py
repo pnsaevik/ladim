@@ -115,5 +115,10 @@ class DynamicState(State):
     def __setitem__(self, item, value):
         self._data[item] = value
 
+    def __getattr__(self, item):
+        if item not in self._data:
+            raise AttributeError(f'Attribute not defined: {item}')
+        return self._data[item]
+
     def __contains__(self, item):
         return item in self._data
