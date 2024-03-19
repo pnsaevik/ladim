@@ -116,9 +116,19 @@ class DynamicState(State):
         self._data[item] = value
 
     def __getattr__(self, item):
-        if item not in self._data:
+        if item not in self:
             raise AttributeError(f'Attribute not defined: {item}')
-        return self._data[item]
+        return self[item]
 
     def __contains__(self, item):
         return item in self._data
+
+    @property
+    def dt(self):
+        """Backwards-compatibility function for returning model.solver.step"""
+        return self.model.solver.step
+
+    @property
+    def timestamp(self):
+        """Backwards-compatibility function for returning solver time as numpy datetime"""
+        return np.int64(self.model.solver.time).astype('datetime64[s]')
