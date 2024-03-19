@@ -100,13 +100,13 @@ def _convert_1_to_2(c):
         grid=dict(
             file=c['gridforce']['input_file'],
             legacy_module=c['gridforce']['module'] + '.Grid',
-            start_time=c['time_control']['start_time'],
+            start_time=np.datetime64(c['time_control']['start_time'], 's'),
         ),
         forcing=dict(
             file=c['gridforce']['input_file'],
             legacy_module=c['gridforce']['module'] + '.Forcing',
-            start_time=c['time_control']['start_time'],
-            stop_time=c['time_control']['stop_time'],
+            start_time=np.datetime64(c['time_control']['start_time'], 's'),
+            stop_time=np.datetime64(c['time_control']['stop_time'], 's'),
             dt=np.timedelta64(dt_value, dt_unit).astype('int64'),
             ibm_forcing=c['gridforce'].get('ibm_forcing', []),
         ),
