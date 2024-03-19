@@ -36,6 +36,7 @@ def _versioned_configure(config_dict):
 def _convert_1_to_2(c):
     # Read timedelta
     dt_value, dt_unit = c['numerics']['dt']
+    dt_sec = np.timedelta64(dt_value, dt_unit).astype('int64')
 
     # Read output variables
     outvars = dict()
@@ -47,8 +48,8 @@ def _convert_1_to_2(c):
     if 'release_time' in outvars and 'units' in outvars['release_time']:
         outvars['release_time']['units'] = 'seconds since 1970-01-01'
 
-    # Read release variables
-    relvars = dict(
+    # Read release config
+    relconf = dict(
         file=c['files']['particle_release_file'],
         frequency=c['particle_release'].get('release_frequency', [0, 's']),
         colnames=c['particle_release']['variables'],
@@ -59,20 +60,33 @@ def _convert_1_to_2(c):
         },
     )
     if c['particle_release'].get('release_type', '') != 'continuous':
-        del relvars['frequency']
+        del relconf['frequency']
+    if 'ibm_variables' in c.get('state', dict()):
+        relconf['defaults'] = {
+            k: np.float64(0)
+            for k in c['state']['ibm_variables']
+            if k not in relconf['colnames']
+        }
 
-    # Read ibm vars
-    ibmvars = c.get('ibm', dict()).copy()
-    if 'ibm_module' in ibmvars:
-        ibmvars['module'] = ibmvars['ibm_module']
-        del ibmvars['ibm_module']
+    # Read ibm config
+    ibmconf_legacy = c.get('ibm', dict()).copy()
+    ibmconf = dict()
+    if 'ibm_module' in ibmconf_legacy:
+        ibmconf['module'] = 'ladim.ibms.LegacyIBM'
+        ibmconf['legacy_module'] = ibmconf_legacy['ibm_module']
+        ibmconf['conf'] = dict(dt=dt_sec)
+        ibmconf['conf']['ibm'] = {
+            k: v
+            for k, v in ibmconf_legacy.items()
+            if k != 'ibm_module'
+        }
 
     config_dict = dict(
         version=2,
         solver=dict(
             start=c['time_control']['start_time'],
             stop=c['time_control']['stop_time'],
-            step=np.timedelta64(dt_value, dt_unit).astype('int64'),
+            step=dt_sec,
             seed=c['numerics'].get('seed', None),
             order=['release', 'forcing', 'output', 'tracker', 'ibm', 'state'],
         ),
@@ -87,8 +101,9 @@ def _convert_1_to_2(c):
             start_time=c['time_control']['start_time'],
             stop_time=c['time_control']['stop_time'],
             dt=np.timedelta64(dt_value, dt_unit).astype('int64'),
+            ibm_forcing=c['gridforce'].get('ibm_forcing', []),
         ),
-        release=relvars,
+        release=relconf,
         output=dict(
             file=c['files']['output_file'],
             frequency=c['output_variables']['outper'],
@@ -98,6 +113,6 @@ def _convert_1_to_2(c):
             method=c['numerics']['advection'],
             diffusion=c['numerics']['diffusion'],
         ),
-        ibm=ibmvars,
+        ibm=ibmconf,
     )
     return config_dict
