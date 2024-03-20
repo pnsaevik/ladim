@@ -13,6 +13,8 @@ class HorizontalTracker:
     def __init__(self, model: Model, method, diffusion) -> None:
         self.model = model
 
+        if not diffusion:
+            method += "_nodiff"
         self.integrator = StochasticDifferentialEquationIntegrator.from_keyword(method)
         self.D = diffusion  # [m2.s-1]
 
@@ -62,6 +64,8 @@ class StochasticDifferentialEquationIntegrator:
         integrators = {
             "RK4": RK4Integrator,
             "EF": EFIntegrator,
+            "RK4_nodiff": RK4NodiffIntegrator,
+            "EF_nodiff": EFNodiffIntegrator,
         }
         if kw not in integrators:
             raise NotImplementedError(f"Unknown integration method: {kw}")
@@ -134,3 +138,28 @@ class EFIntegrator(StochasticDifferentialEquationIntegrator):
         dw = np.random.normal(size=np.size(r0)).reshape(r0.shape) * np.sqrt(dt)
 
         return r_adv + u_diff * dw
+
+
+class RK4NodiffIntegrator(StochasticDifferentialEquationIntegrator):
+    def __call__(self, velocity, mixing, t0, r0, dt):
+        u1 = velocity(t0, r0)
+        r1 = r0 + 0.5 * u1 * dt
+
+        u2 = velocity(t0 + 0.5 * dt, r1)
+        r2 = r0 + 0.5 * u2 * dt
+
+        u3 = velocity(t0 + 0.5 * dt, r2)
+        r3 = r0 + u3 * dt
+
+        u4 = velocity(t0 + dt, r3)
+
+        u_adv = (u1 + 2 * u2 + 2 * u3 + u4) / 6.0
+        r_adv = r0 + u_adv * dt
+
+        return r_adv
+
+
+class EFNodiffIntegrator(StochasticDifferentialEquationIntegrator):
+    def __call__(self, velocity, mixing, t0, r0, dt):
+        u1 = velocity(t0, r0)
+        return r0 + u1 * dt
