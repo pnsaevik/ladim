@@ -218,6 +218,7 @@ def create_netcdf_file(fname: str, formats: dict[str, OutputFormat], diskless=Fa
     from . import __version__ as ladim_version
 
     dset = nc.Dataset(filename=fname, mode='w', format='NETCDF4', diskless=diskless)
+    dset.set_auto_mask(False)
 
     # Create attributes
     dset.Conventions = "CF-1.8"
@@ -238,6 +239,8 @@ def create_netcdf_file(fname: str, formats: dict[str, OutputFormat], diskless=Fa
             datatype=item.ncformat,
             dimensions=item.dimensions,
         )
+        dset.variables[varname].set_auto_mask(False)
         dset.variables[varname].setncatts(item.attributes)
+
 
     return dset
