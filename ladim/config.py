@@ -36,7 +36,7 @@ def _versioned_configure(config_dict):
 def _convert_1_to_2(c):
     # Read timedelta
     dt_value, dt_unit = c['numerics']['dt']
-    dt_sec = np.timedelta64(dt_value, dt_unit).astype('int64')
+    dt_sec = np.timedelta64(dt_value, dt_unit).astype('timedelta64[s]').astype('int64')
 
     # Read output variables
     outvars = dict()
@@ -107,7 +107,7 @@ def _convert_1_to_2(c):
             legacy_module=c['gridforce']['module'] + '.Forcing',
             start_time=np.datetime64(c['time_control']['start_time'], 's'),
             stop_time=np.datetime64(c['time_control']['stop_time'], 's'),
-            dt=np.timedelta64(dt_value, dt_unit).astype('int64'),
+            dt=dt_sec,
             ibm_forcing=c['gridforce'].get('ibm_forcing', []),
         ),
         release=relconf,
