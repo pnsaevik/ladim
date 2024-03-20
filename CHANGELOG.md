@@ -5,7 +5,38 @@ All notable changes to the project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.5] - 2024-01-25
+## [Issues]
+### Change
+- Velocity in forcing module should return "grid speed" velocity. Rescaling
+  should happen within the forcing module, not tracking module.
+- New grid and forcing module should have a clearer separation. Grid should
+  take care of coordinate system changes, while forcing should return static
+  fields.
+### Add
+- Multiplicity to the releaser module
+
+
+## [2.0.0] - 2024-03-20
+### Changed
+- Legacy modules are removed. This may lead to nuance changes in ladim output.
+### Fixed
+- Tracker module no longer gives error if particles are deactivated
+
+
+## [1.3.5] - 2024-01-30 
+### Added
+- Text releaser module can add default values other than zero
+### Fixed
+- Allow mixture of unix and windows path slash in config file
+- Particles close to edge no longer causes errors
+### Changed
+- Output module is now called at the end of each timestep
+- New output module
+- New release module
+- New tracker module
+
+
+## [1.3.4] - 2024-01-25
 ### Fixed
 - Package now works with pandas 2.2.0
 

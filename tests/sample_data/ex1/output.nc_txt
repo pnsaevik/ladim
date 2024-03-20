@@ -1,0 +1,195 @@
+{
+    "coords": {
+        "time": {
+            "dims": [
+                "time"
+            ],
+            "attrs": {
+                "long_name": "time",
+                "standard_name": "time"
+            },
+            "data": [
+                "2015-09-07 01:00:00",
+                "2015-09-07 01:01:00",
+                "2015-09-07 01:02:00",
+                "2015-09-07 01:03:00",
+                "2015-09-07 01:04:00",
+                "2015-09-07 01:05:00"
+            ]
+        }
+    },
+    "attrs": {
+        "Conventions": "CF-1.8",
+        "institution": "Institute of Marine Research",
+        "source": "Lagrangian Advection and Diffusion Model"
+    },
+    "dims": {
+        "time": 6,
+        "particle": 5,
+        "particle_instance": 20
+    },
+    "data_vars": {
+        "instance_offset": {
+            "dims": [],
+            "attrs": {
+                "long_name": "particle instance offset for file"
+            },
+            "data": 0
+        },
+        "particle_count": {
+            "dims": [
+                "time"
+            ],
+            "attrs": {
+                "long_name": "number of particles in a given timestep",
+                "ragged_row_count": "particle count at nth timestep"
+            },
+            "data": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                5
+            ]
+        },
+        "release_time": {
+            "dims": [
+                "particle"
+            ],
+            "attrs": {
+                "long_name": "particle release time"
+            },
+            "data": [
+                "2015-09-07 01:00:00",
+                "2015-09-07 01:01:00",
+                "2015-09-07 01:02:00",
+                "2015-09-07 01:03:00",
+                "2015-09-07 01:04:00"
+            ]
+        },
+        "pid": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle identifier"
+            },
+            "data": [
+                0,
+                0,
+                1,
+                0,
+                1,
+                2,
+                0,
+                1,
+                2,
+                3,
+                0,
+                1,
+                2,
+                3,
+                4,
+                0,
+                1,
+                2,
+                3,
+                4
+            ]
+        },
+        "X": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle X-coordinate"
+            },
+            "data": [
+                5.0,
+                5.036,
+                5.0,
+                5.056,
+                5.046,
+                5.0,
+                5.075,
+                5.042,
+                4.994,
+                5.0,
+                5.091,
+                5.046,
+                5.002,
+                5.004,
+                5.0,
+                5.036,
+                5.063,
+                5.019,
+                4.987,
+                5.045
+            ]
+        },
+        "Y": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle Y-coordinate"
+            },
+            "data": [
+                4.0,
+                3.956,
+                4.0,
+                3.943,
+                3.925,
+                4.0,
+                3.898,
+                3.875,
+                3.978,
+                4.0,
+                3.876,
+                3.816,
+                3.931,
+                3.927,
+                4.0,
+                3.789,
+                3.762,
+                3.872,
+                3.906,
+                3.977
+            ]
+        },
+        "Z": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle depth",
+                "standard_name": "depth_below_surface",
+                "units": "m",
+                "positive": "down"
+            },
+            "data": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ]
+        }
+    }
+}

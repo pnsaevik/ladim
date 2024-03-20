@@ -277,6 +277,9 @@ def bilin_inv(f, g, F, G, maxiter=7, tol=1.0e-7):
             i = x.astype("i")
             j = y.astype("i")
 
+        i = np.maximum(np.minimum(i, imax - 2), 0)
+        j = np.maximum(np.minimum(j, jmax - 2), 0)
+
         p, q = x - i, y - j
 
         # Bilinear estimate of F[x,y] and G[x,y]

@@ -1,0 +1,56 @@
+# New version of configuration file
+
+solver:
+    module: ladim.solver.Solver
+    start: '2015-09-07T01:00:00'
+    stop: '2015-09-07T01:05:00'
+    step: 60
+    seed: 0
+
+grid:
+    module: ladim.grid.RomsGrid
+    file: '../forcing.nc'
+
+release:
+    module: ladim.release.TextFileReleaser
+    file: particles.rls
+    frequency: [1, 'm']
+
+forcing:
+    module: ladim.forcing.RomsForcing
+    file: '../forcing*.nc'
+    start_time: '2015-09-07T01:00:00'
+    stop_time: '2015-09-07T01:05:00'
+    dt: 60
+
+output:
+    module: ladim.output.RaggedOutput
+    file: 'out.nc'
+    frequency: [1, 'm']
+    variables:
+        pid: {
+            'ncformat': 'i4',
+            'long_name': 'particle identifier'}
+        X: {
+            'ncformat': 'f4',
+            'long_name': 'particle X-coordinate'}
+        Y: {
+            'ncformat': 'f4',
+            'long_name': 'particle Y-coordinate'}
+        Z: {
+            'ncformat': 'f4',
+            'long_name': 'particle depth',
+            'standard_name': 'depth_below_surface',
+            'units': 'm',
+            'positive': 'down'}
+
+tracker:
+    module: ladim.tracker.HorizontalTracker
+    method: 'RK4'
+    diffusion: 0.1
+
+ibm:
+    module: ladim.ibms.IBM
+
+state:
+    module: ladim.state.DynamicState

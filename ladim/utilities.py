@@ -25,3 +25,8 @@ def ingrid(x: float, y: float, subgrid: List[int]) -> bool:
     """Check if position (x, y) is in a subgrid"""
     i0, i1, j0, j1 = subgrid
     return (i0 <= x) & (x <= i1 - 1) & (j0 <= y) & (y <= j1 - 1)
+
+
+def read_timedelta(conf) -> np.timedelta64:
+    time_value, time_unit = conf
+    return np.timedelta64(time_value, time_unit)
