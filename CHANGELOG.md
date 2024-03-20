@@ -16,9 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Multiplicity to the releaser module
 
 
-## [Unreleased] - 2024-xx-xx
+## [2.0.0] - 2024-03-20
 ### Changed
-- Legacy modules are removed
+- Legacy modules are removed. This may lead to nuance changes in ladim output.
+### Fixed
+- Tracker module no longer gives error if particles are deactivated
 
 
 ## [1.3.5] - 2024-01-30 
