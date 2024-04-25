@@ -16,6 +16,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Multiplicity to the releaser module
 
 
+## [Unreleased] - xxxx-xx-xx
+### Fixed
+- No longer throws error if there are no released particles at simulation start
+
 ## [2.0.0] - 2024-03-20
 ### Changed
 - Legacy modules are removed. This may lead to nuance changes in ladim output.

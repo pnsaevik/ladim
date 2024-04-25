@@ -80,6 +80,11 @@ class TextFileReleaser(Releaser):
             stop_time=self.model.solver.time + self.model.solver.step,
         ).copy(deep=True)
 
+        # If there are no new particles, but the state is empty, we should
+        # still initialize the state by adding the appropriate columns
+        if (len(df) == 0) and ('X' not in self.model.state):
+            self.model.state.append(df.to_dict(orient='list'))
+
         # If there are no new particles and we don't use continuous release,
         # we are done.
         continuous_release = bool(self._frequency)
