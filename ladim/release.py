@@ -53,7 +53,7 @@ class TextFileReleaser(Releaser):
         self._dataframe = None
 
         # Continuous release variables
-        self._frequency = read_timedelta(frequency)
+        self._frequency = read_timedelta(frequency) / np.timedelta64(1, 's')
         self._last_release_dataframe = pd.DataFrame()
         self._last_release_time = np.int64(-4611686018427387904)
 
