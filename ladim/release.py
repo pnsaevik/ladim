@@ -53,7 +53,7 @@ class TextFileReleaser(Releaser):
         self._dataframe = None
 
         # Continuous release variables
-        self._frequency = read_timedelta(frequency)
+        self._frequency = read_timedelta(frequency) / np.timedelta64(1, 's')
         self._last_release_dataframe = pd.DataFrame()
         self._last_release_time = np.int64(-4611686018427387904)
 
@@ -80,6 +80,12 @@ class TextFileReleaser(Releaser):
             stop_time=self.model.solver.time + self.model.solver.step,
         ).copy(deep=True)
 
+        # If there are no new particles, but the state is empty, we should
+        # still initialize the state by adding the appropriate columns
+        if (len(df) == 0) and ('X' not in self.model.state):
+            self.model.state.append(df.to_dict(orient='list'))
+            self._last_release_dataframe = df
+
         # If there are no new particles and we don't use continuous release,
         # we are done.
         continuous_release = bool(self._frequency)
@@ -99,7 +105,7 @@ class TextFileReleaser(Releaser):
             return
 
         # If we have continuous release, but there are no new particles and
-        # the last release is NOT recent, we should replace the empty
+        # the last release is NOT recent, we should replace empty
         # dataframe with the previously released dataframe
         if continuous_release:
             if (len(df) == 0) and not last_release_is_recent:
@@ -148,6 +154,7 @@ class TextFileReleaser(Releaser):
                 self._dataframe = self._csv_fname
 
             else:
+                # noinspection PyArgumentList
                 with open_or_relay(self._csv_fname, 'r', encoding='utf-8') as fp:
                     self._dataframe = load_release_file(
                         stream=fp,

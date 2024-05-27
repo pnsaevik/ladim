@@ -34,9 +34,57 @@ class Test_TextFileReleaser_update:
 
         model.solver = MockObj()
         model.solver.time = np.datetime64('2000-01-01', 's').astype('int64')
+        model.solver.stop = np.datetime64('2000-01-02', 's').astype('int64')
         model.solver.step = 60
 
         return model
+
+    def test_continuous_release_resets_when_new_release_time(self, mock_model):
+        # Create mock release file
+        buf = io.StringIO(
+            'release_time X Y\n'
+            '2000-01-01T00:01:00 4 60\n'
+            '2000-01-01T00:01:00 5 61\n'
+            '2000-01-01T00:05:00 6 62\n'
+        )
+
+        # Create continuous releaser
+        releaser = release.TextFileReleaser(
+            model=mock_model,
+            file=buf,
+            frequency=(2, 'm'),
+        )
+
+        # Time step 0: No particles yet
+        releaser.update()
+        assert list(mock_model.state['X']) == []
+
+        # Time step 1: First particle release
+        mock_model.solver.time += mock_model.solver.step
+        releaser.update()
+        assert list(mock_model.state['X']) == [4, 5]
+
+        # Time step 2: Intermediate step, no additional particles
+        mock_model.solver.time += mock_model.solver.step
+        releaser.update()
+        assert list(mock_model.state['X']) == [4, 5]
+
+        # Time step 3: Second release, two new particles
+        # Using previous release instructions
+        mock_model.solver.time += mock_model.solver.step
+        releaser.update()
+        assert list(mock_model.state['X']) == [4, 5, 4, 5]
+
+        # Time step 4: Intermediate step, no additional particles
+        mock_model.solver.time += mock_model.solver.step
+        releaser.update()
+        assert list(mock_model.state['X']) == [4, 5, 4, 5]
+
+        # Time step 5: New release instructions
+        # One new particle at a new position, previous instructions cleared
+        mock_model.solver.time += mock_model.solver.step
+        releaser.update()
+        assert list(mock_model.state['X']) == [4, 5, 4, 5, 6]
 
     def test_converts_latlon_colnames_to_xy(self, mock_model):
         # Create mock release file
