@@ -16,9 +16,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Multiplicity to the releaser module
 
 
-## [Unreleased] - xxxx-xx-xx
+## [2.0.1] - 2024-05-27
 ### Fixed
 - No longer throws error if there are no released particles at simulation start
+- Non-second units in continuous release are respected
 
 ## [2.0.0] - 2024-03-20
 ### Changed
