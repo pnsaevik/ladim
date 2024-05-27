@@ -84,6 +84,7 @@ class TextFileReleaser(Releaser):
         # still initialize the state by adding the appropriate columns
         if (len(df) == 0) and ('X' not in self.model.state):
             self.model.state.append(df.to_dict(orient='list'))
+            self._last_release_dataframe = df
 
         # If there are no new particles and we don't use continuous release,
         # we are done.
@@ -104,7 +105,7 @@ class TextFileReleaser(Releaser):
             return
 
         # If we have continuous release, but there are no new particles and
-        # the last release is NOT recent, we should replace the empty
+        # the last release is NOT recent, we should replace empty
         # dataframe with the previously released dataframe
         if continuous_release:
             if (len(df) == 0) and not last_release_is_recent:
@@ -153,6 +154,7 @@ class TextFileReleaser(Releaser):
                 self._dataframe = self._csv_fname
 
             else:
+                # noinspection PyArgumentList
                 with open_or_relay(self._csv_fname, 'r', encoding='utf-8') as fp:
                     self._dataframe = load_release_file(
                         stream=fp,
