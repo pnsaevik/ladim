@@ -15,8 +15,10 @@ import glob
 import logging
 import numpy as np
 from netCDF4 import Dataset, num2date
-
 from ladim.sample import sample2D, bilin_inv
+
+
+logger = logging.getLogger(__name__)
 
 
 class Grid:
@@ -34,7 +36,7 @@ class Grid:
 
     def __init__(self, config):
 
-        logging.info("Initializing ROMS-type grid object")
+        logger.info("Initializing ROMS-type grid object")
 
         # Grid file
         if "grid_file" in config["gridforce"]:
@@ -357,6 +359,7 @@ class Forcing:
         all_frames = []  # All time frames
         num_frames = {}  # Number of time frames in each file
         for fname in files:
+            logging.info(f'Open forcing file {fname}')
             with Dataset(fname) as nc:
                 new_times = nc.variables["ocean_time"][:]
                 num_frames[fname] = len(new_times)
