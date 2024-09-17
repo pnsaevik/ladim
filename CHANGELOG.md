@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Multiplicity to the releaser module
 
 
+## [Unreleased] - xxxx-xx-xx
+### Fixed
+- Accepts setattr-style assignments in ibm module
+
+
 ## [2.0.1] - 2024-05-27
 ### Fixed
 - No longer throws error if there are no released particles at simulation start
