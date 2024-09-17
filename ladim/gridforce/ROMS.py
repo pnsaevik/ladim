@@ -46,14 +46,14 @@ class Grid:
             files.sort()
             grid_file = files[0]
         else:
-            logging.error("No grid file specified")
+            logger.error("No grid file specified")
             raise SystemExit(1)
 
         try:
             ncid = Dataset(grid_file)
             ncid.set_auto_mask(False)
         except OSError:
-            logging.error("Could not open grid file " + grid_file)
+            logger.error("Could not open grid file " + grid_file)
             raise SystemExit(1)
 
         # Subgrid, only considers internal grid cells
@@ -244,7 +244,7 @@ class Forcing:
 
     def __init__(self, config, grid):
 
-        logging.info("Initiating forcing")
+        logger.info("Initiating forcing")
 
         self._grid = grid  # Get the grid object, make private?
         # self.config = config["gridforce"]
@@ -257,9 +257,9 @@ class Forcing:
         files = self.find_files(config["gridforce"])
         numfiles = len(files)
         if numfiles == 0:
-            logging.error("No input file: {}".format(config["gridforce"]["input_file"]))
+            logger.error("No input file: {}".format(config["gridforce"]["input_file"]))
             raise SystemExit(3)
-        logging.info("Number of forcing files = {}".format(numfiles))
+        logger.info("Number of forcing files = {}".format(numfiles))
 
         # ---------------------------
         # Overview of all the files
@@ -359,7 +359,7 @@ class Forcing:
         all_frames = []  # All time frames
         num_frames = {}  # Number of time frames in each file
         for fname in files:
-            logging.info(f'Open forcing file {fname}')
+            logger.info(f'Open forcing file {fname}')
             with Dataset(fname) as nc:
                 new_times = nc.variables["ocean_time"][:]
                 num_frames[fname] = len(new_times)
@@ -373,11 +373,11 @@ class Forcing:
         if np.any(I):
             i = I.nonzero()[0][0] + 1   # Index of first out-of-order frame
             oooframe = str(all_frames[i]).split('.')[0]  # Remove microseconds
-            logging.info(f"Time frame {i} = {oooframe} out of order")
-            logging.critical("Forcing time frames not strictly sorted")
+            logger.info(f"Time frame {i} = {oooframe} out of order")
+            logger.critical("Forcing time frames not strictly sorted")
             raise SystemExit(4)
 
-        logging.info(f"Number of available forcing times = {len(all_frames)}")
+        logger.info(f"Number of available forcing times = {len(all_frames)}")
         return all_frames, num_frames
 
     @staticmethod
@@ -385,8 +385,8 @@ class Forcing:
 
         time0 = all_frames[0]
         time1 = all_frames[-1]
-        logging.info(f"First forcing time = {time0}")
-        logging.info(f"Last forcing time = {time1}")
+        logger.info(f"First forcing time = {time0}")
+        logger.info(f"Last forcing time = {time1}")
         start_time = np.datetime64(config["start_time"])
         dt = np.timedelta64(int(config["dt"]), "s")
 
@@ -394,10 +394,10 @@ class Forcing:
         # ------------------------------------------------------
 
         if time0 > start_time:
-            logging.error("No forcing at start time")
+            logger.error("No forcing at start time")
             raise SystemExit(3)
         if time1 < config["stop_time"]:
-            logging.error("No forcing at stop time")
+            logger.error("No forcing at stop time")
             raise SystemExit(3)
 
         # Make a list steps of the forcing time steps
@@ -430,7 +430,7 @@ class Forcing:
         interpolate_velocity_in_time = True
         interpolate_ibm_forcing_in_time = False
 
-        logging.debug("Updating forcing, time step = {}".format(t))
+        logger.debug("Updating forcing, time step = {}".format(t))
         if t in self.steps:  # No time interpolation
             self.U = self.Unew
             self.V = self.Vnew
@@ -489,7 +489,7 @@ class Forcing:
 
         # Handle file opening/closing
         # Always read velocity before other fields
-        logging.info("Reading velocity for time step = {}".format(n))
+        logger.info("Reading velocity for time step = {}".format(n))
 
         # If finished a file or first read (self._nc == "")
         if not self._nc:  # First read
