@@ -122,6 +122,14 @@ class DynamicState(State):
             raise AttributeError(f'Attribute not defined: {item}')
         return self[item]
 
+    def __setattr__(self, item, value):
+        if item in list(self.__dict__.keys()) + ['_data', '_model', '_num_released', '_varnames']:
+            super().__setattr__(item, value)
+        elif item in self._data:
+            self._data[item] = value
+        else:
+            raise AttributeError(f"Attribute not defined: '{item}'")
+
     def __contains__(self, item):
         return item in self._data
 

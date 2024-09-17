@@ -12,11 +12,12 @@ Lagrangian Advection and Diffusion Model
 # ---------------------------------
 
 import logging
-
 import ladim
-
 from .config import configure
 from .model import Model
+
+
+logger = logging.getLogger(__name__)
 
 
 def main(config_stream, loglevel=logging.INFO):
@@ -67,23 +68,23 @@ def run():
 
     args = parser.parse_args()
 
-    logging.info(" ================================================")
-    logging.info(" === Lagrangian Advection and Diffusion Model ===")
-    logging.info(" ================================================\n")
+    logger.info(" ================================================")
+    logger.info(" === Lagrangian Advection and Diffusion Model ===")
+    logger.info(" ================================================\n")
 
-    logging.info(f"ladim path: {ladim.__file__.strip('__init.py__')}")
-    logging.info(f"ladim version:  {ladim.__version__}\n")
-    logging.info(f"python version:  {sys.version.split()[0]}\n")
+    logger.info(f"ladim path: {ladim.__file__.strip('__init.py__')}")
+    logger.info(f"ladim version:  {ladim.__version__}\n")
+    logger.info(f"python version:  {sys.version.split()[0]}\n")
 
-    logging.info(f"  Configuration file: {args.config_file}")
-    logging.info(f"  loglevel = {logging.getLevelName(args.loglevel)}")
+    logger.info(f"  Configuration file: {args.config_file}")
+    logger.info(f"  loglevel = {logging.getLevelName(args.loglevel)}")
 
     # =============
     # Sanity check
     # =============
 
     if not Path(args.config_file).exists():
-        logging.critical(f'Configuration file {args.config_file} not found')
+        logger.critical(f'Configuration file {args.config_file} not found')
         raise SystemExit(1)
 
     # ===================
@@ -92,7 +93,7 @@ def run():
 
     # Start message
     now = datetime.datetime.now().replace(microsecond=0)
-    logging.info(f'LADiM simulation starting, wall time={now}')
+    logger.info(f'LADiM simulation starting, wall time={now}')
 
     fp = open(args.config_file, encoding='utf8')
     ladim.main(config_stream=fp, loglevel=args.loglevel)
@@ -100,4 +101,4 @@ def run():
     # Reset logging and print final message
     logging.getLogger().setLevel(logging.INFO)
     now = datetime.datetime.now().replace(microsecond=0)
-    logging.info(f'LADiM simulation finished, wall time={now}')
+    logger.info(f'LADiM simulation finished, wall time={now}')

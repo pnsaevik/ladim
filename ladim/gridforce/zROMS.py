@@ -18,6 +18,9 @@ from netCDF4 import Dataset, num2date
 from ladim.sample import sample2D
 
 
+logger = logging.getLogger(__name__)
+
+
 class Grid:
     """Simple ROMS grid object
 
@@ -33,11 +36,11 @@ class Grid:
 
     def __init__(self, config):
 
-        logging.info("Initializing zROMS grid object")
+        logger.info("Initializing zROMS grid object")
         try:
             ncid = Dataset(config["gridforce"]["grid_file"])
         except OSError:
-            logging.error(
+            logger.error(
                 "Grid file {} not found".format(config["gridforce"]["grid_file"])
             )
             raise SystemExit(1)
@@ -188,7 +191,7 @@ class Forcing:
 
     def __init__(self, config, grid):
 
-        logging.info("Initiating forcing")
+        logger.info("Initiating forcing")
 
         self._grid = grid  # Get the grid object, make private?
 
@@ -199,9 +202,9 @@ class Forcing:
         files.sort()
         numfiles = len(files)
         if numfiles == 0:
-            logging.error("No input file: {}".format(config["gridforce"]["input_file"]))
+            logger.error("No input file: {}".format(config["gridforce"]["input_file"]))
             raise SystemExit(3)
-        logging.info("Number of forcing files = {}".format(numfiles))
+        logger.info("Number of forcing files = {}".format(numfiles))
 
         # ----------------------------------------
         # Open first file for some general info
@@ -250,14 +253,14 @@ class Forcing:
                 new_times = nc.variables["time"][:]
                 times.extend(new_times)
                 num_frames.append(len(new_times))
-        logging.info("Number of available forcing times = {:d}".format(len(times)))
+        logger.info("Number of available forcing times = {:d}".format(len(times)))
 
         # Find first/last forcing times
         # -----------------------------
         time0 = num2date(times[0], time_units)
         time1 = num2date(times[-1], time_units)
-        logging.info("time0 = {}".format(str(time0)))
-        logging.info("time1 = {}".format(str(time1)))
+        logger.info("time0 = {}".format(str(time0)))
+        logger.info("time1 = {}".format(str(time1)))
         # print(time0)
         # print(time1)
         start_time = np.datetime64(config["start_time"])
@@ -269,10 +272,10 @@ class Forcing:
         # Use logging module for this
 
         if time0 > start_time:
-            logging.error("No forcing at start time")
+            logger.error("No forcing at start time")
             raise SystemExit(3)
         if time1 < config["stop_time"]:
-            logging.error("No forcing at stop time")
+            logger.error("No forcing at stop time")
             raise SystemExit(3)
 
         # Make a list steps of the forcing time steps
@@ -362,7 +365,7 @@ class Forcing:
         interpolate_velocity_in_time = True
         interpolate_ibm_forcing_in_time = False
 
-        logging.debug("Updating forcing, time step = {}".format(t))
+        logger.debug("Updating forcing, time step = {}".format(t))
         if t in self.steps:  # No time interpolation
             self.U = self.Unew
             self.V = self.Vnew
@@ -399,7 +402,7 @@ class Forcing:
 
         # Handle file opening/closing
         # Always read velocity before other fields
-        logging.debug("Reading velocity for time step = {}".format(n))
+        logger.debug("Reading velocity for time step = {}".format(n))
         first = True
         if first:  # Open file initiallt
             self._nc = Dataset(self._files[self.file_idx[n]])
