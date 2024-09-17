@@ -123,8 +123,7 @@ class DynamicState(State):
         return self[item]
 
     def __setattr__(self, item, value):
-        # Only allow setting of predefined attributes
-        if item in self.__dict__:
+        if item in list(self.__dict__.keys()) + ['_data', '_model', '_num_released', '_varnames']:
             super().__setattr__(item, value)
         elif item in self._data:
             self._data[item] = value
