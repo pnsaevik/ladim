@@ -86,7 +86,7 @@ def convert_1_to_2(c):
     out['grid']['start_time'] = np.datetime64(dict_get(c, 'time_control.start_time', '1970'), 's')
 
     out['forcing'] = {}
-    out['forcing']['file'] = dict_get(c, 'gridforce.input_file')
+    out['forcing']['file'] = dict_get(c, ['gridforce.input_file', 'files.input_file'])
     out['forcing']['legacy_module'] = dict_get(c, 'gridforce.module', '') + '.Forcing'
     out['forcing']['start_time'] = np.datetime64(dict_get(c, 'time_control.start_time', '1970'), 's')
     out['forcing']['stop_time'] = np.datetime64(dict_get(c, 'time_control.stop_time', '1970'), 's')
