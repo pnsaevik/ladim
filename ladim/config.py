@@ -79,7 +79,9 @@ def convert_1_to_2(c):
     out['solver']['order'] = ['release', 'forcing', 'output', 'tracker', 'ibm', 'state']
 
     out['grid'] = {}
-    out['grid']['file'] = dict_get(c, 'gridforce.input_file')
+    out['grid']['file'] = dict_get(c, [
+        'files.grid_file', 'gridforce.grid_file',
+        'files.input_file', 'gridforce.input_file'])
     out['grid']['legacy_module'] = dict_get(c, 'gridforce.module', '') + '.Grid'
     out['grid']['start_time'] = np.datetime64(dict_get(c, 'time_control.start_time', '1970'), 's')
 
