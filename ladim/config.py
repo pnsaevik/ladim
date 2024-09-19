@@ -28,12 +28,12 @@ def configure(module_conf):
 
 def _versioned_configure(config_dict):
     if config_dict['version'] == 1:
-        config_dict = _convert_1_to_2(config_dict)
+        config_dict = convert_1_to_2(config_dict)
 
     return config_dict
 
 
-def _convert_1_to_2(c):
+def convert_1_to_2(c):
     # Read timedelta
     dt_value, dt_unit = c['numerics']['dt']
     dt_sec = np.timedelta64(dt_value, dt_unit).astype('timedelta64[s]').astype('int64')
