@@ -33,93 +33,111 @@ def _versioned_configure(config_dict):
     return config_dict
 
 
-def convert_1_to_2(c):
-    # Read timedelta
-    dt_value, dt_unit = c['numerics']['dt']
-    dt_sec = np.timedelta64(dt_value, dt_unit).astype('timedelta64[s]').astype('int64')
+def dict_get(d, items, default=None):
+    if isinstance(items, str):
+        items = [items]
 
-    # Read output variables
-    outvars = dict()
-    outvar_names = c['output_variables'].get('particle', []) + c['output_variables'].get('instance', [])
+    for item in items:
+        try:
+            return dict_get_single(d, item)
+        except KeyError:
+            pass
+
+    return default
+
+
+def dict_get_single(d, item):
+    tokens = str(item).split(sep='.')
+    sub_dict = d
+    for t in tokens:
+        if t in sub_dict:
+            sub_dict = sub_dict[t]
+        else:
+            raise KeyError
+
+    return sub_dict
+
+
+def convert_1_to_2(c):
+
+    out = {}
+
+    # Read timedelta
+    dt_sec = None
+    if 'numerics' in c:
+        if 'dt' in c['numerics']:
+            dt_value, dt_unit = c['numerics']['dt']
+            dt_sec = np.timedelta64(dt_value, dt_unit).astype('timedelta64[s]').astype('int64')
+
+    out['version'] = 2
+
+    out['solver'] = {}
+    out['solver']['start'] = dict_get(c, 'time_control.start_time')
+    out['solver']['stop'] = dict_get(c, 'time_control.stop_time')
+    out['solver']['step'] = dt_sec
+    out['solver']['seed'] = dict_get(c, 'numerics.seed')
+    out['solver']['order'] = ['release', 'forcing', 'output', 'tracker', 'ibm', 'state']
+
+    out['grid'] = {}
+    out['grid']['file'] = dict_get(c, 'gridforce.input_file')
+    out['grid']['legacy_module'] = dict_get(c, 'gridforce.module', '') + '.Grid'
+    out['grid']['start_time'] = np.datetime64(dict_get(c, 'time_control.start_time', '1970'), 's')
+
+    out['forcing'] = {}
+    out['forcing']['file'] = dict_get(c, 'gridforce.input_file')
+    out['forcing']['legacy_module'] = dict_get(c, 'gridforce.module', '') + '.Forcing'
+    out['forcing']['start_time'] = np.datetime64(dict_get(c, 'time_control.start_time', '1970'), 's')
+    out['forcing']['stop_time'] = np.datetime64(dict_get(c, 'time_control.stop_time', '1970'), 's')
+    out['forcing']['dt'] = dt_sec
+    out['forcing']['ibm_forcing'] = dict_get(c, 'gridforce.ibm_forcing', [])
+
+    out['output'] = {}
+    out['output']['file'] = dict_get(c, 'files.output_file')
+    out['output']['frequency'] = dict_get(c, 'output_variables.outper')
+    out['output']['variables'] = {}
+
+    # Convert output variable format spec
+    outvar_names = dict_get(c, 'output_variables.particle', []).copy()
+    outvar_names += dict_get(c, 'output_variables.instance', [])
     for v in outvar_names:
-        outvars[v] = c['output_variables'][v].copy()
-    for v in c['output_variables'].get('particle', []):
-        outvars[v]['kind'] = 'initial'
-    if 'release_time' in outvars and 'units' in outvars['release_time']:
-        outvars['release_time']['units'] = 'seconds since 1970-01-01'
+        out['output']['variables'][v] = c['output_variables'][v].copy()
+        if v == 'release_time' and 'units' in c['output_variables'][v]:
+            out['output']['variables'][v]['units'] = 'seconds since 1970-01-01'
+    for v in dict_get(c, 'output_variables.particle', []):
+        out['output']['variables'][v]['kind'] = 'initial'
+
+    out['tracker'] = {}
+    out['tracker']['method'] = dict_get(c, 'numerics.advection')
+    out['tracker']['diffusion'] = dict_get(c, 'numerics.diffusion')
 
     # Read release config
-    relconf = dict(
-        file=c['files']['particle_release_file'],
-        frequency=c['particle_release'].get('release_frequency', [0, 's']),
-        colnames=c['particle_release']['variables'],
-        formats={
-            c['particle_release'][v]: v
-            for v in c['particle_release']['variables']
-            if v in c['particle_release'].keys()
-        },
-    )
-    if c['particle_release'].get('release_type', '') != 'continuous':
-        del relconf['frequency']
-    ibmvars = c.get('state', dict()).get('ibm_variables', [])
-    ibmvars += c.get('ibm', dict()).get('variables', [])
-    relconf['defaults'] = {
+    out['release'] = {}
+    out['release']['file'] = dict_get(c, 'files.particle_release_file')
+    out['release']['colnames'] = dict_get(c, 'particle_release.variables', [])
+    if dict_get(c, 'particle_release.release_type', '') == 'continuous':
+        out['release']['frequency'] = dict_get(c, 'particle_release.release_frequency', [0, 's'])
+    out['release']['formats'] = {
+        c.get('particle_release', {})[v]: v
+        for v in dict_get(c, 'particle_release.variables', [])
+        if v in c.get('particle_release', {}).keys()
+    }
+    out['release']['defaults'] = {
         k: np.float64(0)
-        for k in ibmvars
-        if k not in relconf['colnames']
+        for k in dict_get(c, 'state.ibm_variables', []) + dict_get(c, 'ibm.variables', [])
+        if k not in out['release']['colnames']
     }
 
-    # Read ibm config
-    ibmconf_legacy = c.get('ibm', dict()).copy()
-    if 'module' in ibmconf_legacy:
-        ibmconf_legacy['ibm_module'] = ibmconf_legacy.pop('module')
-    ibmconf = dict()
-    if 'ibm_module' in ibmconf_legacy:
-        ibmconf['module'] = 'ladim.ibms.LegacyIBM'
-        ibmconf['legacy_module'] = ibmconf_legacy['ibm_module']
-        ibmconf['conf'] = dict(
-            dt=dt_sec,
-            output_instance=c.get('output_variables', {}).get('instance', []),
-            nc_attributes={k: v for k, v in outvars.items()}
-        )
-        ibmconf['conf']['ibm'] = {
+    out['ibm'] = {}
+    if 'ibm' in c:
+        out['ibm']['module'] = 'ladim.ibms.LegacyIBM'
+        out['ibm']['legacy_module'] = dict_get(c, ['ibm.ibm_module', 'ibm.module'])
+        out['ibm']['conf'] = {}
+        out['ibm']['conf']['dt'] = dt_sec
+        out['ibm']['conf']['output_instance'] = dict_get(c, 'output_variables.instance', [])
+        out['ibm']['conf']['nc_attributes'] = {
             k: v
-            for k, v in ibmconf_legacy.items()
-            if k != 'ibm_module'
+            for k, v in out['output']['variables'].items()
         }
+        out['ibm']['conf']['ibm'] = {k: v for k, v in c['ibm'].items() if k != 'ibm_module'}
 
-    config_dict = dict(
-        version=2,
-        solver=dict(
-            start=c['time_control']['start_time'],
-            stop=c['time_control']['stop_time'],
-            step=dt_sec,
-            seed=c['numerics'].get('seed', None),
-            order=['release', 'forcing', 'output', 'tracker', 'ibm', 'state'],
-        ),
-        grid=dict(
-            file=c['gridforce']['input_file'],
-            legacy_module=c['gridforce']['module'] + '.Grid',
-            start_time=np.datetime64(c['time_control']['start_time'], 's'),
-        ),
-        forcing=dict(
-            file=c['gridforce']['input_file'],
-            legacy_module=c['gridforce']['module'] + '.Forcing',
-            start_time=np.datetime64(c['time_control']['start_time'], 's'),
-            stop_time=np.datetime64(c['time_control']['stop_time'], 's'),
-            dt=dt_sec,
-            ibm_forcing=c['gridforce'].get('ibm_forcing', []),
-        ),
-        release=relconf,
-        output=dict(
-            file=c['files']['output_file'],
-            frequency=c['output_variables']['outper'],
-            variables=outvars,
-        ),
-        tracker=dict(
-            method=c['numerics']['advection'],
-            diffusion=c['numerics']['diffusion'],
-        ),
-        ibm=ibmconf,
-    )
-    return config_dict
+    return out
