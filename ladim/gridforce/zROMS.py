@@ -258,7 +258,7 @@ class Forcing:
         num_frames = []  # Available time frames in each file
         # change_times = []     # Times for change of file
         for fname in files:
-            print(fname)
+            logging.info(f'Load {fname}')
             with Dataset(fname) as nc:
                 # new_times = nc.variables['ocean_time'][:]
                 new_times = nc.variables["time"][:]
