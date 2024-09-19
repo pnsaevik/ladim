@@ -18,7 +18,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased] - 2024-09-19
 ### Fixed
-- Can import local IBM and gridforce modules 
+- Can import local IBM and gridforce modules
+### Changed
+- Logger now outputs current time
 
 
 ## [2.0.2] - 2024-09-17
