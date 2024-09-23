@@ -16,10 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Multiplicity to the releaser module
 
 
-## [Unreleased] - 2024-09-19
+## [2.0.3] - 2024-09-19
 ### Fixed
 - Can import local IBM and gridforce modules
 - zROMS module now works with legacy config file
+- Simulation no longer breaks if particles reach domain boundary
 ### Changed
 - Logger now outputs current time
 
