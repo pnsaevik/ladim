@@ -37,12 +37,23 @@ class Grid:
     def __init__(self, config):
 
         logger.info("Initializing zROMS grid object")
+
+        # Grid file
+        if "grid_file" in config["gridforce"]:
+            grid_file = config["gridforce"]["grid_file"]
+        elif "input_file" in config["gridforce"]:
+            files = glob.glob(config["gridforce"]["input_file"])
+            files.sort()
+            grid_file = files[0]
+        else:
+            logger.error("No grid file specified")
+            raise SystemExit(1)
+
         try:
-            ncid = Dataset(config["gridforce"]["grid_file"])
+            ncid = Dataset(grid_file)
+            ncid.set_auto_mask(False)
         except OSError:
-            logger.error(
-                "Grid file {} not found".format(config["gridforce"]["grid_file"])
-            )
+            logger.error("Could not open grid file " + grid_file)
             raise SystemExit(1)
 
         # Subgrid, only considers internal grid cells
@@ -247,7 +258,7 @@ class Forcing:
         num_frames = []  # Available time frames in each file
         # change_times = []     # Times for change of file
         for fname in files:
-            print(fname)
+            logging.info(f'Load {fname}')
             with Dataset(fname) as nc:
                 # new_times = nc.variables['ocean_time'][:]
                 new_times = nc.variables["time"][:]

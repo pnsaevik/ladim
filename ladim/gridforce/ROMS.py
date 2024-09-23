@@ -182,6 +182,8 @@ class Grid:
         """Return the depth of grid cells"""
         I = X.round().astype(int) - self.i0
         J = Y.round().astype(int) - self.j0
+        I = np.minimum(np.maximum(I, 0), self.H.shape[1] - 1)
+        J = np.minimum(np.maximum(J, 0), self.H.shape[0] - 1)
         return self.H[J, I]
 
     def lonlat(self, X, Y, method="bilinear"):
@@ -191,6 +193,8 @@ class Grid:
         # else: containing grid cell, less accurate
         I = X.round().astype("int") - self.i0
         J = Y.round().astype("int") - self.j0
+        I = np.minimum(np.maximum(I, 0), self.lon.shape[1] - 1)
+        J = np.minimum(np.maximum(J, 0), self.lon.shape[0] - 1)
         return self.lon[J, I], self.lat[J, I]
 
     def ingrid(self, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
@@ -206,6 +210,11 @@ class Grid:
         """Returns True for points on land"""
         I = X.round().astype(int) - self.i0
         J = Y.round().astype(int) - self.j0
+
+        # Constrain to valid indices
+        I = np.minimum(np.maximum(I, 0), self.M.shape[-1] - 1)
+        J = np.minimum(np.maximum(J, 0), self.M.shape[-2] - 1)
+
         return self.M[J, I] < 1
 
     # Error if point outside
@@ -802,6 +811,11 @@ def sample3D(F, X, Y, K, A, method="bilinear"):
     # else:  method == 'nearest'
     I = X.round().astype("int")
     J = Y.round().astype("int")
+
+    # Constrain to valid indices
+    I = np.minimum(np.maximum(I, 0), F.shape[-1] - 1)
+    J = np.minimum(np.maximum(J, 0), F.shape[-2] - 1)
+
     return F[K, J, I]
 
 
