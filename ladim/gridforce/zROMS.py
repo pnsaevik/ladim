@@ -15,7 +15,7 @@ import glob
 import logging
 import numpy as np
 from netCDF4 import Dataset, num2date
-from ladim.sample import sample2D
+from ladim.sample import sample2D, bilin_inv
 
 
 logger = logging.getLogger(__name__)
@@ -107,11 +107,6 @@ class Grid:
         self.lon = ncid.variables["lon_rho"][self.J, self.I]
         self.lat = ncid.variables["lat_rho"][self.J, self.I]
 
-        # self.z_r = sdepth(self.H, self.hc, self.Cs_r,
-        #                  stagger='rho', Vtransform=self.Vtransform)
-        # self.z_w = sdepth(self.H, self.hc, self.Cs_w,
-        #                  stagger='w', Vtransform=self.Vtransform)
-
         # Land masks at u- and v-points
         M = self.M
         Mu = np.zeros((self.jmax, self.imax + 1), dtype=int)
@@ -137,6 +132,10 @@ class Grid:
         I = X.round().astype(int) - self.i0
         J = Y.round().astype(int) - self.j0
 
+        # Constrain to valid indices
+        I = np.minimum(np.maximum(I, 0), self.dx.shape[-1] - 2)
+        J = np.minimum(np.maximum(J, 0), self.dx.shape[-2] - 2)
+
         # Metric is conform for PolarStereographic
         A = self.dx[J, I]
         return A, A
@@ -145,30 +144,39 @@ class Grid:
         """Return the depth of grid cells"""
         I = X.round().astype(int) - self.i0
         J = Y.round().astype(int) - self.j0
+        I = np.minimum(np.maximum(I, 0), self.H.shape[1] - 1)
+        J = np.minimum(np.maximum(J, 0), self.H.shape[0] - 1)
         return self.H[J, I]
 
     def lonlat(self, X, Y, method="bilinear"):
         """Return the longitude and latitude from grid coordinates"""
         if method == "bilinear":  # More accurate
             return self.xy2ll(X, Y)
-        else:  # containing grid cell, less accurate
-            I = X.round().astype("int") - self.i0
-            J = Y.round().astype("int") - self.j0
-            return self.lon[J, I], self.lat[J, I]
+        # else: containing grid cell, less accurate
+        I = X.round().astype("int") - self.i0
+        J = Y.round().astype("int") - self.j0
+        I = np.minimum(np.maximum(I, 0), self.lon.shape[1] - 1)
+        J = np.minimum(np.maximum(J, 0), self.lon.shape[0] - 1)
+        return self.lon[J, I], self.lat[J, I]
 
-        return (
-            sample2D(self.lon, X - self.i0, Y - self.j0),
-            sample2D(self.lat, X - self.i0, Y - self.j0),
-        )
-
-    def ingrid(self, X, Y):
+    def ingrid(self, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
         """Returns True for points inside the subgrid"""
-        return (self.xmin < X) & (X < self.xmax) & (self.ymin < Y) & (Y < self.ymax)
+        return (
+            (self.xmin + 0.5 < X)
+            & (X < self.xmax - 0.5)
+            & (self.ymin + 0.5 < Y)
+            & (Y < self.ymax - 0.5)
+        )
 
     def onland(self, X, Y):
         """Returns True for points on land"""
         I = X.round().astype(int) - self.i0
         J = Y.round().astype(int) - self.j0
+
+        # Constrain to valid indices
+        I = np.minimum(np.maximum(I, 0), self.M.shape[-1] - 1)
+        J = np.minimum(np.maximum(J, 0), self.M.shape[-2] - 1)
+
         return self.M[J, I] < 1
 
     # Error if point outside
@@ -176,6 +184,11 @@ class Grid:
         """Returns True for points at sea"""
         I = X.round().astype(int) - self.i0
         J = Y.round().astype(int) - self.j0
+
+        # Constrain to valid indices
+        I = np.minimum(np.maximum(I, 0), self.M.shape[-1] - 1)
+        J = np.minimum(np.maximum(J, 0), self.M.shape[-2] - 1)
+
         return self.M[J, I] > 0
 
     def xy2ll(self, X, Y):
@@ -205,7 +218,7 @@ class Forcing:
         logger.info("Initiating forcing")
 
         self._grid = grid  # Get the grid object, make private?
-
+        # self.config = config["gridforce"]
         self.ibm_forcing = config["ibm_forcing"]
 
         # Test for glob, use MFDataset if needed
@@ -324,6 +337,7 @@ class Forcing:
         # --------------
         # prestep = last forcing step < 0
         #
+
         V = [step for step in steps if step < 0]
         if V:  # Forcing available before start time
             prestep = max(V)
@@ -345,11 +359,12 @@ class Forcing:
 
         elif steps[0] == 0:
             # Simulation start at first forcing time
+            # Runge-Kutta needs dU and dV in this case as well
             self.U, self.V = self._read_velocity(0)
             self.Unew, self.Vnew = self._read_velocity(steps[1])
             self.dU = (self.Unew - self.U) / steps[1]
             self.dV = (self.Vnew - self.V) / steps[1]
-            # Syncronize
+            # Synchronize with start time
             self.Unew = self.U
             self.Vnew = self.V
             # Extrapolate to time step = -1
@@ -372,7 +387,7 @@ class Forcing:
     def update(self, t):
         """Update the fields to time step t"""
 
-        # Read from config
+        # Read from config?
         interpolate_velocity_in_time = True
         interpolate_ibm_forcing_in_time = False
 
@@ -413,7 +428,7 @@ class Forcing:
 
         # Handle file opening/closing
         # Always read velocity before other fields
-        logger.debug("Reading velocity for time step = {}".format(n))
+        logger.info("Reading velocity for time step = {}".format(n))
         first = True
         if first:  # Open file initiallt
             self._nc = Dataset(self._files[self.file_idx[n]])
@@ -430,6 +445,7 @@ class Forcing:
         # Read the velocity
         U = self._nc.variables["u"][frame, :, self._grid.Ju, self._grid.Iu]
         V = self._nc.variables["v"][frame, :, self._grid.Jv, self._grid.Iv]
+
         # Scale if needed
         # Assume offset = 0 for velocity
         if self.scaled["U"]:
@@ -446,7 +462,6 @@ class Forcing:
 
     def _read_field(self, name, n):
         """Read a 3D field"""
-        # print("IBM-forcing:", name)
         frame = self.frame_idx[n]
         F = self._nc.variables[name][frame, :, self._grid.J, self._grid.I]
         if self.scaled[name]:
@@ -579,7 +594,7 @@ def sdepth(H, Hc, C, stagger="rho", Vtransform=1):
     """
     H = np.asarray(H)
     Hshape = H.shape  # Save the shape of H
-    H = H.ravel()  # and make H 1D for easy shape manipulation
+    H = H.ravel()  # and make H 1D for easy shape maniplation
     C = np.asarray(C)
     N = len(C)
     outshape = (N,) + Hshape  # Shape of output
@@ -595,13 +610,13 @@ def sdepth(H, Hc, C, stagger="rho", Vtransform=1):
         B = np.outer(C, H)
         return (A + B).reshape(outshape)
 
-    elif Vtransform == 2:  # New transform by Shchepetkin
+    if Vtransform == 2:  # New transform by Shchepetkin
         N = Hc * S[:, None] + np.outer(C, H)
         D = 1.0 + Hc / H
         return (N / D).reshape(outshape)
 
-    else:
-        raise ValueError("Unknown Vtransform")
+    # else:
+    raise ValueError("Unknown Vtransform")
 
 
 # ------------------------
@@ -660,13 +675,15 @@ def sample3D(F, X, Y, K, A, method="bilinear"):
 
     """
 
-    # print('sample3D: method =', method)
-
-    # sjekk om 1-A eller A
     if method == "bilinear":
         # Find rho-point as lower left corner
         I = X.astype("int")
         J = Y.astype("int")
+
+        # Constrain to valid indices
+        I = np.minimum(np.maximum(I, 0), F.shape[-1] - 2)
+        J = np.minimum(np.maximum(J, 0), F.shape[-2] - 2)
+
         P = X - I
         Q = Y - J
         W000 = (1 - P) * (1 - Q) * A
@@ -689,10 +706,15 @@ def sample3D(F, X, Y, K, A, method="bilinear"):
             + W111 * F[K - 1, J + 1, I + 1]
         )
 
-    else:  # method == 'nearest'
-        I = X.round().astype("int")
-        J = Y.round().astype("int")
-        return F[K, J, I]
+    # else:  method == 'nearest'
+    I = X.round().astype("int")
+    J = Y.round().astype("int")
+
+    # Constrain to valid indices
+    I = np.minimum(np.maximum(I, 0), F.shape[-1] - 1)
+    J = np.minimum(np.maximum(J, 0), F.shape[-2] - 1)
+
+    return F[K, J, I]
 
 
 def sample3DUV(U, V, X, Y, K, A, method="bilinear"):
