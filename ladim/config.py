@@ -59,8 +59,13 @@ def dict_get_single(d, item):
 
 
 def convert_1_to_2(c):
-
     out = {}
+
+    # If any of the top-level attribute values in `c` are None, they should be
+    # converted to empty dicts
+    top_level_nones = [k for k in c if k is None]
+    for k in top_level_nones:
+        c[k] = dict()
 
     # Read timedelta
     dt_sec = None
