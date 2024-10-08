@@ -59,8 +59,14 @@ def dict_get_single(d, item):
 
 
 def convert_1_to_2(c):
-
     out = {}
+
+    # If any of the top-level attribute values in `c` are None, they should be
+    # converted to empty dicts
+    top_level_nones = [k for k in c if c[k] is None]
+    c = c.copy()
+    for k in top_level_nones:
+        c[k] = dict()
 
     # Read timedelta
     dt_sec = None
@@ -133,6 +139,8 @@ def convert_1_to_2(c):
     if 'ibm' in c:
         out['ibm']['module'] = 'ladim.ibms.LegacyIBM'
         out['ibm']['legacy_module'] = dict_get(c, ['ibm.ibm_module', 'ibm.module'])
+        if out['ibm']['legacy_module'] == 'ladim.ibms.ibm_salmon_lice':
+            out['ibm']['legacy_module'] = 'ladim_plugins.salmon_lice'
         out['ibm']['conf'] = {}
         out['ibm']['conf']['dt'] = dt_sec
         out['ibm']['conf']['output_instance'] = dict_get(c, 'output_variables.instance', [])

@@ -12,8 +12,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - New grid and forcing module should have a clearer separation. Grid should
   take care of coordinate system changes, while forcing should return static
   fields.
-### Add
-- Multiplicity to the releaser module
+
+
+## [2.0.4] - 2024-10-08
+### Fixed
+- References to legacy salmon lice model in ladim.yaml are
+  converted to ladim_plugins version of the module
+- Accepts empty module config in yaml file
 
 
 ## [2.0.3] - 2024-09-19
@@ -40,6 +45,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Legacy modules are removed. This may lead to nuance changes in ladim output.
 ### Fixed
 - Tracker module no longer gives error if particles are deactivated
+- Multiplicity to the releaser module
 
 
 ## [1.3.5] - 2024-01-30 
