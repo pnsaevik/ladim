@@ -14,10 +14,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   fields.
 
 
-## [2.0.4]
+## [2.0.4] - 2024-10-08
 ### Fixed
 - References to legacy salmon lice model in ladim.yaml are
   converted to ladim_plugins version of the module
+- Accepts empty module config in yaml file
 
 
 ## [2.0.3] - 2024-09-19
