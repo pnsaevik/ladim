@@ -63,7 +63,8 @@ def convert_1_to_2(c):
 
     # If any of the top-level attribute values in `c` are None, they should be
     # converted to empty dicts
-    top_level_nones = [k for k in c if k is None]
+    top_level_nones = [k for k in c if c[k] is None]
+    c = c.copy()
     for k in top_level_nones:
         c[k] = dict()
 
