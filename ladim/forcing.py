@@ -45,6 +45,8 @@ class RomsForcing(Forcing):
         legacy_conf = dict(
             gridforce=dict(
                 input_file=file,
+                first_file=conf.get('first_file', ""),
+                last_file=conf.get('last_file', ""),
             ),
             ibm_forcing=conf.get('ibm_forcing', []),
             start_time=conf.get('start_time', None),

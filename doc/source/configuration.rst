@@ -28,11 +28,3 @@ example configuration files are self-describing and can easily be modified.
 .. seealso::
   Module :mod:`configuration`
     Documentation of the :mod:`configuration` module
-
-An example configuration file
------------------------------
-
-Below is an example configuration file, :file:`models/salmon_lice/ladim.yaml`.
-
-.. literalinclude:: ../../models/salmon_lice/ladim.yaml
-  :language: yaml

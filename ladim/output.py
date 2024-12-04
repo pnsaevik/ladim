@@ -242,5 +242,4 @@ def create_netcdf_file(fname: str, formats: dict[str, OutputFormat], diskless=Fa
         dset.variables[varname].set_auto_mask(False)
         dset.variables[varname].setncatts(item.attributes)
 
-
     return dset

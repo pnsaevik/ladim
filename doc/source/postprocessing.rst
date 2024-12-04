@@ -160,6 +160,7 @@ InstanceVariable
     Number of particles at given time
 
   .. attribute:: time
+    :noindex:
 
     The time steps
 
@@ -212,3 +213,4 @@ time.
 Supports item notation::
 
   ``V[p]`` is value of particle with ``pid = p``.
+
