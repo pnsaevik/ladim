@@ -37,6 +37,8 @@ class Test_convert_1_to_2:
             'forcing': {
                 'dt': 60,
                 'file': '../forcing*.nc',
+                'first_file': '',
+                'last_file': '',
                 'ibm_forcing': [],
                 'legacy_module': 'ladim.gridforce.ROMS.Forcing',
                 'start_time': np.datetime64('2015-09-07T01:00:00'),

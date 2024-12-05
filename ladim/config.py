@@ -73,7 +73,7 @@ def convert_1_to_2(c):
     if 'numerics' in c:
         if 'dt' in c['numerics']:
             dt_value, dt_unit = c['numerics']['dt']
-            dt_sec = np.timedelta64(dt_value, dt_unit).astype('timedelta64[s]').astype('int64')
+            dt_sec = int(np.timedelta64(dt_value, dt_unit).astype('timedelta64[s]').astype(int))
 
     out['version'] = 2
 
