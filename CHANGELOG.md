@@ -14,6 +14,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   fields.
 
 
+## [2.0.5] - 2025-01-27
+### Fixed
+- Subgrid configuration was ignored by Ladim, this is now fixed
+
+
 ## [2.0.4] - 2024-10-08
 ### Fixed
 - References to legacy salmon lice model in ladim.yaml are

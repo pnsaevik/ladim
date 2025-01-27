@@ -22,18 +22,28 @@ class Grid(Module):
 
 
 class RomsGrid(Grid):
-    def __init__(self, model: Model, **conf):
+    def __init__(
+            self,
+            model: Model,
+            file: str,
+            start_time=None,
+            subgrid=None,
+            legacy_module='ladim.gridforce.ROMS.Grid',
+            **_,
+    ):
         super().__init__(model)
 
         legacy_conf = dict(
             gridforce=dict(
-                input_file=conf['file'],
+                input_file=file,
             ),
-            start_time=conf.get('start_time', None),
+            start_time=start_time,
         )
+        if subgrid is not None:
+            legacy_conf['gridforce']['subgrid'] = subgrid
 
         from .model import load_class
-        LegacyGrid = load_class(conf.get('legacy_module', 'ladim.gridforce.ROMS.Grid'))
+        LegacyGrid = load_class(legacy_module)
 
         # Allow gridforce module in current directory
         import sys
