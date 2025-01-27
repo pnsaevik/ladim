@@ -91,6 +91,7 @@ def convert_1_to_2(c):
         'files.input_file', 'gridforce.input_file'])
     out['grid']['legacy_module'] = dict_get(c, 'gridforce.module', '') + '.Grid'
     out['grid']['start_time'] = np.datetime64(dict_get(c, 'time_control.start_time', '1970'), 's')
+    out['grid']['subgrid'] = dict_get(c, 'gridforce.subgrid', None)
 
     out['forcing'] = {}
     out['forcing']['file'] = dict_get(c, ['gridforce.input_file', 'files.input_file'])
