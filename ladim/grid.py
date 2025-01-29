@@ -100,16 +100,15 @@ class Grid(Module):
         """
         raise NotImplementedError
 
-    def from_depth(
-            self, x: Sequence, y: Sequence, z: Sequence
-    ) -> np.ndarray:
+    def from_latlon(
+            self, lat: Sequence, lon: Sequence,
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Vertical coordinates from depth and horizontal coordinates.
+        Horizontal coordinates from latitude and longitude
 
-        :param x: X positions
-        :param y: Y positions
-        :param z: Depth below surface [m, positive downwards]
-        :return: Vertical coordinates
+        :param lat: Latitude [degrees north]
+        :param lon: Longitude [degrees east]
+        :return: A tuple (x, y) of horizontal coordinates
         """
         raise NotImplementedError
 
@@ -125,15 +124,16 @@ class Grid(Module):
         """
         raise NotImplementedError
 
-    def from_latlon(
-            self, lat: Sequence, lon: Sequence,
-    ) -> tuple[np.ndarray, np.ndarray]:
+    def from_depth(
+            self, x: Sequence, y: Sequence, z: Sequence
+    ) -> np.ndarray:
         """
-        Horizontal coordinates from latitude and longitude
+        Vertical coordinates from depth and horizontal coordinates.
 
-        :param lat: Latitude [degrees north]
-        :param lon: Longitude [degrees east]
-        :return: A tuple (x, y) of horizontal coordinates
+        :param x: X positions
+        :param y: Y positions
+        :param z: Depth below surface [m, positive downwards]
+        :return: Vertical coordinates
         """
         raise NotImplementedError
 
@@ -252,6 +252,8 @@ class ArrayGrid(Grid):
         - The lat/lon coordinates are independent of the T and Z dimensions
         - The depth is independent of the T dimension
         - The time is independent of the X, Y and Z timensions
+        - Time values must be increasing
+        - Depth values must be decreasing with Z
 
         :param lat: Latitude coordinates [degrees, NY * NX array]
         :param lon: Longitude coordinates [degrees, NY * NX array]
@@ -262,6 +264,11 @@ class ArrayGrid(Grid):
         self.lon = np.asarray(lon).astype('f8')
         self.depth = np.asarray(depth).astype('f4')
         self.time = np.asarray(time).astype('datetime64[s]').astype('int64')
+
+        if np.any(np.diff(self.time) <= 0):
+            raise ValueError('Time values must be increasing')
+        if np.any(self.depth[0] < self.depth[-1]):
+            raise ValueError('Depth values must be decreasing with Z')
 
     def from_epoch(self, p: Sequence) -> np.ndarray:
         return np.interp(x=p, xp=self.time, fp=np.arange(len(self.time)))
@@ -281,6 +288,11 @@ class ArrayGrid(Grid):
     ) -> tuple[np.ndarray, np.ndarray]:
         y, x = bilin_inv(f=lat, g=lon, F=self.lat, G=self.lon)
         return x, y
+
+    def to_depth(
+            self, x: Sequence, y: Sequence, s: Sequence
+    ) -> np.ndarray:
+        return map_coordinates(self.depth, (s, y, x), order=1, mode='nearest')
 
 
 def bilin_inv(f, g, F, G, maxiter=7, tol=1.0e-7) -> tuple[np.ndarray, np.ndarray]:

@@ -88,6 +88,23 @@ class Test_ArrayGrid_from_latlon:
         assert y.tolist() == [0, 1, 0, 0]
 
 
+class Test_ArrayGrid_to_depth:
+    def test_can_extract(self):
+        g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))
+        depth = g.to_depth(x=[0, 1, 2, 3], y=[0, 1, 2, 1], s=[0, 1, 0, 1])
+        assert depth.tolist() == [12, 5, 22, 7]
+
+    def test_can_interpolate(self):
+        g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))
+        depth = g.to_depth(x=[0, .5, 1, 1, 1], y=[0, 0, 0, .5, 1], s=[1] * 5)
+        assert depth.tolist() == [0, 0.5, 1, 3, 5]
+
+    def test_extrapolates_as_constant(self):
+        g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))
+        depth = g.to_depth(x=[-1, 9, 1, 1], y=[1, 1, -1, 9], s=[1] * 4)
+        assert depth.tolist() == [4, 7, 1, 9]
+
+
 class Test_bilin_inv:
     def test_can_invert_single_cell(self):
         x, y = grid.bilin_inv(
