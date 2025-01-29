@@ -40,6 +40,7 @@ class Grid(Module):
         :param y: Y positions
         :return: Metric scale factor [in meters per grid unit]
         """
+        raise NotImplementedError
 
     def dy(self, x: Sequence, y: Sequence) -> np.ndarray:
         """
@@ -53,6 +54,7 @@ class Grid(Module):
         :param y: Y positions
         :return: Metric scale factor [in meters per grid unit]
         """
+        raise NotImplementedError
 
     def from_bearing(
             self, x: Sequence, y: Sequence, b: Sequence
@@ -74,6 +76,7 @@ class Grid(Module):
         :param b: Compass bearings [degrees]
         :return: Azimutal vector angles [degrees]
         """
+        raise NotImplementedError
 
     def to_bearing(
             self, x: Sequence, y: Sequence, az: Sequence
@@ -95,6 +98,7 @@ class Grid(Module):
         :param az: Azimutal vector angles [degrees]
         :return: Compass bearings [degrees]
         """
+        raise NotImplementedError
 
     def from_depth(
             self, x: Sequence, y: Sequence, z: Sequence
@@ -107,6 +111,31 @@ class Grid(Module):
         :param z: Depth below surface [m, positive downwards]
         :return: Vertical coordinates
         """
+        raise NotImplementedError
+
+    def to_latlon(
+            self, x: Sequence, y: Sequence,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Latitude and longitude from horizontal coordinates
+
+        :param x: X positions
+        :param y: Y positions
+        :return: A tuple (lat, lon) of latitude [degrees north] and longitude [degrees east]
+        """
+        raise NotImplementedError
+
+    def from_latlon(
+            self, lat: Sequence, lon: Sequence,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Horizontal coordinates from latitude and longitude
+
+        :param lat: Latitude [degrees north]
+        :param lon: Longitude [degrees east]
+        :return: A tuple (x, y) of horizontal coordinates
+        """
+        raise NotImplementedError
 
     def to_depth(
             self, x: Sequence, y: Sequence, s: Sequence
@@ -119,6 +148,7 @@ class Grid(Module):
         :param s: Vertical coordinates
         :return: Depth below surface [m, positive downwards]
         """
+        raise NotImplementedError
 
     def from_epoch(self, p: Sequence) -> np.ndarray:
         """
@@ -127,6 +157,7 @@ class Grid(Module):
         :param p: Posix time [seconds since 1970-01-01]
         :return: Time coordinates
         """
+        raise NotImplementedError
 
     def to_epoch(self, t: Sequence) -> np.ndarray:
         """
@@ -135,6 +166,7 @@ class Grid(Module):
         :param t: Time coordinates
         :return: Posix time [seconds since 1970-01-01]
         """
+        raise NotImplementedError
 
 
 class RomsGrid(Grid):
@@ -236,3 +268,10 @@ class ArrayGrid(Grid):
 
     def to_epoch(self, t: Sequence) -> np.ndarray:
         return map_coordinates(self.time, (t, ), order=1, mode='nearest')
+
+    def to_latlon(
+            self, x: Sequence, y: Sequence,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        lat = map_coordinates(self.lat, (y, x), order=1, mode='nearest')
+        lon = map_coordinates(self.lon, (y, x), order=1, mode='nearest')
+        return lat, lon
