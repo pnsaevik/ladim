@@ -1,4 +1,5 @@
 from ladim import grid
+import numpy as np
 
 
 class Test_ArrayGrid_from_epoch:
@@ -57,3 +58,60 @@ class Test_ArrayGrid_to_latlon:
         assert lat.tolist() == [60, 60, 61]
         assert lon.tolist() == [5, 7, 5]
 
+
+class Test_ArrayGrid_from_latlon:
+    def test_can_extract(self):
+        g = grid.ArrayGrid(
+            lat=[[60, 60, 60], [61, 61, 61]],
+            lon=[[5, 6, 7], [5, 6, 7]],
+        )
+        x, y = g.from_latlon([60, 60, 61, 61], [5, 6, 6, 7])
+        assert x.tolist() == [0, 1, 1, 2]
+        assert y.tolist() == [0, 0, 1, 1]
+
+    def test_can_interpolate(self):
+        g = grid.ArrayGrid(
+            lat=[[60, 60, 60], [61, 61, 61]],
+            lon=[[5, 6, 7], [5, 6, 7]],
+        )
+        x, y = g.from_latlon([60.5, 60.5, 61, 61], [5, 6, 5.5, 6.5])
+        assert x.tolist() == [0, 1, 0.5, 1.5]
+        assert y.tolist() == [0.5, 0.5, 1, 1]
+
+    def test_extrapolates_as_constant(self):
+        g = grid.ArrayGrid(
+            lat=[[60, 60, 60], [61, 61, 61]],
+            lon=[[5, 6, 7], [5, 6, 7]],
+        )
+        x, y = g.from_latlon([50, 70, 60, 60], [6, 6, 4, 9])
+        assert x.tolist() == [1, 1, 0, 2]
+        assert y.tolist() == [0, 1, 0, 0]
+
+
+class Test_bilin_inv:
+    def test_can_invert_single_cell(self):
+        x, y = grid.bilin_inv(
+            f=np.array([3, 3, 5, 5]),
+            g=np.array([30, 50, 50, 30]),
+            F=np.array([[0, 10], [0, 10]]),
+            G=np.array([[0, 0], [100, 100]]),
+        )
+        assert x.tolist() == [0.3, 0.5, 0.5, 0.3]
+        assert y.tolist() == [0.3, 0.3, 0.5, 0.5]
+
+    def test_can_invert_when_integer_coordinate(self):
+        f = np.array([0, 1, 0, 2])
+        g = np.array([0, 0, 10, 10])
+        F = np.array([[0, 1, 2], [0, 1, 2]])
+        G = np.array([[0, 0, 0], [10, 10, 10]])
+        x, y = grid.bilin_inv(f, g, F, G)
+        i = x.round().astype(int)
+        j = y.round().astype(int)
+
+        # Assert i and j are practically equal to x and y
+        assert np.abs(i - x).max() < 1e-7
+        assert np.abs(j - y).max() < 1e-7
+
+        # Check that F, G interpolated to i, j gives f, g
+        assert F[i, j].tolist() == f.tolist()
+        assert G[i, j].tolist() == g.tolist()
