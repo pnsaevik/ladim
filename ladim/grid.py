@@ -1,9 +1,12 @@
-from .model import Model, Module
+from .model import Module
 
 
 class Grid(Module):
-    def __init__(self, model: Model):
-        super().__init__(model)
+    """
+    The grid class represents the coordinate system used for particle tracking.
+    It contains methods for converting between global coordinates (latitude,
+    longitude, depth and posix time) and internal coordinates.
+    """
 
     def ingrid(self, X, Y):
         raise NotImplementedError
@@ -24,14 +27,12 @@ class Grid(Module):
 class RomsGrid(Grid):
     def __init__(
             self,
-            model: Model,
             file: str,
             start_time=None,
             subgrid=None,
             legacy_module='ladim.gridforce.ROMS.Grid',
             **_,
     ):
-        super().__init__(model)
 
         legacy_conf = dict(
             gridforce=dict(

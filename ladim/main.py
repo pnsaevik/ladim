@@ -29,7 +29,7 @@ def main(config_stream, loglevel=logging.INFO):
     # Read configuration
     config = configure(config_stream)
 
-    model = Model(config)
+    model = Model.from_config(config)
     model.run()
     model.close()
 

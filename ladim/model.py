@@ -27,74 +27,72 @@ DEFAULT_MODULES = dict(
 
 
 class Model:
-    def __init__(self, config):
+    """
+    The Model class represents the entire simulation model. The different
+    submodules control the simulation behaviour. In particular, the solver
+    submodule controls the execution flow while the other submodules are
+    called once every time step within the main simulation loop.
+    """
+
+    def __init__(
+            self, grid: "Grid", forcing: "Forcing", release: "Releaser",
+            state: "State", output: "Output", ibm: "IBM", tracker: "Tracker",
+            solver: "Solver",
+    ):
+        self.grid = grid
+        self.forcing = forcing
+        self.release = release
+        self.state = state
+        self.output = output
+        self.ibm = ibm
+        self.tracker = tracker
+        self.solver = solver
+
+    @staticmethod
+    def from_config(config: dict) -> "Model":
+        """
+        Initialize a model class by supplying the configuration parameters
+        of each submodule.
+
+        :param config: Configuration parameters for each submodule
+        :return: An initialized Model class
+        """
+
+        # Create new version of the config dict without the 'model' keyword
+        def remove_module_key(d: dict):
+            return {k: v for k, v in d.items() if k != 'module'}
+
+        # Initialize modules
         module_names = (
             'grid', 'forcing', 'release', 'state', 'output', 'ibm', 'tracker',
             'solver',
         )
-
-        self.modules = dict()
+        modules = dict()
         for name in module_names:
-            self.add_module(name, config.get(name, dict()))
+            subconf = config.get(name, dict())
+            modules[name] = Module.from_config(
+                conf=remove_module_key(subconf),
+                module=subconf.get('module', DEFAULT_MODULES[name]),
+            )
 
-    def add_module(self, name, conf):
-        module_name = conf.get('module', DEFAULT_MODULES[name])
-        conf_without_module = {
-            k: v for k, v in conf.items()
-            if k != 'module'
-        }
-
-        cls = load_class(module_name)
-        self.modules[name] = cls(self, **conf_without_module)
+        # Initialize model
+        return Model(**modules)
 
     @property
-    def grid(self) -> "Grid":
-        # noinspection PyTypeChecker
-        return self.modules.get('grid', None)
-
-    @property
-    def forcing(self) -> "Forcing":
-        # noinspection PyTypeChecker
-        return self.modules.get('forcing', None)
-
-    @property
-    def release(self) -> "Releaser":
-        # noinspection PyTypeChecker
-        return self.modules.get('release', None)
-
-    @property
-    def state(self) -> "State":
-        # noinspection PyTypeChecker
-        return self.modules.get('state', None)
-
-    @property
-    def output(self) -> "Output":
-        # noinspection PyTypeChecker
-        return self.modules.get('output', None)
-
-    @property
-    def ibm(self) -> "IBM":
-        # noinspection PyTypeChecker
-        return self.modules.get('ibm', None)
-
-    @property
-    def tracker(self) -> "Tracker":
-        # noinspection PyTypeChecker
-        return self.modules.get('tracker', None)
-
-    @property
-    def solver(self) -> "Solver":
-        # noinspection PyTypeChecker
-        return self.modules.get('solver', None)
-
-    def __getitem__(self, item):
-        return self.modules[item]
-
-    def __contains__(self, item):
-        return item in self.modules
+    def modules(self) -> dict:
+        return dict(
+            grid=self.grid,
+            forcing=self.forcing,
+            release=self.release,
+            state=self.state,
+            output=self.output,
+            ibm=self.ibm,
+            tracker=self.tracker,
+            solver=self.solver,
+        )
 
     def run(self):
-        self.solver.run()
+        self.solver.run(self)
 
     def close(self):
         for m in self.modules.values():
@@ -127,18 +125,19 @@ def load_class(name):
 
 
 class Module:
-    def __init__(self, model: Model):
-        self._model = model
+    @staticmethod
+    def from_config(conf: dict, module: str) -> "Module":
+        """
+        Initialize a module using a configuration dict.
 
-    @property
-    def model(self) -> Model:
-        return self._model
+        :param conf: The configuration parameters of the module
+        :param module: The fully qualified name of the module
+        :return: An initialized module
+        """
+        cls = load_class(module)
+        return cls(**conf)
 
-    @model.setter
-    def model(self, value: Model):
-        self._model = value
-
-    def update(self):
+    def update(self, model: Model):
         pass
 
     def close(self):

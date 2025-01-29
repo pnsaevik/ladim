@@ -4,16 +4,14 @@ import numpy as np
 
 
 class Output(Module):
-    def __init__(self, model: Model):
-        super().__init__(model)
+    pass
 
 
 class RaggedOutput(Output):
-    def __init__(self, model: Model, variables: dict, file: str, frequency):
+    def __init__(self, variables: dict, file: str, frequency):
         """
         Writes simulation output to netCDF file in ragged array format
 
-        :param model: Parent model
         :param variables: Simulation variables to include in output, and their formatting
         :param file: Name of output file, or empty if a diskless dataset is desired
         :param frequency: Output frequency in seconds. Alternatively, as a two-element
@@ -21,8 +19,6 @@ class RaggedOutput(Output):
         unit.
 
         """
-        super().__init__(model)
-
         # Convert output format specification from ladim.yaml config to OutputFormat
         self._formats = {
             k: OutputFormat.from_ladim_conf(v)
@@ -56,47 +52,47 @@ class RaggedOutput(Output):
         """Returns a handle to the netCDF dataset currently being written to"""
         return self._dset
 
-    def update(self):
+    def update(self, model: Model):
         if self._dset is None:
             self._create_dset()
 
-        self._write_init_vars()
-        self._write_instance_vars()
+        self._write_init_vars(model)
+        self._write_instance_vars(model)
 
-    def _write_init_vars(self):
+    def _write_init_vars(self, model):
         """
         Write the initial state of new particles
         """
 
         # Check if there are any new particles
         part_size = self._dset.dimensions['particle'].size
-        num_new = self.model.state.released - part_size
+        num_new = model.state.released - part_size
         if num_new == 0:
             return
 
         # Write variable data
-        idx = self.model.state['pid'] > part_size - 1
-        pid = self.model.state['pid'][idx]
+        idx = model.state['pid'] > part_size - 1
+        pid = model.state['pid'][idx]
         for v in set(self._init_vars) - {'release_time'}:
             # The idx array is not necessarily monotonically increasing by 1
             # all the way. We therefore copy the data into a temporary,
             # continuous array.
-            data_raw = self.model.state[v][idx]
+            data_raw = model.state[v][idx]
             data = np.zeros(num_new, dtype=data_raw.dtype)
             data[pid - part_size] = data_raw
             self._dset.variables[v][part_size:part_size + num_new] = data
 
         # Write release time variable
-        data = np.broadcast_to(self.model.solver.time, shape=(num_new, ))
+        data = np.broadcast_to(model.solver.time, shape=(num_new, ))
         self._dset.variables['release_time'][part_size:part_size + num_new] = data
 
-    def _write_instance_vars(self):
+    def _write_instance_vars(self, model):
         """
         Write the current state of dynamic varaibles
         """
 
         # Check if this is a write time step
-        current_time = self.model.solver.time
+        current_time = model.solver.time
         elapsed_since_last_write = current_time - self._last_write_time
         if elapsed_since_last_write < self._write_frequency:
             return
@@ -109,11 +105,11 @@ class RaggedOutput(Output):
 
         # Write variable values
         inst_size = self._dset.dimensions['particle_instance'].size
-        inst_num = self.model.state.size
-        inst_vars = {k: self.model.state[k] for k in set(self._inst_vars) - {'lat', 'lon'}}
+        inst_num = model.state.size
+        inst_vars = {k: model.state[k] for k in set(self._inst_vars) - {'lat', 'lon'}}
         if {'lat', 'lon'}.intersection(self._inst_vars):
-            x, y = self.model.state['X'], self.model.state['Y']
-            inst_vars['lon'], inst_vars['lat'] = self.model.grid.xy2ll(x, y)
+            x, y = model.state['X'], model.state['Y']
+            inst_vars['lon'], inst_vars['lat'] = model.grid.xy2ll(x, y)
         for name, data in inst_vars.items():
             self._dset.variables[name][inst_size:inst_size + inst_num] = data
 

@@ -26,7 +26,7 @@ class Test_TextFileReleaser_update:
 
         model = MockObj()  # type: typing.Any
 
-        model.state = ladim.state.DynamicState(model)
+        model.state = ladim.state.DynamicState()
 
         model.grid = MockObj()
         model.grid.ll2xy = lambda lon, lat: (100*lon, 10*lat)
@@ -50,40 +50,39 @@ class Test_TextFileReleaser_update:
 
         # Create continuous releaser
         releaser = release.TextFileReleaser(
-            model=mock_model,
             file=buf,
             frequency=(2, 'm'),
         )
 
         # Time step 0: No particles yet
-        releaser.update()
+        releaser.update(mock_model)
         assert list(mock_model.state['X']) == []
 
         # Time step 1: First particle release
         mock_model.solver.time += mock_model.solver.step
-        releaser.update()
+        releaser.update(mock_model)
         assert list(mock_model.state['X']) == [4, 5]
 
         # Time step 2: Intermediate step, no additional particles
         mock_model.solver.time += mock_model.solver.step
-        releaser.update()
+        releaser.update(mock_model)
         assert list(mock_model.state['X']) == [4, 5]
 
         # Time step 3: Second release, two new particles
         # Using previous release instructions
         mock_model.solver.time += mock_model.solver.step
-        releaser.update()
+        releaser.update(mock_model)
         assert list(mock_model.state['X']) == [4, 5, 4, 5]
 
         # Time step 4: Intermediate step, no additional particles
         mock_model.solver.time += mock_model.solver.step
-        releaser.update()
+        releaser.update(mock_model)
         assert list(mock_model.state['X']) == [4, 5, 4, 5]
 
         # Time step 5: New release instructions
         # One new particle at a new position, previous instructions cleared
         mock_model.solver.time += mock_model.solver.step
-        releaser.update()
+        releaser.update(mock_model)
         assert list(mock_model.state['X']) == [4, 5, 4, 5, 6]
 
     def test_converts_latlon_colnames_to_xy(self, mock_model):
@@ -95,8 +94,8 @@ class Test_TextFileReleaser_update:
         )
 
         # Run releaser update
-        releaser = release.TextFileReleaser(model=mock_model, file=buf)
-        releaser.update()
+        releaser = release.TextFileReleaser(file=buf)
+        releaser.update(mock_model)
 
         # Confirm effect on state module
         assert 'lat' not in mock_model.state
@@ -113,11 +112,10 @@ class Test_TextFileReleaser_update:
 
         # Run releaser update
         releaser = release.TextFileReleaser(
-            model=mock_model,
             file=buf,
             defaults=dict(myvar=23),
         )
-        releaser.update()
+        releaser.update(mock_model)
 
         # Confirm effect on state module
         assert list(mock_model.state['myvar']) == [23, 23]
@@ -131,8 +129,8 @@ class Test_TextFileReleaser_update:
         )
 
         # Run releaser update
-        releaser = release.TextFileReleaser(model=mock_model, file=buf)
-        releaser.update()
+        releaser = release.TextFileReleaser(file=buf)
+        releaser.update(mock_model)
 
         # Confirm effect on state module
         assert list(mock_model.state['X']) == [60, 61, 61]
@@ -146,14 +144,14 @@ class Test_TextFileReleaser_update:
         )
 
         # Run releaser update
-        releaser = release.TextFileReleaser(model=mock_model, file=buf)
-        releaser.update()
+        releaser = release.TextFileReleaser(file=buf)
+        releaser.update(mock_model)
         assert list(mock_model.state['X']) == [60, 61]
 
         # Mark particle 0 as dead and run releaser update
         mock_model.state['alive'][0] = False
         mock_model.solver.time += mock_model.solver.step
-        releaser.update()
+        releaser.update(mock_model)
 
         # Confirm effect on state module
         assert list(mock_model.state['X']) == [61]

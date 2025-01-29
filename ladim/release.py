@@ -11,13 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class Releaser(Module):
-    def __init__(self, model: Model):
-        super().__init__(model)
+    pass
 
 
 class TextFileReleaser(Releaser):
     def __init__(
-            self, model: Model, file, colnames: list = None, formats: dict = None,
+            self, file, colnames: list = None, formats: dict = None,
             frequency=(0, 's'), defaults=None,
     ):
         """
@@ -25,7 +24,6 @@ class TextFileReleaser(Releaser):
 
         The text file must be a whitespace-separated csv file
 
-        :param model: Parent model
         :param file: Release file
 
         :param colnames: Column names, if the release file does not contain any
@@ -44,8 +42,6 @@ class TextFileReleaser(Releaser):
             release.
         """
 
-        super().__init__(model)
-
         # Release file
         self._csv_fname = file   # Path name
         self._csv_column_names = colnames   # Column headers
@@ -60,30 +56,31 @@ class TextFileReleaser(Releaser):
         # Other parameters
         self._defaults = defaults or dict()
 
-    def update(self):
-        self._add_new()
-        self._kill_old()
+    def update(self, model: Model):
+        self._add_new(model)
+        self._kill_old(model)
 
-    def _kill_old(self):
-        state = self.model.state
+    # noinspection PyMethodMayBeStatic
+    def _kill_old(self, model: Model):
+        state = model.state
         if 'alive' in state:
             alive = state['alive']
-            alive &= self.model.grid.ingrid(state['X'], state['Y'])
+            alive &= model.grid.ingrid(state['X'], state['Y'])
             state.remove(~alive)
 
-    def _add_new(self):
+    def _add_new(self, model: Model):
         # Get the portion of the release dataset that corresponds to
         # current simulation time
         df = release_data_subset(
             dataframe=self.dataframe,
-            start_time=self.model.solver.time,
-            stop_time=self.model.solver.time + self.model.solver.step,
+            start_time=model.solver.time,
+            stop_time=model.solver.time + model.solver.step,
         ).copy(deep=True)
 
         # If there are no new particles, but the state is empty, we should
         # still initialize the state by adding the appropriate columns
-        if (len(df) == 0) and ('X' not in self.model.state):
-            self.model.state.append(df.to_dict(orient='list'))
+        if (len(df) == 0) and ('X' not in model.state):
+            model.state.append(df.to_dict(orient='list'))
             self._last_release_dataframe = df
 
         # If there are no new particles and we don't use continuous release,
@@ -94,14 +91,14 @@ class TextFileReleaser(Releaser):
 
         # If we have continuous release, but there are no new particles and
         # the last release is recent, we are also done
-        current_time = self.model.solver.time
+        current_time = model.solver.time
         elapsed_since_last_write = current_time - self._last_release_time
         last_release_is_recent = (elapsed_since_last_write < self._frequency)
         if continuous_release and (len(df) == 0) and last_release_is_recent:
             return
 
         # If we are at the final time step, we should not release any more particles
-        if continuous_release and self.model.solver.time >= self.model.solver.stop:
+        if continuous_release and model.solver.time >= model.solver.stop:
             return
 
         # If we have continuous release, but there are no new particles and
@@ -119,7 +116,7 @@ class TextFileReleaser(Releaser):
                 logger.critical("Particle release must have position")
                 raise ValueError()
             # else
-            X, Y = self.model.grid.ll2xy(df["lon"].values, df["lat"].values)
+            X, Y = model.grid.ll2xy(df["lon"].values, df["lat"].values)
             df.rename(columns=dict(lon="X", lat="Y"), inplace=True)
             df["X"] = X
             df["Y"] = Y
@@ -136,7 +133,7 @@ class TextFileReleaser(Releaser):
 
         # Add new particles
         new_particles = df.to_dict(orient='list')
-        state = self.model.state
+        state = model.state
         state.append(new_particles)
 
     @property
