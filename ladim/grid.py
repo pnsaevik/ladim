@@ -294,6 +294,20 @@ class ArrayGrid(Grid):
     ) -> np.ndarray:
         return map_coordinates(self.depth, (s, y, x), order=1, mode='nearest')
 
+    def from_depth(
+            self, x: Sequence, y: Sequence, z: Sequence
+    ) -> np.ndarray:
+        nz, ny, nx = self.depth.shape
+        j = np.clip(x, 0, nx - 1) + nx * np.clip(y, 0, ny - 1)
+
+        depths = self.depth.reshape((nz, ny * nx))[:, j].T
+        idx, frac = array_lookup(
+            arr=-depths,
+            values=-np.asarray(z),
+            return_frac=True,
+        )
+        return idx
+
 
 def bilin_inv(f, g, F, G, maxiter=7, tol=1.0e-7) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -375,3 +389,49 @@ def bilin_inv(f, g, F, G, maxiter=7, tol=1.0e-7) -> tuple[np.ndarray, np.ndarray
         y = np.maximum(0, np.minimum(jmax, y))
 
     return x, y
+
+
+def array_lookup(arr, values, return_frac=False):
+    """
+    Find indices of a set of values
+
+    The lookup table "arr" has dimensions N * M, and should be sorted
+    along the M axis (i.e., arr[i, j] <= arr[i, j + 1] for all i, j)
+
+    The search value array "values" should have dimensions N. The values
+    are clipped by the minimum and maximum values given by "arr".
+
+    The function returns and index array "idx" such that arr[i, idx[i]] <=
+    values[i] < arr[i, idx[i] + 1] for all i. All values in "idx" are
+    values between 0 and M - 2.
+
+    If the parameter "return_frac" is set to True, the function returns an
+    additional array "frac" with values in the range [0, 1] such that
+    values == arr[i, idx[i]] * (1 - frac[i]) + arr[i, idx[i + 1]] * frac[i]
+    for all i.
+
+    :param arr: Lookup table, shape N * M
+    :param values: Values to search for, shape N
+    :param return_frac: True if interpolation index "frac" should be returned
+    :return: A tuple ("idx", "frac"), or just "idx" if return_frac is set to False
+    """
+
+    arr = np.asarray(arr)
+    values = np.asarray(values)
+    n, m = arr.shape
+
+    assert (n, ) == values.shape
+    assert np.all(arr[:, 0] <= arr[:, -1])
+
+    idx_raw = np.sum(arr.T <= values, axis=0) - 1
+    idx = np.maximum(0, np.minimum(idx_raw, m - 2))
+
+    if not return_frac:
+        return idx
+
+    i = np.arange(n)
+    values_0 = arr[i, idx]
+    values_1 = arr[i, idx + 1]
+    frac_raw = (values - values_0) / (values_1 - values_0)
+    frac = np.maximum(0, np.minimum(frac_raw, 1))
+    return idx, frac

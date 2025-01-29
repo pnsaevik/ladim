@@ -88,21 +88,33 @@ class Test_ArrayGrid_from_latlon:
         assert y.tolist() == [0, 1, 0, 0]
 
 
-class Test_ArrayGrid_to_depth:
+class Test_ArrayGrid_from_to_depth:
     def test_can_extract(self):
         g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))
-        depth = g.to_depth(x=[0, 1, 2, 3], y=[0, 1, 2, 1], s=[0, 1, 0, 1])
-        assert depth.tolist() == [12, 5, 22, 7]
+        x = [0, 1, 2, 3]
+        y = [0, 1, 2, 1]
+        s = [0, 1, 0, 1]
+        z = [12, 5, 22, 7]
+        assert g.to_depth(x, y, s).tolist() == z
+        assert g.from_depth(x, y, z).tolist() == s
 
     def test_can_interpolate(self):
         g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))
-        depth = g.to_depth(x=[0, .5, 1, 1, 1], y=[0, 0, 0, .5, 1], s=[1] * 5)
-        assert depth.tolist() == [0, 0.5, 1, 3, 5]
+        x = [0, .5, 1, 1, 1]
+        y = [0, 0, 0, .5, 1]
+        s = [1, 1, 1, 1, 1]
+        z = [0, 0.5, 1, 3, 5]
+        assert g.to_depth(x, y, s).tolist() == z
+        assert g.from_depth(x, y, z).tolist() == s
 
     def test_extrapolates_as_constant(self):
         g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))
-        depth = g.to_depth(x=[-1, 9, 1, 1], y=[1, 1, -1, 9], s=[1] * 4)
-        assert depth.tolist() == [4, 7, 1, 9]
+        x = [-1, 9, 1, 1]
+        y = [1, 1, -1, 9]
+        s = [1, 1, 1, 1]
+        z = [4, 7, 1, 9]
+        assert g.to_depth(x, y, s).tolist() == z
+        assert g.from_depth(x, y, z).tolist() == s
 
 
 class Test_bilin_inv:
@@ -132,3 +144,33 @@ class Test_bilin_inv:
         # Check that F, G interpolated to i, j gives f, g
         assert F[i, j].tolist() == f.tolist()
         assert G[i, j].tolist() == g.tolist()
+
+
+class Test_array_lookup:
+    def test_correct_when_no_frac(self):
+        arr = np.array([
+            [0, 10, 20],
+            [0, 10, 20],
+            [0, 10, 20],
+            [0, 10, 20],
+            [0, 10, 20],
+            [0, 10, 20],
+            [0, 10, 20],
+            [0, 100, 300],
+        ])
+        values = np.array([-5, 0, 5, 10, 15, 20, 25, 100])
+        idx = grid.array_lookup(arr, values)
+        assert idx.tolist() == [0, 0, 0, 1, 1, 1, 1, 1]
+
+    def test_correct_when_frac(self):
+        arr = np.array([
+            [0, 10, 20],
+            [0, 10, 20],
+            [0, 10, 20],
+            [0, 10, 20],
+            [0, 10, 20],
+        ])
+        values = np.array([-5, 5, 15, 20, 25])
+        idx, frac = grid.array_lookup(arr, values, return_frac=True)
+        assert idx.tolist() == [0, 0, 1, 1, 1]
+        assert frac.tolist() == [0, .5, .5, 1, 1]
