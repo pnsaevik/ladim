@@ -1,5 +1,7 @@
 from .model import Module
 import numpy as np
+from typing import Sequence
+from scipy.ndimage import map_coordinates
 
 
 class Grid(Module):
@@ -26,26 +28,34 @@ class Grid(Module):
 
     # --- MODERN METHODS ---
 
-    def scale_factors(
-            self, x: np.ndarray, y: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray]:
+    def dx(self, x: Sequence, y: Sequence) -> np.ndarray:
         """
-        Metric scale factors.
+        Metric scale factor in the X direction
 
-        The metric scale factor dx is defined such that if one moves
-        a small increment delta_x along the X axis, then the distance
-        (in meters) equals dx * delta_x. The scale factor dy is defined
-        similarly.
+        The metric scale factor is defined such that if one moves
+        a small increment delta along the axis, then the distance
+        (in meters) equals scale_factor * delta.
 
         :param x: X positions
         :param y: Y positions
-        :return: A tuple dx, dy of scale factors [in meters per horizontal
-            grid units]
+        :return: Metric scale factor [in meters per grid unit]
         """
-        pass
+
+    def dy(self, x: Sequence, y: Sequence) -> np.ndarray:
+        """
+        Metric scale factor in the Y direction
+
+        The metric scale factor is defined such that if one moves
+        a small increment delta along the axis, then the distance
+        (in meters) equals scale_factor * delta.
+
+        :param x: X positions
+        :param y: Y positions
+        :return: Metric scale factor [in meters per grid unit]
+        """
 
     def from_bearing(
-            self, x: np.ndarray, y: np.ndarray, b: np.ndarray
+            self, x: Sequence, y: Sequence, b: Sequence
     ) -> np.ndarray:
         """
         Azimutal angles from compass bearings.
@@ -66,7 +76,7 @@ class Grid(Module):
         """
 
     def to_bearing(
-            self, x: np.ndarray, y: np.ndarray, az: np.ndarray
+            self, x: Sequence, y: Sequence, az: Sequence
     ) -> np.ndarray:
         """
         Azimutal angles from compass bearings.
@@ -87,7 +97,7 @@ class Grid(Module):
         """
 
     def from_depth(
-            self, x: np.ndarray, y: np.ndarray, z: np.ndarray
+            self, x: Sequence, y: Sequence, z: Sequence
     ) -> np.ndarray:
         """
         Vertical coordinates from depth and horizontal coordinates.
@@ -99,7 +109,7 @@ class Grid(Module):
         """
 
     def to_depth(
-            self, x: np.ndarray, y: np.ndarray, s: np.ndarray
+            self, x: Sequence, y: Sequence, s: Sequence
     ) -> np.ndarray:
         """
         Depth from horizontal and vertical coordinates.
@@ -110,7 +120,7 @@ class Grid(Module):
         :return: Depth below surface [m, positive downwards]
         """
 
-    def from_epoch(self, p: np.ndarray) -> np.ndarray:
+    def from_epoch(self, p: Sequence) -> np.ndarray:
         """
         Time coordinates from posix time
 
@@ -118,7 +128,7 @@ class Grid(Module):
         :return: Time coordinates
         """
 
-    def to_epoch(self, t: np.ndarray) -> np.ndarray:
+    def to_epoch(self, t: Sequence) -> np.ndarray:
         """
         Posix time from time coordinates
 
@@ -191,3 +201,38 @@ class RomsGrid(Grid):
 
     def xy2ll(self, X, Y):
         return self.grid.xy2ll(X, Y)
+
+
+class ArrayGrid(Grid):
+    def __init__(
+            self,
+            lat: np.ndarray | tuple[tuple] = ((), ),
+            lon: np.ndarray | tuple[tuple] = ((), ),
+            depth: np.ndarray | tuple[tuple[tuple]] = (((), ), ),
+            time: np.ndarray | tuple = (),
+    ):
+        """
+        Define an array grid
+
+        The number of lattice points in the T (time), Z (depth), Y and X
+        dimensions are NT, NZ, NY and NX, respectively. It is assumed that
+
+        - The lat/lon coordinates are independent of the T and Z dimensions
+        - The depth is independent of the T dimension
+        - The time is independent of the X, Y and Z timensions
+
+        :param lat: Latitude coordinates [degrees, NY * NX array]
+        :param lon: Longitude coordinates [degrees, NY * NX array]
+        :param depth: Depth below surface [meters, positive downwards, NZ * NY * NX array]
+        :param time: Time since 1970-01-01 [seconds, NT array]
+        """
+        self.lat = np.asarray(lat).astype('f8')
+        self.lon = np.asarray(lon).astype('f8')
+        self.depth = np.asarray(depth).astype('f4')
+        self.time = np.asarray(time).astype('datetime64[s]').astype('int64')
+
+    def from_epoch(self, p: Sequence) -> np.ndarray:
+        return np.interp(x=p, xp=self.time, fp=np.arange(len(self.time)))
+
+    def to_epoch(self, t: Sequence) -> np.ndarray:
+        return map_coordinates(self.time, (t, ), order=1, mode='nearest')
