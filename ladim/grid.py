@@ -264,6 +264,9 @@ class ArrayGrid(Grid):
         self.lon = np.asarray(lon).astype('f8')
         self.depth = np.asarray(depth).astype('f4')
         self.time = np.asarray(time).astype('datetime64[s]').astype('int64')
+        self._dx = None
+        self._dy = None
+        self._az = None
 
         if np.any(np.diff(self.time) <= 0):
             raise ValueError('Time values must be increasing')
@@ -305,10 +308,40 @@ class ArrayGrid(Grid):
         )
         return idx + frac
 
+    def _compute_dxdyaz(self):
+        if self._dx is None:
+            dx, dy, az_x, az_y = compute_dx_dy_az(lat=self.lat, lon=self.lon)
+
+            self._dx = dx
+            self._dy = dy
+            self._az = az_x
+
     def dx(self, x: Sequence, y: Sequence) -> np.ndarray:
-        pass
+        x = np.asarray(x)
+        y = np.asarray(y)
+        if x.shape != y.shape:
+            raise ValueError('all input arrays must have the same shape')
+        self._compute_dxdyaz()
+        coords = (y, x - 0.5)  # Convert from 'rho' to 'u' coordinates
+        return map_coordinates(self._dx, coords, order=1, mode='nearest')
 
     def dy(self, x: Sequence, y: Sequence) -> np.ndarray:
+        x = np.asarray(x)
+        y = np.asarray(y)
+        if x.shape != y.shape:
+            raise ValueError('all input arrays must have the same shape')
+        self._compute_dxdyaz()
+        coords = (y - 0.5, x)  # Convert from 'rho' to 'v' coordinates
+        return map_coordinates(self._dy, coords, order=1, mode='nearest')
+
+    def from_bearing(
+            self, x: Sequence, y: Sequence, b: Sequence
+    ) -> np.ndarray:
+        pass
+
+    def to_bearing(
+            self, x: Sequence, y: Sequence, az: Sequence
+    ) -> np.ndarray:
         pass
 
 
@@ -476,3 +509,47 @@ def bilinear_interp(arr: np.ndarray, y: Sequence, x: Sequence):
             + z11 * xf * yf
     )
     return z.T
+
+
+def compute_dx_dy_az(lat, lon):
+    """
+    Compute scale factors and bearings from grid
+
+    The grid is assumed to be a structured grid with lat/lon coordinates
+    at every grid point. The function computes four variables:
+
+    dx:  The distance (in meters) when moving one grid cell along the X axis
+    dy:  The distance (in meters) when moving one grid cell along the Y axis
+    bx: The bearing (in degrees) when moving in positive X direction
+    by: The bearing (in degrees) when moving in positive Y direction
+
+    The shape of the returned arrays will be one less than the input arrays
+    in the dimension where the differential is computed. The bearing is
+    measured counterclockwise from north, that is, north is 0 degrees and east
+    is 90 degrees.
+
+    :param lat: Latitude (in degrees) of grid points
+    :param lon: Longitude (in degrees) of grid points
+    :return: A tuple (dx, dy, bx, by)
+    """
+    import pyproj
+    from scipy.stats import circmean
+
+    geod = pyproj.Geod(ellps='WGS84')
+
+    azi12_x, azi21_x, dist_x = geod.inv(
+        lons1=lon[:, :-1], lats1=lat[:, :-1],
+        lons2=lon[:, 1:], lats2=lat[:, 1:],
+        return_back_azimuth=True
+    )
+
+    azi_x = circmean([azi12_x, azi21_x + 180], high=360, axis=0) % 360
+
+    azi12_y, azi21_y, dist_y = geod.inv(
+        lons1=lon[:-1, :], lats1=lat[:-1, :],
+        lons2=lon[1:, :], lats2=lat[1:, :],
+        return_back_azimuth=True,
+    )
+    azi_y = circmean([azi12_y, azi21_y + 180], high=360, axis=0) % 360
+
+    return dist_x, dist_y, azi_x, azi_y

@@ -159,6 +159,38 @@ class Test_ArrayGrid_from_to_depth:
         assert g.from_depth(x, y, z).tolist() == s
 
 
+class Test_ArrayGrid_dx_dy:
+    def test_can_interpolate(self):
+        g = grid.ArrayGrid(
+            lat=[[60, 60, 60, 60], [61, 61, 61, 61], [62, 62, 62, 62]],
+            lon=[[5, 6, 7, 8], [5, 6, 7, 8], [5, 6, 7, 8]],
+        )
+
+        # Move along inner dimension (longitude)
+        dx = g.dx(x=[1, 1.5, 2], y=[1, 1, 1])
+        dy = g.dy(x=[1, 1.5, 2], y=[1, 1, 1])
+        assert dx.round(-1).tolist() == [54110, 54110, 54110]
+        assert dy.round(-1).tolist() == [111430, 111430, 111430]
+
+        # Move along outer dimension (latitude)
+        dx = g.dx(x=[2, 2, 2], y=[0.5, 1, 1.5])
+        dy = g.dy(x=[2, 2, 2], y=[0.5, 1, 1.5])
+        assert dx.round(-1).tolist() == [54950, 54110, 53250]
+        assert dy.round(-1).tolist() == [111420, 111430, 111440]
+
+    def test_extrapolates_as_constant(self):
+        g = grid.ArrayGrid(
+            lat=[[60, 60, 60, 60], [61, 61, 61, 61], [62, 62, 62, 62]],
+            lon=[[5, 6, 7, 8], [5, 6, 7, 8], [5, 6, 7, 8]],
+        )
+
+        # Move along outer dimension (latitude)
+        dx = g.dx(x=[2, 2, 2, 2, 2], y=[-1, 0, 1, 2, 3])
+        dy = g.dy(x=[2, 2, 2, 2, 2], y=[-1, 0, 1, 2, 3])
+        assert dx.round(-1).tolist() == [55800, 55800, 54110, 52400, 52400]
+        assert dy.round(-1).tolist() == [111420, 111420, 111430, 111440, 111440]
+
+
 class Test_bilin_inv:
     def test_can_invert_single_cell(self):
         x, y = grid.bilin_inv(
@@ -216,3 +248,16 @@ class Test_array_lookup:
         idx, frac = grid.array_lookup(arr, values, return_frac=True)
         assert idx.tolist() == [0, 0, 1, 1, 1]
         assert frac.tolist() == [0, .5, .5, 1, 1]
+
+
+class Test_compute_dx_dy_az:
+    def test_matches_test_value(self):
+        lon = np.array([[5, 6], [5, 6], [5, 6]])
+        lat = np.array([[60, 60], [61, 61], [62, 62]])
+        dx, dy, bx, by = grid.compute_dx_dy_az(lon=lon, lat=lat)
+
+        assert np.round(dx, -1).tolist() == [[55800], [54110], [52400]]
+        assert np.round(bx, 0).tolist() == [[90], [90], [90]]
+
+        assert np.round(dy, -1).tolist() == [[111420] * 2, [111440] * 2]
+        assert np.round(by, 0).tolist() == [[0, 0], [0, 0]]
