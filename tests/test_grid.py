@@ -88,6 +88,48 @@ class Test_ArrayGrid_from_latlon:
         assert y.tolist() == [0, 1, 0, 0]
 
 
+class Test_ArrayGrid_interpolate_depth_array:
+    def test_can_extract(self):
+        g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))
+        x = [0, 1, 1]
+        y = [0, 0, 1]
+        z = g._interpolate_depth_array(x, y)
+        assert z.tolist() == [
+            [12, 0],
+            [13, 1],
+            [17, 5],
+        ]
+
+    def test_can_interpolate(self):
+        g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))
+        x = [0, 1, 0, 1, .5, 0, .5]
+        y = [0, 0, 1, 1, 0, .5, .5]
+        z = g._interpolate_depth_array(x, y)
+        assert z.tolist() == [
+            [12.0, 0.0],
+            [13.0, 1.0],
+            [16.0, 4.0],
+            [17.0, 5.0],
+            [12.5, 0.5],
+            [14.0, 2.0],
+            [14.5, 2.5],
+        ]
+
+    def test_extrapolates_as_constant(self):
+        g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))
+        x = [0, -1, 0, 3, 4, 3]
+        y = [0, 0, -1, 2, 2, 3]
+        z = g._interpolate_depth_array(x, y)
+        assert z.tolist() == [
+            [12, 0],
+            [12, 0],
+            [12, 0],
+            [23, 11],
+            [23, 11],
+            [23, 11],
+        ]
+
+
 class Test_ArrayGrid_from_to_depth:
     def test_can_extract(self):
         g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))

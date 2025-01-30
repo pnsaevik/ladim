@@ -294,19 +294,41 @@ class ArrayGrid(Grid):
     ) -> np.ndarray:
         return map_coordinates(self.depth, (s, y, x), order=1, mode='nearest')
 
+    def _interpolate_depth_array(self, x: Sequence, y: Sequence) -> np.ndarray:
+        nz, ny, nx = self.depth.shape
+
+        x = np.minimum(nx - 1, np.maximum(0, x))
+        y = np.minimum(ny - 1, np.maximum(0, y))
+
+        x0 = np.minimum(nx - 2, np.int32(x))
+        y0 = np.minimum(ny - 2, np.int32(y))
+
+        xf = x - x0
+        yf = y - y0
+
+        z00 = self.depth[:, y0, x0]
+        z01 = self.depth[:, y0, x0 + 1]
+        z10 = self.depth[:, y0 + 1, x0]
+        z11 = self.depth[:, y0 + 1, x0 + 1]
+
+        z = (
+                z00 * (1 - xf) * (1 - yf)
+                + z01 * xf * (1 - yf)
+                + z10 * (1 - xf) * yf
+                + z11 * xf * yf
+        )
+        return z.T
+
     def from_depth(
             self, x: Sequence, y: Sequence, z: Sequence
     ) -> np.ndarray:
-        nz, ny, nx = self.depth.shape
-        j = np.clip(x, 0, nx - 1) + nx * np.clip(y, 0, ny - 1)
-
-        depths = self.depth.reshape((nz, ny * nx))[:, j].T
+        depths = self._interpolate_depth_array(x, y)
         idx, frac = array_lookup(
             arr=-depths,
             values=-np.asarray(z),
             return_frac=True,
         )
-        return idx
+        return idx + frac
 
 
 def bilin_inv(f, g, F, G, maxiter=7, tol=1.0e-7) -> tuple[np.ndarray, np.ndarray]:
