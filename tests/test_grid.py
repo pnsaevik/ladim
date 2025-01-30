@@ -88,12 +88,12 @@ class Test_ArrayGrid_from_latlon:
         assert y.tolist() == [0, 1, 0, 0]
 
 
-class Test_ArrayGrid_interpolate_depth_array:
+class Test_bilinear_interp:
     def test_can_extract(self):
-        g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))
+        depth = np.flip(np.arange(24).reshape((2, 3, 4)), 0)
         x = [0, 1, 1]
         y = [0, 0, 1]
-        z = g._interpolate_depth_array(x, y)
+        z = grid.bilinear_interp(depth, y, x)
         assert z.tolist() == [
             [12, 0],
             [13, 1],
@@ -101,10 +101,10 @@ class Test_ArrayGrid_interpolate_depth_array:
         ]
 
     def test_can_interpolate(self):
-        g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))
+        depth = np.flip(np.arange(24).reshape((2, 3, 4)), 0)
         x = [0, 1, 0, 1, .5, 0, .5]
         y = [0, 0, 1, 1, 0, .5, .5]
-        z = g._interpolate_depth_array(x, y)
+        z = grid.bilinear_interp(depth, y, x)
         assert z.tolist() == [
             [12.0, 0.0],
             [13.0, 1.0],
@@ -116,10 +116,10 @@ class Test_ArrayGrid_interpolate_depth_array:
         ]
 
     def test_extrapolates_as_constant(self):
-        g = grid.ArrayGrid(depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0))
+        depth = np.flip(np.arange(24).reshape((2, 3, 4)), 0)
         x = [0, -1, 0, 3, 4, 3]
         y = [0, 0, -1, 2, 2, 3]
-        z = g._interpolate_depth_array(x, y)
+        z = grid.bilinear_interp(depth, y, x)
         assert z.tolist() == [
             [12, 0],
             [12, 0],

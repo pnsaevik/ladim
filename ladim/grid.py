@@ -294,41 +294,22 @@ class ArrayGrid(Grid):
     ) -> np.ndarray:
         return map_coordinates(self.depth, (s, y, x), order=1, mode='nearest')
 
-    def _interpolate_depth_array(self, x: Sequence, y: Sequence) -> np.ndarray:
-        nz, ny, nx = self.depth.shape
-
-        x = np.minimum(nx - 1, np.maximum(0, x))
-        y = np.minimum(ny - 1, np.maximum(0, y))
-
-        x0 = np.minimum(nx - 2, np.int32(x))
-        y0 = np.minimum(ny - 2, np.int32(y))
-
-        xf = x - x0
-        yf = y - y0
-
-        z00 = self.depth[:, y0, x0]
-        z01 = self.depth[:, y0, x0 + 1]
-        z10 = self.depth[:, y0 + 1, x0]
-        z11 = self.depth[:, y0 + 1, x0 + 1]
-
-        z = (
-                z00 * (1 - xf) * (1 - yf)
-                + z01 * xf * (1 - yf)
-                + z10 * (1 - xf) * yf
-                + z11 * xf * yf
-        )
-        return z.T
-
     def from_depth(
             self, x: Sequence, y: Sequence, z: Sequence
     ) -> np.ndarray:
-        depths = self._interpolate_depth_array(x, y)
+        depths = bilinear_interp(self.depth, y, x)
         idx, frac = array_lookup(
             arr=-depths,
             values=-np.asarray(z),
             return_frac=True,
         )
         return idx + frac
+
+    def dx(self, x: Sequence, y: Sequence) -> np.ndarray:
+        pass
+
+    def dy(self, x: Sequence, y: Sequence) -> np.ndarray:
+        pass
 
 
 def bilin_inv(f, g, F, G, maxiter=7, tol=1.0e-7) -> tuple[np.ndarray, np.ndarray]:
@@ -457,3 +438,41 @@ def array_lookup(arr, values, return_frac=False):
     frac_raw = (values - values_0) / (values_1 - values_0)
     frac = np.maximum(0, np.minimum(frac_raw, 1))
     return idx, frac
+
+
+def bilinear_interp(arr: np.ndarray, y: Sequence, x: Sequence):
+    """
+    Bilinear interpolation of a multi-dimensional array
+
+    The function interpolates the input array in the second last and last
+    dimensions, but leaves the first dimensions unchanged.
+
+    :param arr: Input array
+    :param y: Fractional coordinates of the second last dimension
+    :param x: Fractional coordinates of the last dimension
+    :return:
+    """
+    nx = arr.shape[-1]
+    ny = arr.shape[-2]
+
+    x = np.minimum(nx - 1, np.maximum(0, x))
+    y = np.minimum(ny - 1, np.maximum(0, y))
+
+    x0 = np.minimum(nx - 2, np.int32(x))
+    y0 = np.minimum(ny - 2, np.int32(y))
+
+    xf = x - x0
+    yf = y - y0
+
+    z00 = arr[..., y0, x0]
+    z01 = arr[..., y0, x0 + 1]
+    z10 = arr[..., y0 + 1, x0]
+    z11 = arr[..., y0 + 1, x0 + 1]
+
+    z = (
+            z00 * (1 - xf) * (1 - yf)
+            + z01 * xf * (1 - yf)
+            + z10 * (1 - xf) * yf
+            + z11 * xf * yf
+    )
+    return z.T
