@@ -360,19 +360,26 @@ class ArrayGrid(Grid):
     ) -> np.ndarray:
         pass
 
-    def to_bearing(
-            self, x: Sequence, y: Sequence, az: Sequence
-    ) -> np.ndarray:
-        # Define input variables
+    def _latlondiff(self, x: Sequence, y: Sequence):
+        """
+        Compute latitude and longitude unit difference at selected points
+
+        Returns a tuple latdiff_x, latdiff_y, londiff_x, londiff_y. Together,
+        these variables tell how much the latitude and longitude increases when
+        moving by one grid cell in either the X or Y direction.
+
+        :param x: X coordinates of starting points
+        :param y: Y coordinates of starting points
+        :return: A tuple latdiff_x, latdiff_y, londiff_x, londiff_y
+        """
         x = np.asarray(x)
         y = np.asarray(y)
-        az_radians = np.asarray(az) * (np.pi / 180)
+
         latdiff_xdir_grid = self.compute('latdiff_x')
         londiff_xdir_grid = self.compute('londiff_x')
         latdiff_ydir_grid = self.compute('latdiff_y')
         londiff_ydir_grid = self.compute('londiff_y')
 
-        # Interpolate latitude and longitude differentials to desired positions
         crd_x = (y, x - 0.5)  # Convert from 'rho' to 'u' coordinates
         crd_y = (y - 0.5, x)  # Convert from 'rho' to 'v' coordinates
         latdiff_xdir = map_coordinates(latdiff_xdir_grid, crd_x, order=1, mode='nearest')
@@ -380,13 +387,23 @@ class ArrayGrid(Grid):
         latdiff_ydir = map_coordinates(latdiff_ydir_grid, crd_y, order=1, mode='nearest')
         londiff_ydir = map_coordinates(londiff_ydir_grid, crd_y, order=1, mode='nearest')
 
+        return latdiff_xdir, latdiff_ydir, londiff_xdir, londiff_ydir
+
+    def to_bearing(
+            self, x: Sequence, y: Sequence, az: Sequence
+    ) -> np.ndarray:
+        # Compute unit lat/lon difference in the x and y directions
+        latdiff_x, latdiff_y, londiff_x, londiff_y = self._latlondiff(x, y)
+
         # Define directional vector 'p' which is defined on the x/y grid
-        # Define new vector 'q' which is defined on the lon/lat grid
-        # and has the same direction as 'p'
+        az_radians = np.asarray(az) * (np.pi / 180)
         p_x = np.cos(az_radians)
         p_y = np.sin(az_radians)
-        q_lat = p_x * latdiff_xdir + p_y * latdiff_ydir
-        q_lon = p_x * londiff_xdir + p_y * londiff_ydir
+
+        # Define new vector 'q' which is defined on the lon/lat grid
+        # and has the same direction as 'p'
+        q_lat = p_x * latdiff_x + p_y * latdiff_y
+        q_lon = p_x * londiff_x + p_y * londiff_y
 
         # Compute bearing
         bearing_radians = np.atan2(q_lon, q_lat)
