@@ -251,10 +251,11 @@ class Forcing:
 
     """
 
-    def __init__(self, config, grid):
+    def __init__(self, config, _):
 
         logger.info("Initiating forcing")
 
+        grid = Grid(config)
         self._grid = grid  # Get the grid object, make private?
         # self.config = config["gridforce"]
         self.ibm_forcing = config["ibm_forcing"]
