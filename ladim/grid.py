@@ -242,6 +242,7 @@ class ArrayGrid(Grid):
             lon: np.ndarray | tuple[tuple] = ((), ),
             depth: np.ndarray | tuple[tuple[tuple]] = (((), ), ),
             time: np.ndarray | tuple = (),
+            mask: np.ndarray | tuple[tuple] = ((), ),
     ):
         """
         Define an array grid
@@ -259,11 +260,18 @@ class ArrayGrid(Grid):
         :param lon: Longitude coordinates [degrees, NY * NX array]
         :param depth: Depth below surface [meters, positive downwards, NZ * NY * NX array]
         :param time: Time since 1970-01-01 [seconds, NT array]
+        :param mask: Zero at land positions (default all ones) [NY * NX array]
         """
-        self.lat = np.asarray(lat).astype('f8')
-        self.lon = np.asarray(lon).astype('f8')
-        self.depth = np.asarray(depth).astype('f4')
-        self.time = np.asarray(time).astype('datetime64[s]').astype('int64')
+        self.lat = np.asarray(lat, dtype='f8')
+        self.lon = np.asarray(lon, dtype='f8')
+        self.depth = np.asarray(depth, dtype='f4')
+        self.time = np.asarray(time, dtype='datetime64[s]').astype('int64')
+
+        if (not mask) or np.size(mask) == 0:
+            self.mask = np.ones(self.depth.shape[-2:], dtype='i2')
+        else:
+            self.mask = np.asarray(mask, dtype='i2')
+
         self._cache_dict = dict()
 
         if np.any(np.diff(self.time) <= 0):
@@ -293,7 +301,10 @@ class ArrayGrid(Grid):
     def to_depth(
             self, x: Sequence, y: Sequence, s: Sequence
     ) -> np.ndarray:
-        return map_coordinates(self.depth, (s, y, x), order=1, mode='nearest')
+        mask = map_coordinates(self.mask, (y, x), order=0, mode='nearest')
+        depth = map_coordinates(self.depth, (s, y, x), order=1, mode='nearest')
+        depth[mask == 0] = 0
+        return depth
 
     def from_depth(
             self, x: Sequence, y: Sequence, z: Sequence
@@ -304,7 +315,11 @@ class ArrayGrid(Grid):
             values=-np.asarray(z),
             return_frac=True,
         )
-        return idx + frac
+
+        s = idx + frac
+        mask = map_coordinates(self.mask, (y, x), order=0, mode='nearest')
+        s[mask == 0] = 0
+        return s
 
     def compute(self, key):
         """

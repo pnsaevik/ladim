@@ -158,6 +158,17 @@ class Test_ArrayGrid_from_to_depth:
         assert g.to_depth(x, y, s).tolist() == z
         assert g.from_depth(x, y, z).tolist() == s
 
+    def test_depth_is_zero_on_land(self):
+        g = grid.ArrayGrid(
+            depth=np.flip(np.arange(24).reshape((2, 3, 4)), 0),
+            mask=[[1, 1, 1, 1], [1, 0, 1, 1], [1, 1, 1, 1]]
+        )
+        x = [0, .25, .75, 1, 1.25, 1.75, 2]
+        y = [1] * len(x)
+        s = [1] * len(x)
+        z = [4, 4.25, 0, 0, 0, 5.75, 6]
+        assert g.to_depth(x, y, s).tolist() == z
+
 
 class Test_ArrayGrid_dx_dy:
     def test_can_interpolate(self):
