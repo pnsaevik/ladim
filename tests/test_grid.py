@@ -191,6 +191,28 @@ class Test_ArrayGrid_dx_dy:
         assert dy.round(-1).tolist() == [111420, 111420, 111430, 111440, 111440]
 
 
+class Test_ArrayGrid_to_bearing:
+    def test_returns_bearings_in_counterclockwise_degrees(self):
+        g = grid.ArrayGrid(
+            lat=[[61, 62, 63], [60, 61, 62]],
+            lon=[[5, 6, 7], [6, 7, 8]],
+        )
+
+        az = [
+            0,    # Along  X direction (lat+, lon+)
+            90,   # Along  Y direction (lat-, lon+)
+            180,  # Along -X direction (lat-, lon-)
+            270,  # Along -Y direction (lat+, lon-)
+        ]
+
+        assert g.to_bearing(x=[0] * 4, y=[0] * 4, az=az).round().tolist() == [
+            45,   # North-East along X direction
+            135,  # South-East along Y direction
+            225,  # South-West along -X direction
+            315,  # North-West along -Y direction
+        ]
+
+
 class Test_bilin_inv:
     def test_can_invert_single_cell(self):
         x, y = grid.bilin_inv(
@@ -250,14 +272,11 @@ class Test_array_lookup:
         assert frac.tolist() == [0, .5, .5, 1, 1]
 
 
-class Test_compute_dx_dy_az:
+class Test_compute_dx_dy:
     def test_matches_test_value(self):
         lon = np.array([[5, 6], [5, 6], [5, 6]])
         lat = np.array([[60, 60], [61, 61], [62, 62]])
-        dx, dy, bx, by = grid.compute_dx_dy_az(lon=lon, lat=lat)
+        dx, dy = grid.compute_dx_dy(lon=lon, lat=lat)
 
         assert np.round(dx, -1).tolist() == [[55800], [54110], [52400]]
-        assert np.round(bx, 0).tolist() == [[90], [90], [90]]
-
         assert np.round(dy, -1).tolist() == [[111420] * 2, [111440] * 2]
-        assert np.round(by, 0).tolist() == [[0, 0], [0, 0]]

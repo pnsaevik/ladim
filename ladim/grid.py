@@ -264,9 +264,15 @@ class ArrayGrid(Grid):
         self.lon = np.asarray(lon).astype('f8')
         self.depth = np.asarray(depth).astype('f4')
         self.time = np.asarray(time).astype('datetime64[s]').astype('int64')
+        self._cache_dict = dict()
         self._dx = None
         self._dy = None
-        self._az = None
+        self._az_x = None
+        self._az_y = None
+        self._cos_az_x = None
+        self._sin_az_x = None
+        self._cos_az_y = None
+        self._sin_az_y = None
 
         if np.any(np.diff(self.time) <= 0):
             raise ValueError('Time values must be increasing')
@@ -308,31 +314,46 @@ class ArrayGrid(Grid):
         )
         return idx + frac
 
-    def _compute_dxdyaz(self):
-        if self._dx is None:
-            dx, dy, az_x, az_y = compute_dx_dy_az(lat=self.lat, lon=self.lon)
+    def compute(self, key):
+        """
+        Cached computation of key variables
 
-            self._dx = dx
-            self._dy = dy
-            self._az = az_x
+        :param key: The variable to compute
+        :return: The computed variables
+        """
+        if key in self._cache_dict:
+            return self._cache_dict[key]
+
+        if key in ['dx', 'dy']:
+            dx, dy = compute_dx_dy(lat=self.lat, lon=self.lon)
+            self._cache_dict['dx'] = dx
+            self._cache_dict['dy'] = dy
+
+        elif key in ['latdiff_x', 'latdiff_y', 'londiff_x', 'londiff_y']:
+            lax = (self.lat[:, 1:] - self.lat[:, :-1]) * (np.pi / 180)
+            lox = (self.lon[:, 1:] - self.lon[:, :-1]) * (np.pi / 180)
+            lay = (self.lat[1:, :] - self.lat[:-1, :]) * (np.pi / 180)
+            loy = (self.lon[1:, :] - self.lon[:-1, :]) * (np.pi / 180)
+            self._cache_dict['latdiff_x'] = lax
+            self._cache_dict['londiff_x'] = lox
+            self._cache_dict['latdiff_y'] = lay
+            self._cache_dict['londiff_y'] = loy
+
+        return self._cache_dict[key]
 
     def dx(self, x: Sequence, y: Sequence) -> np.ndarray:
         x = np.asarray(x)
         y = np.asarray(y)
-        if x.shape != y.shape:
-            raise ValueError('all input arrays must have the same shape')
-        self._compute_dxdyaz()
+        dx = self.compute('dx')
         coords = (y, x - 0.5)  # Convert from 'rho' to 'u' coordinates
-        return map_coordinates(self._dx, coords, order=1, mode='nearest')
+        return map_coordinates(dx, coords, order=1, mode='nearest')
 
     def dy(self, x: Sequence, y: Sequence) -> np.ndarray:
         x = np.asarray(x)
         y = np.asarray(y)
-        if x.shape != y.shape:
-            raise ValueError('all input arrays must have the same shape')
-        self._compute_dxdyaz()
+        dy = self.compute('dy')
         coords = (y - 0.5, x)  # Convert from 'rho' to 'v' coordinates
-        return map_coordinates(self._dy, coords, order=1, mode='nearest')
+        return map_coordinates(dy, coords, order=1, mode='nearest')
 
     def from_bearing(
             self, x: Sequence, y: Sequence, b: Sequence
@@ -342,7 +363,35 @@ class ArrayGrid(Grid):
     def to_bearing(
             self, x: Sequence, y: Sequence, az: Sequence
     ) -> np.ndarray:
-        pass
+        # Define input variables
+        x = np.asarray(x)
+        y = np.asarray(y)
+        az_radians = np.asarray(az) * (np.pi / 180)
+        latdiff_xdir_grid = self.compute('latdiff_x')
+        londiff_xdir_grid = self.compute('londiff_x')
+        latdiff_ydir_grid = self.compute('latdiff_y')
+        londiff_ydir_grid = self.compute('londiff_y')
+
+        # Interpolate latitude and longitude differentials to desired positions
+        crd_x = (y, x - 0.5)  # Convert from 'rho' to 'u' coordinates
+        crd_y = (y - 0.5, x)  # Convert from 'rho' to 'v' coordinates
+        latdiff_xdir = map_coordinates(latdiff_xdir_grid, crd_x, order=1, mode='nearest')
+        londiff_xdir = map_coordinates(londiff_xdir_grid, crd_x, order=1, mode='nearest')
+        latdiff_ydir = map_coordinates(latdiff_ydir_grid, crd_y, order=1, mode='nearest')
+        londiff_ydir = map_coordinates(londiff_ydir_grid, crd_y, order=1, mode='nearest')
+
+        # Define directional vector 'p' which is defined on the x/y grid
+        # Define new vector 'q' which is defined on the lon/lat grid
+        # and has the same direction as 'p'
+        p_x = np.cos(az_radians)
+        p_y = np.sin(az_radians)
+        q_lat = p_x * latdiff_xdir + p_y * latdiff_ydir
+        q_lon = p_x * londiff_xdir + p_y * londiff_ydir
+
+        # Compute bearing
+        bearing_radians = np.atan2(q_lon, q_lat)
+        bearing = (bearing_radians * (180 / np.pi)) % 360
+        return bearing
 
 
 def bilin_inv(f, g, F, G, maxiter=7, tol=1.0e-7) -> tuple[np.ndarray, np.ndarray]:
@@ -511,45 +560,35 @@ def bilinear_interp(arr: np.ndarray, y: Sequence, x: Sequence):
     return z.T
 
 
-def compute_dx_dy_az(lat, lon):
+def compute_dx_dy(lat, lon):
     """
     Compute scale factors and bearings from grid
 
     The grid is assumed to be a structured grid with lat/lon coordinates
-    at every grid point. The function computes four variables:
+    at every grid point. The function computes two variables:
 
     dx:  The distance (in meters) when moving one grid cell along the X axis
     dy:  The distance (in meters) when moving one grid cell along the Y axis
-    bx: The bearing (in degrees) when moving in positive X direction
-    by: The bearing (in degrees) when moving in positive Y direction
 
     The shape of the returned arrays will be one less than the input arrays
-    in the dimension where the differential is computed. The bearing is
-    measured counterclockwise from north, that is, north is 0 degrees and east
-    is 90 degrees.
+    in the dimension where the differential is computed.
 
     :param lat: Latitude (in degrees) of grid points
     :param lon: Longitude (in degrees) of grid points
-    :return: A tuple (dx, dy, bx, by)
+    :return: A tuple (dx, dy)
     """
     import pyproj
-    from scipy.stats import circmean
 
     geod = pyproj.Geod(ellps='WGS84')
 
-    azi12_x, azi21_x, dist_x = geod.inv(
+    _, _, dist_x = geod.inv(
         lons1=lon[:, :-1], lats1=lat[:, :-1],
         lons2=lon[:, 1:], lats2=lat[:, 1:],
-        return_back_azimuth=True
     )
 
-    azi_x = circmean([azi12_x, azi21_x + 180], high=360, axis=0) % 360
-
-    azi12_y, azi21_y, dist_y = geod.inv(
+    _, _, dist_y = geod.inv(
         lons1=lon[:-1, :], lats1=lat[:-1, :],
         lons2=lon[1:, :], lats2=lat[1:, :],
-        return_back_azimuth=True,
     )
-    azi_y = circmean([azi12_y, azi21_y + 180], high=360, axis=0) % 360
 
-    return dist_x, dist_y, azi_x, azi_y
+    return dist_x, dist_y
