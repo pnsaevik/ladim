@@ -265,14 +265,6 @@ class ArrayGrid(Grid):
         self.depth = np.asarray(depth).astype('f4')
         self.time = np.asarray(time).astype('datetime64[s]').astype('int64')
         self._cache_dict = dict()
-        self._dx = None
-        self._dy = None
-        self._az_x = None
-        self._az_y = None
-        self._cos_az_x = None
-        self._sin_az_x = None
-        self._cos_az_y = None
-        self._sin_az_y = None
 
         if np.any(np.diff(self.time) <= 0):
             raise ValueError('Time values must be increasing')
