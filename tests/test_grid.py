@@ -212,7 +212,8 @@ class Test_ArrayGrid_to_bearing:
             315,  # North-West along -Y direction
         ]
 
-        assert g.to_bearing(x=[0] * 4, y=[0] * 4, az=az).round().tolist() == b
+        result = g.to_bearing(x=[0] * 4, y=[0] * 4, az=az)
+        assert max_dist_angle(result, b) < 1
 
 
 class Test_ArrayGrid_from_bearing:
@@ -236,7 +237,8 @@ class Test_ArrayGrid_from_bearing:
             315,  # North-West along -Y direction
         ]
 
-        assert g.from_bearing(x=[0] * 4, y=[0] * 4, b=b).round().tolist() == az
+        result = g.from_bearing(x=[0] * 4, y=[0] * 4, b=b)
+        assert max_dist_angle(result, az) < 1
 
 
 class Test_bilin_inv:
@@ -306,3 +308,16 @@ class Test_compute_dx_dy:
 
         assert np.round(dx, -1).tolist() == [[55800], [54110], [52400]]
         assert np.round(dy, -1).tolist() == [[111420] * 2, [111440] * 2]
+
+
+def max_dist_angle(a, b):
+    return max_norm_angle(a - b)
+
+
+def max_norm_angle(a):
+    b = zero_centric_angle(a)
+    return np.max(np.abs(b))
+
+
+def zero_centric_angle(a):
+    return ((a % 360) + 180) % 360 - 180
