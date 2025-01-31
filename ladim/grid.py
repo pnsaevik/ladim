@@ -355,11 +355,6 @@ class ArrayGrid(Grid):
         coords = (y - 0.5, x)  # Convert from 'rho' to 'v' coordinates
         return map_coordinates(dy, coords, order=1, mode='nearest')
 
-    def from_bearing(
-            self, x: Sequence, y: Sequence, b: Sequence
-    ) -> np.ndarray:
-        pass
-
     def _latlondiff(self, x: Sequence, y: Sequence):
         """
         Compute latitude and longitude unit difference at selected points
@@ -409,6 +404,27 @@ class ArrayGrid(Grid):
         bearing_radians = np.atan2(q_lon, q_lat)
         bearing = (bearing_radians * (180 / np.pi)) % 360
         return bearing
+
+    def from_bearing(
+            self, x: Sequence, y: Sequence, b: Sequence
+    ) -> np.ndarray:
+        # Compute unit lat/lon difference in the x and y directions
+        latdiff_x, latdiff_y, londiff_x, londiff_y = self._latlondiff(x, y)
+
+        # Define directional vector 'q' which is defined on the lat/lon grid
+        bearing_radians = np.asarray(b) * (np.pi / 180)
+        q_lat = np.cos(bearing_radians)
+        q_lon = np.sin(bearing_radians)
+
+        # Define new vector 'p' which is defined on the x/y grid
+        # and has the same direction as 'q'
+        p_x = q_lat * londiff_y - q_lon * latdiff_y
+        p_y = -q_lat * londiff_x + q_lon * latdiff_x
+
+        # Compute azimuth
+        az_radians = np.atan2(p_y, p_x)
+        az = (az_radians * (180 / np.pi)) % 360
+        return az
 
 
 def bilin_inv(f, g, F, G, maxiter=7, tol=1.0e-7) -> tuple[np.ndarray, np.ndarray]:

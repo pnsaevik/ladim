@@ -205,12 +205,38 @@ class Test_ArrayGrid_to_bearing:
             270,  # Along -Y direction (lat+, lon-)
         ]
 
-        assert g.to_bearing(x=[0] * 4, y=[0] * 4, az=az).round().tolist() == [
-            45,   # North-East along X direction
+        b = [
+            45,  # North-East along X direction
             135,  # South-East along Y direction
             225,  # South-West along -X direction
             315,  # North-West along -Y direction
         ]
+
+        assert g.to_bearing(x=[0] * 4, y=[0] * 4, az=az).round().tolist() == b
+
+
+class Test_ArrayGrid_from_bearing:
+    def test_returns_azimuths_in_clockwise_degrees(self):
+        g = grid.ArrayGrid(
+            lat=[[61, 62, 63], [60, 61, 62]],
+            lon=[[5, 6, 7], [6, 7, 8]],
+        )
+
+        az = [
+            0,    # Along  X direction (lat+, lon+)
+            90,   # Along  Y direction (lat-, lon+)
+            180,  # Along -X direction (lat-, lon-)
+            270,  # Along -Y direction (lat+, lon-)
+        ]
+
+        b = [
+            45,  # North-East along X direction
+            135,  # South-East along Y direction
+            225,  # South-West along -X direction
+            315,  # North-West along -Y direction
+        ]
+
+        assert g.from_bearing(x=[0] * 4, y=[0] * 4, b=b).round().tolist() == az
 
 
 class Test_bilin_inv:
