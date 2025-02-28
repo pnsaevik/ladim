@@ -13,6 +13,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.0.6] - 2025-02-28
+### Fixed
+- Ladim output is now flushed every time step
+
 
 ## [2.0.5] - 2025-01-27
 ### Fixed

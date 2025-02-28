@@ -251,10 +251,11 @@ class Forcing:
 
     """
 
-    def __init__(self, config, grid):
+    def __init__(self, config, _):
 
         logger.info("Initiating forcing")
 
+        grid = Grid(config)
         self._grid = grid  # Get the grid object, make private?
         # self.config = config["gridforce"]
         self.ibm_forcing = config["ibm_forcing"]
@@ -292,7 +293,12 @@ class Forcing:
         # --------------
         # prestep = last forcing step < 0
         #
+        self.has_been_initialized = False
+        self.steps = steps
+        self._files = files
 
+    def _remaining_initialization(self):
+        steps = self.steps
         V = [step for step in steps if step < 0]
         if V:  # Forcing available before start time
             prestep = max(V)
@@ -335,9 +341,7 @@ class Forcing:
         else:
             # No forcing at start, should already be excluded
             raise SystemExit(3)
-
-        self.steps = steps
-        self._files = files
+        self.has_been_initialized = True
 
     # ===================================================
     @staticmethod
@@ -434,6 +438,9 @@ class Forcing:
     # TODO: Implement a switch for turning it on again if wanted
     def update(self, t):
         """Update the fields to time step t"""
+
+        if not self.has_been_initialized:
+            self._remaining_initialization()
 
         # Read from config?
         interpolate_velocity_in_time = True

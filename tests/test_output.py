@@ -29,15 +29,15 @@ class Test_RaggedOutput_update:
         model.solver = MockObj()
         model.solver.time = np.datetime64('2000-01-01', 's').astype('int64')
         model.solver.step = 60
-        model.output = MockObj()
-        model.output = output.RaggedOutput(model, variables=dict(), file="", frequency=0)
+
+        out = output.RaggedOutput(variables=dict(), file="", frequency=0)
 
         try:
             # Run update
-            model.output.update()
+            out.update(model)
 
             # Confirm effect on output file
-            dset = model.output.dataset
+            dset = out.dataset
             assert 'release_time' in dset.variables
             assert dset['release_time'].dimensions == ('particle', )
             assert dset['release_time'].units == "seconds since 1970-01-01"
@@ -51,7 +51,7 @@ class Test_RaggedOutput_update:
             model.state.released = 5
             model.state.size = 4
             model.state['pid'] = np.array([0, 2, 3, 4])
-            model.output.update()
+            out.update(model)
 
             # Confirm effect on output file
             assert dset['release_time'][:].astype('datetime64[s]').astype(str).tolist() == (
@@ -59,7 +59,7 @@ class Test_RaggedOutput_update:
             )
 
         finally:
-            model.output.close()
+            out.close()
 
     def test_writes_time_and_particle_count_for_each_timestep(self):
         # Define model
@@ -72,11 +72,11 @@ class Test_RaggedOutput_update:
         model.solver.time = np.datetime64('2000-01-01', 's').astype('int64')
         model.solver.step = 60
         model.output = MockObj()
-        model.output = output.RaggedOutput(model, variables=dict(), file="", frequency=0)
+        model.output = output.RaggedOutput(variables=dict(), file="", frequency=0)
 
         try:
             # Run update
-            model.output.update()
+            model.output.update(model)
 
             # Confirm effect on output file
             dset = model.output.dataset
@@ -98,7 +98,7 @@ class Test_RaggedOutput_update:
             model.state.released = 5
             model.state.size = 4
             model.state['pid'] = np.array([0, 2, 3, 4])
-            model.output.update()
+            model.output.update(model)
 
             # Confirm effect on output file
             assert dset['particle_count'][:].tolist() == [2, 4]
@@ -123,7 +123,6 @@ class Test_RaggedOutput_update:
         model.solver.step = 60
         model.output = MockObj()
         model.output = output.RaggedOutput(
-            model,
             variables=dict(X=dict(units='m', long_name='x coord', kind=kind)),
             file="",
             frequency=0,
@@ -131,7 +130,7 @@ class Test_RaggedOutput_update:
 
         try:
             # Run update
-            model.output.update()
+            model.output.update(model)
 
             # Confirm effect on output file
             dset = model.output.dataset
@@ -146,7 +145,7 @@ class Test_RaggedOutput_update:
             model.state.size = 4
             model.state['pid'] = np.array([0, 2, 3, 4])
             model.state['X'] = np.array([100, 200, 300, 400])
-            model.output.update()
+            model.output.update(model)
 
             # Confirm effect on output file
             if kind == 'initial':
@@ -174,7 +173,6 @@ class Test_RaggedOutput_update:
         model.solver.step = 60
         model.output = MockObj()
         model.output = output.RaggedOutput(
-            model,
             variables=dict(X=dict(units='m', long_name='x coord')),
             file="",
             frequency=120,
@@ -182,17 +180,17 @@ class Test_RaggedOutput_update:
 
         try:
             # Writes output on first step (0 sec)
-            model.output.update()
+            model.output.update(model)
             assert model.output.dataset['X'][:].tolist() == [10, 20]
 
             # Does not write output on second step (60 sec)
             model.solver.time += model.solver.step
-            model.output.update()
+            model.output.update(model)
             assert model.output.dataset['X'][:].tolist() == [10, 20]
 
             # Writes output on third step (120 sec)
             model.solver.time += model.solver.step
-            model.output.update()
+            model.output.update(model)
             assert model.output.dataset['X'][:].tolist() == [10, 20, 10, 20]
 
         finally:
@@ -213,7 +211,6 @@ class Test_RaggedOutput_update:
         model.grid.xy2ll = lambda x, y: (x + 10, y + 70)
         model.output = MockObj()
         model.output = output.RaggedOutput(
-            model,
             variables=dict(lat=dict(), lon=dict()),
             file="",
             frequency=0,
@@ -221,7 +218,7 @@ class Test_RaggedOutput_update:
 
         try:
             # Run update
-            model.output.update()
+            model.output.update(model)
 
             # Confirm effect on output file
             dset = model.output.dataset

@@ -2,19 +2,15 @@ from .model import Model, Module
 
 
 class Forcing(Module):
-    def __init__(self, model: Model):
-        super().__init__(model)
-
     def velocity(self, X, Y, Z, tstep=0.0):
         raise NotImplementedError
 
 
 class RomsForcing(Forcing):
-    def __init__(self, model: Model, file, variables=None, **conf):
+    def __init__(self, file, variables=None, **conf):
         """
         Forcing module which uses output data from the ROMS ocean model
 
-        :param model: Parent model
         :param file: Glob pattern for the input files
         :param variables: A mapping of variable names to interpolation
         specifications. Each interpolaction specification consists of 0-4
@@ -34,14 +30,12 @@ class RomsForcing(Forcing):
 
         :param conf: Legacy config dict
         """
-        super().__init__(model)
-
         # Apply default interpolation configs
         variables = variables or dict()
         default_vars = dict(u="xt", v="yt", w="zt", temp="xyzt", salt="xyzt")
         self.variables = {**default_vars, **variables}
 
-        grid_ref = GridReference(model)
+        grid_ref = GridReference()
         legacy_conf = dict(
             gridforce=dict(
                 input_file=file,
@@ -67,17 +61,19 @@ class RomsForcing(Forcing):
         # self.U = self.forcing.U
         # self.V = self.forcing.V
 
-    def update(self):
-        elapsed = self.model.solver.time - self.model.solver.start
-        t = elapsed // self.model.solver.step
+    def update(self, model: Model):
+        elapsed = model.solver.time - model.solver.start
+        t = elapsed // model.solver.step
 
+        # noinspection PyProtectedMember
+        self.forcing._grid.modules = model
         self.forcing.update(t)
 
         # Update state variables by sampling the field
-        x, y, z = self.model.state['X'], self.model.state['Y'], self.model.state['Z']
+        x, y, z = model.state['X'], model.state['Y'], model.state['Z']
         for v in self.variables:
-            if v in self.model.state:
-                self.model.state[v] = self.field(x, y, z, v)
+            if v in model.state:
+                model.state[v] = self.field(x, y, z, v)
 
     def velocity(self, X, Y, Z, tstep=0.0):
         return self.forcing.velocity(X, Y, Z, tstep=tstep)
@@ -90,8 +86,8 @@ class RomsForcing(Forcing):
 
 
 class GridReference:
-    def __init__(self, modules: Model):
-        self.modules = modules
+    def __init__(self):
+        self.modules = None
 
     def __getattr__(self, item):
         return getattr(self.modules.grid.grid, item)

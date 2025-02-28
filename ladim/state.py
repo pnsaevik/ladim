@@ -4,19 +4,13 @@ from .model import Model, Module
 
 
 class State(Module):
-    def __init__(self, model: Model):
-        """
-        The state module contains static and dynamic particle properties
+    """
+    The state module contains static and dynamic particle properties
 
-        The other modules interact with the state module mostly through
-        the getitem and setitem methods. For instance, to increase the
-        depth of all particles by 1, use
-
-        >>> model.state['Z'] += 1
-
-        :param model: Parent model
-        """
-        super().__init__(model)
+    The other modules interact with the state module mostly through
+    the getitem and setitem methods. For instance, to increase the
+    depth of all particles by 1, use state['Z'] += 1
+    """
 
     @property
     def size(self):
@@ -65,12 +59,9 @@ class State(Module):
 
 
 class DynamicState(State):
-    def __init__(self, model: Model):
-        super().__init__(model)
-
+    def __init__(self):
         self._num_released = 0
         self._varnames = set()
-
         self._data = pd.DataFrame()
 
     @property
@@ -123,7 +114,11 @@ class DynamicState(State):
         return self[item]
 
     def __setattr__(self, item, value):
-        if item in list(self.__dict__.keys()) + ['_data', '_model', '_num_released', '_varnames']:
+        excepted_values = [
+            '_data', '_model', '_num_released', '_varnames', 'dt', 'timestep',
+            'timestamp'
+        ]
+        if item in list(self.__dict__.keys()) + excepted_values:
             super().__setattr__(item, value)
         elif item in self._data:
             self._data[item] = value
@@ -132,19 +127,3 @@ class DynamicState(State):
 
     def __contains__(self, item):
         return item in self._data
-
-    @property
-    def dt(self):
-        """Backwards-compatibility function for returning model.solver.step"""
-        return self.model.solver.step
-
-    @property
-    def timestamp(self):
-        """Backwards-compatibility function for returning solver time as numpy datetime"""
-        return np.int64(self.model.solver.time).astype('datetime64[s]')
-
-    @property
-    def timestep(self):
-        """Backwards-compatibility function for returning solver time as timestep"""
-        elapsed = self.model.solver.time - self.model.solver.start
-        return elapsed // self.model.solver.step

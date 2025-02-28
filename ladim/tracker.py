@@ -3,28 +3,25 @@ import numpy as np
 
 
 class Tracker(Module):
-    def __init__(self, model: Model):
-        super().__init__(model)
+    pass
 
 
 class HorizontalTracker:
     """The physical particle tracking kernel"""
 
-    def __init__(self, model: Model, method, diffusion) -> None:
-        self.model = model
-
+    def __init__(self, method, diffusion) -> None:
         if not diffusion:
             method += "_nodiff"
         self.integrator = StochasticDifferentialEquationIntegrator.from_keyword(method)
         self.D = diffusion  # [m2.s-1]
 
-    def update(self):
-        state = self.model.state
-        grid = self.model.grid
-        forcing = self.model.forcing
+    def update(self, model: Model):
+        state = model.state
+        grid = model.grid
+        forcing = model.forcing
 
-        t0 = self.model.solver.time
-        dt = self.model.solver.step
+        t0 = model.solver.time
+        dt = model.solver.step
 
         act = state['active']
         X, Y, Z = state['X'][act], state['Y'][act], state['Z'][act]
