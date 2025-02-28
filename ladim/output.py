@@ -43,7 +43,7 @@ class RaggedOutput(Output):
             freq_unit = 's'
         self._write_frequency = np.timedelta64(freq_num, freq_unit).astype('timedelta64[s]').astype('int64')
 
-        self._dset = None
+        self._dset = None  # type: nc.Dataset | None
         self._num_writes = 0
         self._last_write_time = np.int64(-4611686018427387904)
 
@@ -85,6 +85,7 @@ class RaggedOutput(Output):
         # Write release time variable
         data = np.broadcast_to(model.solver.time, shape=(num_new, ))
         self._dset.variables['release_time'][part_size:part_size + num_new] = data
+        self._dset.sync()
 
     def _write_instance_vars(self, model):
         """
@@ -115,6 +116,7 @@ class RaggedOutput(Output):
 
         # Write particle count
         self._dset.variables['particle_count'][time_size] = inst_num
+        self._dset.sync()
 
     def _create_dset(self):
         default_formats = dict(
@@ -157,6 +159,7 @@ class RaggedOutput(Output):
         )
 
         self._dset.variables['instance_offset'][:] = 0
+        self._dset.sync()
 
     def close(self):
         if self._dset is not None:
