@@ -48,7 +48,7 @@ class RomsForcing(Forcing):
             dt=conf.get('dt', None),
         )
         if conf.get('subgrid', None) is not None:
-            legacy_conf['subgrid'] = conf['subgrid']
+            legacy_conf['gridforce']['subgrid'] = conf['subgrid']
 
         from .model import load_class
         LegacyForcing = load_class(conf.get('legacy_module', 'ladim.gridforce.ROMS.Forcing'))
