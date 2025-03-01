@@ -13,6 +13,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+
+## [2.0.7] - 2025-03-01
+### Fixed
+- Subgrid configuration was ignored when loading velocities, this is now fixed
+
+
 ## [2.0.6] - 2025-02-28
 ### Fixed
 - Ladim output is now flushed every time step
