@@ -42,7 +42,9 @@ class Test_convert_1_to_2:
                 'ibm_forcing': [],
                 'legacy_module': 'ladim.gridforce.ROMS.Forcing',
                 'start_time': np.datetime64('2015-09-07T01:00:00'),
-                'stop_time': np.datetime64('2015-09-07T01:05:00')},
+                'stop_time': np.datetime64('2015-09-07T01:05:00'),
+                'subgrid': None,
+            },
             'grid': {
                 'file': '../forcing*.nc',
                 'legacy_module': 'ladim.gridforce.ROMS.Grid',

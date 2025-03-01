@@ -100,6 +100,7 @@ def convert_1_to_2(c):
     out['forcing']['legacy_module'] = dict_get(c, 'gridforce.module', '') + '.Forcing'
     out['forcing']['start_time'] = np.datetime64(dict_get(c, 'time_control.start_time', '1970'), 's')
     out['forcing']['stop_time'] = np.datetime64(dict_get(c, 'time_control.stop_time', '1970'), 's')
+    out['forcing']['subgrid'] = dict_get(c, 'gridforce.subgrid', None)
     out['forcing']['dt'] = dt_sec
     out['forcing']['ibm_forcing'] = dict_get(c, 'gridforce.ibm_forcing', [])
 
