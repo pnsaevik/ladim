@@ -81,7 +81,6 @@ class Test_convert_1_to_2:
                 'formats': {'time': 'release_time'},
                 'frequency': [1, 'm']},
             'solver': {
-                'order': ['release', 'forcing', 'output', 'tracker', 'ibm', 'state'],
                 'seed': 0,
                 'start': datetime.datetime(2015, 9, 7, 1, 0),
                 'step': 60,
