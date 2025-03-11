@@ -44,17 +44,22 @@ class Test_convert_1_to_2:
                 'start_time': np.datetime64('2015-09-07T01:00:00'),
                 'stop_time': np.datetime64('2015-09-07T01:05:00'),
                 'subgrid': None,
+                'module': 'ladim.forcing.RomsForcing',
             },
             'grid': {
                 'file': '../forcing*.nc',
                 'legacy_module': 'ladim.gridforce.ROMS.Grid',
                 'start_time': np.datetime64('2015-09-07T01:00:00'),
                 'subgrid': None,
+                'module': 'ladim.grid.RomsGrid',
             },
-            'ibm': {},
+            'ibm': {
+                'module': 'ladim.ibms.IBM',
+            },
             'output': {
                 'file': 'out.nc',
                 'frequency': [60, 's'],
+                'module': 'ladim.output.RaggedOutput',
                 'variables': {
                     'X': {
                         'long_name': 'particle X-coordinate', 'ncformat': 'f4'},
@@ -79,13 +84,22 @@ class Test_convert_1_to_2:
                 'defaults': {},
                 'file': 'particles.rls',
                 'formats': {'time': 'release_time'},
+                'module': 'ladim.release.TextFileReleaser',
                 'frequency': [1, 'm']},
             'solver': {
                 'seed': 0,
                 'start': datetime.datetime(2015, 9, 7, 1, 0),
                 'step': 60,
+                'module': 'ladim.solver.Solver',
                 'stop': datetime.datetime(2015, 9, 7, 1, 5)},
-            'tracker': {'diffusion': 0.1, 'method': 'RK4'},
+            'tracker': {
+                'diffusion': 0.1,
+                'method': 'RK4',
+                'module': 'ladim.tracker.HorizontalTracker',
+            },
+            'state': {
+                'module': 'ladim.state.DynamicState',
+            },
             'version': 2
         }
 

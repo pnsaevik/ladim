@@ -3,27 +3,16 @@ import importlib.util
 import sys
 from pathlib import Path
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Hashable, Any
 if TYPE_CHECKING:
-    from ladim.grid import Grid
-    from ladim.forcing import Forcing
+    from ladim.grid import RomsGrid as Grid
+    from ladim.forcing import RomsForcing as Forcing
     from ladim.ibms import IBM
-    from ladim.output import Output
-    from ladim.release import Releaser
-    from ladim.state import State
-    from ladim.tracker import Tracker
+    from ladim.output import RaggedOutput as Output
+    from ladim.release import TextFileReleaser as Releaser
+    from ladim.state import DynamicState as State
+    from ladim.tracker import HorizontalTracker as Tracker
     from ladim.solver import Solver
-
-DEFAULT_MODULES = dict(
-    grid='ladim.grid.RomsGrid',
-    forcing='ladim.forcing.RomsForcing',
-    release='ladim.release.TextFileReleaser',
-    state='ladim.state.DynamicState',
-    output='ladim.output.RaggedOutput',
-    ibm='ladim.ibms.IBM',
-    tracker='ladim.tracker.HorizontalTracker',
-    solver='ladim.solver.Solver',
-)
 
 
 class Model:
@@ -58,25 +47,17 @@ class Model:
         :return: An initialized Model class
         """
 
-        # Create new version of the config dict without the 'model' keyword
-        def remove_module_key(d: dict):
-            return {k: v for k, v in d.items() if k != 'module'}
-
-        # Initialize modules
-        module_names = (
-            'grid', 'forcing', 'release', 'state', 'output', 'ibm', 'tracker',
-            'solver',
+        # noinspection PyTypeChecker
+        return Model(
+            grid=Module.from_config(config['grid']),
+            forcing=Module.from_config(config['forcing']),
+            release=Module.from_config(config['release']),
+            state=Module.from_config(config['state']),
+            output=Module.from_config(config['output']),
+            ibm=Module.from_config(config['ibm']),
+            tracker=Module.from_config(config['tracker']),
+            solver=Module.from_config(config['solver']),
         )
-        modules = dict()
-        for name in module_names:
-            subconf = config.get(name, dict())
-            modules[name] = Module.from_config(
-                conf=remove_module_key(subconf),
-                module=subconf.get('module', DEFAULT_MODULES[name]),
-            )
-
-        # Initialize model
-        return Model(**modules)
 
     @property
     def modules(self) -> dict:
@@ -126,19 +107,38 @@ def load_class(name):
 
 class Module:
     @staticmethod
-    def from_config(conf: dict, module: str) -> "Module":
+    def from_config(conf: dict) -> "Module":
         """
         Initialize a module using a configuration dict.
 
+        The configuration dict should contain the keyword ``module``,
+        which is the fully qualified name of the module. The other
+        keys should be the named parameters of the module's init
+        method.
+
         :param conf: The configuration parameters of the module
-        :param module: The fully qualified name of the module
         :return: An initialized module
         """
+        conf2, module = dict_pop_pure(conf, 'module')
         cls = load_class(module)
-        return cls(**conf)
+        return cls(**conf2)
 
     def update(self, model: Model):
         pass
 
     def close(self):
         pass
+
+
+def dict_pop_pure(d: dict, key: Hashable) -> tuple[dict, Any]:
+    """
+    Same as dict.pop, but does not modify the input dict
+
+    :param d: Input dict
+    :param key: Key to pop
+    :return: A tuple (d2, val) where d2 is the dict without the key,
+        and val is d[key]
+    """
+    d2 = {k: v for k, v in d.items() if k != key}
+    val = d[key]
+    return d2, val

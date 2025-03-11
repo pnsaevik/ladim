@@ -8,6 +8,18 @@ different versions of config file formats.
 import numpy as np
 
 
+DEFAULT_MODULES = dict(
+    grid='ladim.grid.RomsGrid',
+    forcing='ladim.forcing.RomsForcing',
+    release='ladim.release.TextFileReleaser',
+    state='ladim.state.DynamicState',
+    output='ladim.output.RaggedOutput',
+    ibm='ladim.ibms.IBM',
+    tracker='ladim.tracker.HorizontalTracker',
+    solver='ladim.solver.Solver',
+)
+
+
 def configure(module_conf):
     import yaml
 
@@ -82,6 +94,7 @@ def convert_1_to_2(c):
     out['solver']['stop'] = dict_get(c, 'time_control.stop_time')
     out['solver']['step'] = dt_sec
     out['solver']['seed'] = dict_get(c, 'numerics.seed')
+    out['solver']['module'] = 'ladim.solver.Solver'
 
     out['grid'] = {}
     out['grid']['file'] = dict_get(c, [
@@ -91,6 +104,7 @@ def convert_1_to_2(c):
     out['grid']['legacy_module'] = dict_get(c, 'gridforce.module', '') + '.Grid'
     out['grid']['start_time'] = np.datetime64(dict_get(c, 'time_control.start_time', '1970'), 's')
     out['grid']['subgrid'] = dict_get(c, 'gridforce.subgrid', None)
+    out['grid']['module'] = 'ladim.grid.RomsGrid'
 
     out['forcing'] = {}
     out['forcing']['file'] = dict_get(c, ['gridforce.input_file', 'files.input_file'])
@@ -102,11 +116,13 @@ def convert_1_to_2(c):
     out['forcing']['subgrid'] = dict_get(c, 'gridforce.subgrid', None)
     out['forcing']['dt'] = dt_sec
     out['forcing']['ibm_forcing'] = dict_get(c, 'gridforce.ibm_forcing', [])
+    out['forcing']['module'] = 'ladim.forcing.RomsForcing'
 
     out['output'] = {}
     out['output']['file'] = dict_get(c, 'files.output_file')
     out['output']['frequency'] = dict_get(c, 'output_variables.outper')
     out['output']['variables'] = {}
+    out['output']['module'] = 'ladim.output.RaggedOutput'
 
     # Convert output variable format spec
     outvar_names = dict_get(c, 'output_variables.particle', []).copy()
@@ -121,6 +137,7 @@ def convert_1_to_2(c):
     out['tracker'] = {}
     out['tracker']['method'] = dict_get(c, 'numerics.advection')
     out['tracker']['diffusion'] = dict_get(c, 'numerics.diffusion')
+    out['tracker']['module'] = 'ladim.tracker.HorizontalTracker'
 
     # Read release config
     out['release'] = {}
@@ -138,6 +155,7 @@ def convert_1_to_2(c):
         for k in dict_get(c, 'state.ibm_variables', []) + dict_get(c, 'ibm.variables', [])
         if k not in out['release']['colnames']
     }
+    out['release']['module'] = 'ladim.release.TextFileReleaser'
 
     out['ibm'] = {}
     if 'ibm' in c:
@@ -153,5 +171,10 @@ def convert_1_to_2(c):
             for k, v in out['output']['variables'].items()
         }
         out['ibm']['conf']['ibm'] = {k: v for k, v in c['ibm'].items() if k != 'ibm_module'}
+    else:
+        out['ibm']['module'] = 'ladim.ibms.IBM'
+
+    out['state'] = {}
+    out['state']['module'] = 'ladim.state.DynamicState'
 
     return out
