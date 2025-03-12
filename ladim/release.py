@@ -350,9 +350,11 @@ class Schedule:
         return Schedule(times=times[idx], events=events[idx])
 
     def resolve(self, start, stop, interval):
-        s1 = self
-        s2 = s1.extend_backwards_using_interval(start, interval)
-        s3 = s2.trim_head(start)
-        s4 = s3.trim_tail(stop)
-        s5 = s4.expand(interval, stop)
-        return s5
+        s = self
+        if interval:
+            s = s.extend_backwards_using_interval(start, interval)
+        s = s.trim_head(start)
+        s = s.trim_tail(stop)
+        if interval:
+            s = s.expand(interval, stop)
+        return s

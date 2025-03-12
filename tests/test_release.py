@@ -185,6 +185,23 @@ class Test_resolve_schedule:
         ).tolist()
         assert e == [0, 1] * 3 + [2, 3, 4] * 2
 
+    def test_correct_when_no_interval(self):
+        e = release.resolve_schedule(
+            times=[0, 0, 1, 1, 1, 2, 3, 4, 5],
+            interval=0,
+            start_time=1,
+            stop_time=4,
+        ).tolist()
+        assert e == [2, 3, 4, 5, 6]
+
+        e = release.resolve_schedule(
+            times=[0, 0, 1, 1, 1, 2, 3, 4, 5],
+            interval=0,
+            start_time=0,
+            stop_time=10,
+        ).tolist()
+        assert e == [0, 1, 2, 3, 4, 5, 6, 7, 8]
+
 
 class Test_Schedule:
     def test_can_expand(self):
