@@ -157,5 +157,82 @@ class Test_TextFileReleaser_update:
         assert list(mock_model.state['X']) == [61]
 
 
+class Test_resolve_schedule:
+    def test_correct_when_all_events_are_specified(self):
+        e = list(release.resolve_schedule(
+            times=[0, 1, 1, 6, 9],
+            interval=10,
+            start_time=0,
+            stop_time=10,
+        ))
+        assert e == [0, 1, 2, 3, 4]
+
+    def test_correct_when_intermediate_points(self):
+        e = release.resolve_schedule(
+            times=[0, 1, 1, 1, 6, 6, 9],
+            interval=2,
+            start_time=0,
+            stop_time=10,
+        ).tolist()
+        assert e == [0] + [1, 2, 3] * 3 + [4, 5] * 2 + [6]
+
+    def test_correct_when_before_schedule(self):
+        e = release.resolve_schedule(
+            times=[0, 0, 1, 1, 1],
+            interval=2,
+            start_time=-4,
+            stop_time=4,
+        ).tolist()
+        assert e == [0, 1] * 3 + [2, 3, 4] * 2
+
+
+class Test_Schedule:
+    def test_can_expand(self):
+        s = release.Schedule(times=np.arange(3) * 3, events=np.arange(3))
+        s2 = s.expand(interval=2, stop=8)
+        assert s2.times.tolist() == [0, 2, 3, 5, 6]
+        assert s2.events.tolist() == [0, 0, 1, 1, 2]
+
+    def test_is_invalid_if_nondecreasing(self):
+        s = release.Schedule(times=np.array([3, 2, 1]), events=np.arange(3))
+        assert not s.valid()
+        s2 = release.Schedule(times=np.zeros(3), events=np.zeros(3))
+        assert s2.valid()
+
+    def test_can_append(self):
+        s1 = release.Schedule(np.arange(3), np.arange(3) * 2)
+        s2 = release.Schedule(np.arange(4), np.arange(4) * 2)
+        s3 = s1.append(s2)
+        assert s3.times.tolist() == [0, 1, 2, 0, 1, 2, 3]
+        assert s3.events.tolist() == [0, 2, 4, 0, 2, 4, 6]
+
+    def test_can_extend_backwards(self):
+        s1 = release.Schedule(np.ones(3), np.arange(3))
+        s2 = s1.extend_backwards(0)
+        assert s2.times.tolist() == [0, 0, 0, 1, 1, 1]
+        assert s2.events.tolist() == [0, 1, 2, 0, 1, 2]
+
+    def test_can_extend_backwards_using_interval(self):
+        s1 = release.Schedule(np.ones(3) * 4, np.arange(3))
+        s2 = s1.extend_backwards_using_interval(
+            time=1,
+            interval=2,
+        )
+        assert s2.times.tolist() == [0, 0, 0, 4, 4, 4]
+        assert s2.events.tolist() == [0, 1, 2, 0, 1, 2]
+
+    def test_can_trim_tail(self):
+        s1 = release.Schedule(np.arange(5), np.arange(5))
+
+        assert s1.trim_tail(4.0).times.tolist() == [0, 1, 2, 3]
+        assert s1.trim_tail(3.0).times.tolist() == [0, 1, 2]
+        assert s1.trim_tail(2.5).times.tolist() == [0, 1, 2]
+
+    def test_can_trim_head(self):
+        s1 = release.Schedule(np.arange(5), np.arange(5))
+
+        assert s1.trim_head(1.0).times.tolist() == [1, 2, 3, 4]
+        assert s1.trim_head(0.5).times.tolist() == [0, 1, 2, 3, 4]
+
 class MockObj:
     pass
