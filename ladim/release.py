@@ -43,17 +43,13 @@ class TextFileReleaser(Releaser):
             release.
         """
 
-        # Release file
-        self._csv_fname = file   # Path name
-        self._csv_column_names = colnames   # Column headers
-        self._csv_column_formats = formats or dict()
-        self._dataframe = None
-
-        # Continuous release variables
-        self._frequency = read_timedelta(frequency) / np.timedelta64(1, 's')
-
-        # Other parameters
-        self._defaults = defaults or dict()
+        self.release_table = ReleaseTable.from_filename_or_stream(
+            file=file,
+            column_names=colnames,
+            column_formats=formats or dict(),
+            interval=read_timedelta(frequency) / np.timedelta64(1, 's'),
+            defaults=defaults or dict(),
+        )
 
     def update(self, model: Model):
         self._add_new(model)
@@ -70,12 +66,11 @@ class TextFileReleaser(Releaser):
     def _add_new(self, model: Model):
         # Get the portion of the release dataset that corresponds to
         # current simulation time
-        df = release_data_subset(
-            dataframe=self.dataframe,
+        df = self.release_table.subset(
             start_time=model.solver.time,
             stop_time=model.solver.time + model.solver.step,
-            interval=self._frequency,
-        ).copy(deep=True)
+            lonlat_converter=model.grid.ll2xy,
+        )
 
         # If there are no new particles, but the state is empty, we should
         # still initialize the state by adding the appropriate columns
@@ -90,55 +85,10 @@ class TextFileReleaser(Releaser):
         if model.solver.time >= model.solver.stop:
             return
 
-        # If positions are given as lat/lon coordinates, we should convert
-        if "X" not in df.columns or "Y" not in df.columns:
-            if "lon" not in df.columns or "lat" not in df.columns:
-                logger.critical("Particle release must have position")
-                raise ValueError()
-            # else
-            X, Y = model.grid.ll2xy(df["lon"].values, df["lat"].values)
-            df.rename(columns=dict(lon="X", lat="Y"), inplace=True)
-            df["X"] = X
-            df["Y"] = Y
-
-        # Add default variables, if any
-        for k, v in self._defaults.items():
-            if k not in df:
-                df[k] = v
-
-        # Expand multiplicity variable, if any
-        if 'mult' in df:
-            df = df.loc[np.repeat(df.index, df['mult'].values.astype('i4'))]
-            df = df.reset_index(drop=True).drop(columns='mult')
-
         # Add new particles
         new_particles = df.to_dict(orient='list')
         state = model.state
         state.append(new_particles)
-
-    @property
-    def dataframe(self):
-        @contextlib.contextmanager
-        def open_or_relay(file_or_buf, *args, **kwargs):
-            if hasattr(file_or_buf, 'read'):
-                yield file_or_buf
-            else:
-                with open(file_or_buf, *args, **kwargs) as f:
-                    yield f
-
-        if self._dataframe is None:
-            if isinstance(self._csv_fname, pd.DataFrame):
-                self._dataframe = self._csv_fname
-
-            else:
-                # noinspection PyArgumentList
-                with open_or_relay(self._csv_fname, 'r', encoding='utf-8') as fp:
-                    self._dataframe = load_release_file(
-                        stream=fp,
-                        names=self._csv_column_names,
-                        formats=self._csv_column_formats,
-                    )
-        return self._dataframe
 
 
 def release_data_subset(dataframe, start_time, stop_time, interval: typing.Any = 0):
@@ -199,6 +149,66 @@ def get_converters(varnames: list, conf: dict) -> dict:
         converters[varname] = dtype_func
 
     return converters
+
+
+class ReleaseTable:
+    def __init__(self, dataframe: pd.DataFrame, interval, defaults):
+        self.dataframe = dataframe
+        self.interval = interval
+        self.defaults = defaults
+
+    def subset(self, start_time, stop_time, lonlat_converter):
+        events = resolve_schedule(
+            times=self.dataframe['release_time'].values,
+            interval=self.interval,
+            start_time=start_time,
+            stop_time=stop_time,
+        )
+
+        df = self.dataframe.iloc[events].copy(deep=True)
+        df = replace_lonlat_in_release_table(df, lonlat_converter)
+        df = add_default_variables_in_release_table(df, self.defaults)
+        df = expand_multiplicity_in_release_table(df)
+
+        return df
+
+    @staticmethod
+    def from_filename_or_stream(file, column_names, column_formats, interval, defaults):
+        with open_or_relay(file, 'r', encoding='utf-8') as fp:
+            return ReleaseTable.from_stream(
+                fp, column_names, column_formats, interval, defaults)
+
+    @staticmethod
+    def from_stream(fp, column_names, column_formats, interval, defaults):
+        df = load_release_file(stream=fp, names=column_names, formats=column_formats)
+        return ReleaseTable(df, interval, defaults)
+
+
+def replace_lonlat_in_release_table(df, lonlat_converter):
+    if "lon" not in df.columns or "lat" not in df.columns:
+        return df
+
+    X, Y = lonlat_converter(df["lon"].values, df["lat"].values)
+    df_new = df.drop(columns=['X', 'Y', 'lat', 'lon'], errors='ignore')
+    df_new["X"] = X
+    df_new["Y"] = Y
+    return df_new
+
+
+def add_default_variables_in_release_table(df, defaults):
+    df_new = df.copy()
+    for k, v in defaults.items():
+        if k not in df:
+            df_new[k] = v
+    return df_new
+
+
+def expand_multiplicity_in_release_table(df):
+    if 'mult' not in df:
+        return df
+    df = df.loc[np.repeat(df.index, df['mult'].values.astype('i4'))]
+    df = df.reset_index(drop=True).drop(columns='mult')
+    return df
 
 
 def resolve_schedule(times, interval, start_time, stop_time):
@@ -343,3 +353,12 @@ class Schedule:
         s = s.trim_tail(stop)
         s = s.expand(interval, stop)
         return s
+
+
+@contextlib.contextmanager
+def open_or_relay(file_or_buf, *args, **kwargs):
+    if hasattr(file_or_buf, 'read'):
+        yield file_or_buf
+    else:
+        with open(file_or_buf, *args, **kwargs) as f:
+            yield f
