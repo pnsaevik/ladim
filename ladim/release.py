@@ -170,25 +170,6 @@ def load_release_file(stream, names: list, formats: dict) -> pd.DataFrame:
     return df
 
 
-def sorted_interval(v, a, b):
-    """
-    Searches for an interval in a sorted array
-
-    Returns the start (inclusive) and stop (exclusive) indices of
-    elements in *v* that are greater than or equal to *a* and
-    less than *b*. In other words, returns *start* and *stop* such
-    that v[start:stop] == v[(v >= a) & (v < b)]
-
-    :param v: Sorted input array
-    :param a: Lower bound of array values (inclusive)
-    :param b: Upper bound of array values (exclusive)
-    :returns: A tuple (start, stop) defining the output interval
-    """
-    start = np.searchsorted(v, a, side='left')
-    stop = np.searchsorted(v, b, side='left')
-    return start, stop
-
-
 def get_converters(varnames: list, conf: dict) -> dict:
     """
     Given a list of varnames and config keywords, return a dict of converters
