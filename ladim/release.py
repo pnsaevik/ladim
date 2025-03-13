@@ -1,4 +1,5 @@
 import contextlib
+import typing
 
 from .model import Model, Module
 import numpy as np
@@ -50,8 +51,6 @@ class TextFileReleaser(Releaser):
 
         # Continuous release variables
         self._frequency = read_timedelta(frequency) / np.timedelta64(1, 's')
-        self._last_release_dataframe = pd.DataFrame()
-        self._last_release_time = np.int64(-4611686018427387904)
 
         # Other parameters
         self._defaults = defaults or dict()
@@ -75,40 +74,21 @@ class TextFileReleaser(Releaser):
             dataframe=self.dataframe,
             start_time=model.solver.time,
             stop_time=model.solver.time + model.solver.step,
+            interval=self._frequency,
         ).copy(deep=True)
 
         # If there are no new particles, but the state is empty, we should
         # still initialize the state by adding the appropriate columns
         if (len(df) == 0) and ('X' not in model.state):
             model.state.append(df.to_dict(orient='list'))
-            self._last_release_dataframe = df
 
-        # If there are no new particles and we don't use continuous release,
-        # we are done.
-        continuous_release = bool(self._frequency)
-        if (len(df) == 0) and not continuous_release:
-            return
-
-        # If we have continuous release, but there are no new particles and
-        # the last release is recent, we are also done
-        current_time = model.solver.time
-        elapsed_since_last_write = current_time - self._last_release_time
-        last_release_is_recent = (elapsed_since_last_write < self._frequency)
-        if continuous_release and (len(df) == 0) and last_release_is_recent:
+        # If there are no new particles, we are done.
+        if len(df) == 0:
             return
 
         # If we are at the final time step, we should not release any more particles
-        if continuous_release and model.solver.time >= model.solver.stop:
+        if model.solver.time >= model.solver.stop:
             return
-
-        # If we have continuous release, but there are no new particles and
-        # the last release is NOT recent, we should replace empty
-        # dataframe with the previously released dataframe
-        if continuous_release:
-            if (len(df) == 0) and not last_release_is_recent:
-                df = self._last_release_dataframe
-            self._last_release_dataframe = df  # Update release dataframe
-            self._last_release_time = current_time
 
         # If positions are given as lat/lon coordinates, we should convert
         if "X" not in df.columns or "Y" not in df.columns:
@@ -161,13 +141,15 @@ class TextFileReleaser(Releaser):
         return self._dataframe
 
 
-def release_data_subset(dataframe, start_time, stop_time):
-    start_idx, stop_idx = sorted_interval(
-        dataframe['release_time'].values,
-        start_time,
-        stop_time,
+def release_data_subset(dataframe, start_time, stop_time, interval: typing.Any = 0):
+    events = resolve_schedule(
+        times=dataframe['release_time'].values,
+        interval=interval,
+        start_time=start_time,
+        stop_time=stop_time,
     )
-    return dataframe.iloc[start_idx:stop_idx]
+
+    return dataframe.iloc[events]
 
 
 def load_release_file(stream, names: list, formats: dict) -> pd.DataFrame:
@@ -271,25 +253,18 @@ def resolve_schedule(times, interval, start_time, stop_time):
     return sched2.events
 
 
-def _subset_schedule(times, start_time, stop_time):
-    """Compute subset of times that are within the specified time span"""
-    start = np.sum(times < start_time)
-    stop = np.sum(times < stop_time)
-
-    # Add an extra time step in the beginning
-    return times[start:stop]
-
-
 class Schedule:
     def __init__(self, times: np.ndarray, events: np.ndarray):
-        self.times = times
-        self.events = events
+        self.times = times.view()
+        self.events = events.view()
+        self.times.flags.writeable = False
+        self.events.flags.writeable = False
 
     def valid(self):
         return np.all(np.diff(self.times) >= 0)
 
     def copy(self):
-        return Schedule(times=self.times, events=self.events)
+        return Schedule(times=self.times.copy(), events=self.events.copy())
 
     def append(self, other: "Schedule"):
         return Schedule(
@@ -315,25 +290,55 @@ class Schedule:
         )
         return extension.append(self)
 
-    def trim_tail(self, time):
-        num = np.sum(self.times < time)
+    def trim_tail(self, stop_time):
+        num = np.sum(self.times < stop_time)
         return Schedule(
             times=self.times[:num],
             events=self.events[:num],
         )
 
-    def trim_head(self, time):
-        idx_first_relevant_time = sum(self.times <= time) - 1
-        assert idx_first_relevant_time >= 0, "Run extend_backwards to avoid this error"
-
-        first_time = self.times[idx_first_relevant_time]
-        num = np.sum(self.times < first_time)
+    def trim_head(self, start_time):
+        num = np.sum(self.times < start_time)
         return Schedule(
             times=self.times[num:],
             events=self.events[num:],
         )
 
+    def rightshift_closest_time_value(self, time, interval):
+        # If interval=0 is specified, this means there is nothing to right-shift
+        if interval <= 0:
+            return self
+
+        # Find largest value that is smaller than or equal to time
+        idx_target_time = sum(self.times <= time) - 1
+
+        # If no tabulated time values are smaller than the given time, there
+        # is nothing to right-shift
+        if idx_target_time == -1:
+            return self
+
+        # Compute new value to write
+        target_time = self.times[idx_target_time]
+        num_offsets = np.ceil((time - target_time) / interval)
+        new_target_time = target_time + num_offsets * interval
+
+        # Check if the new value is larger than the next value
+        if idx_target_time + 1 < len(self.times):  # If not, then there is no next value
+            next_time = self.times[idx_target_time + 1]
+            if new_target_time > next_time:
+                return self
+
+        # Change times
+        new_times = self.times.copy()
+        new_times[self.times == target_time] = new_target_time
+        return Schedule(times=new_times, events=self.events)
+
     def expand(self, interval, stop):
+        # If there are no times, there should be no expansion
+        # Also, interval = 0 means no expansion
+        if (len(self.times) == 0) or (interval <= 0):
+            return self
+
         t_unq, t_inv, t_cnt = np.unique(self.times, return_inverse=True, return_counts=True)
         stop2 = np.maximum(stop, t_unq[-1])
         diff = np.diff(np.concatenate((t_unq, [stop2])))
@@ -352,9 +357,8 @@ class Schedule:
     def resolve(self, start, stop, interval):
         s = self
         if interval:
-            s = s.extend_backwards_using_interval(start, interval)
+            s = s.rightshift_closest_time_value(start, interval)
         s = s.trim_head(start)
         s = s.trim_tail(stop)
-        if interval:
-            s = s.expand(interval, stop)
+        s = s.expand(interval, stop)
         return s

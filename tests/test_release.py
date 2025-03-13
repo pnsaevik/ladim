@@ -40,12 +40,15 @@ class Test_TextFileReleaser_update:
         return model
 
     def test_continuous_release_resets_when_new_release_time(self, mock_model):
+        mock_model.solver.time = np.datetime64('1970-01-01', 's').astype('int64')
+        mock_model.solver.step = 60
+
         # Create mock release file
         buf = io.StringIO(
             'release_time X Y\n'
-            '2000-01-01T00:01:00 4 60\n'
-            '2000-01-01T00:01:00 5 61\n'
-            '2000-01-01T00:05:00 6 62\n'
+            '1970-01-01T00:01:00 4 60\n'
+            '1970-01-01T00:01:00 5 61\n'
+            '1970-01-01T00:05:00 6 62\n'
         )
 
         # Create continuous releaser
@@ -177,13 +180,14 @@ class Test_resolve_schedule:
         assert e == [0] + [1, 2, 3] * 3 + [4, 5] * 2 + [6]
 
     def test_correct_when_before_schedule(self):
+        # Repetition should start only after first time
         e = release.resolve_schedule(
-            times=[0, 0, 1, 1, 1],
+            times=[0, 0, 3, 3, 3],
             interval=2,
             start_time=-4,
-            stop_time=4,
+            stop_time=6,
         ).tolist()
-        assert e == [0, 1] * 3 + [2, 3, 4] * 2
+        assert e == [0, 1] * 2 + [2, 3, 4] * 2
 
     def test_correct_when_no_interval(self):
         e = release.resolve_schedule(
@@ -205,10 +209,17 @@ class Test_resolve_schedule:
 
 class Test_Schedule:
     def test_can_expand(self):
-        s = release.Schedule(times=np.arange(3) * 3, events=np.arange(3))
-        s2 = s.expand(interval=2, stop=8)
+        # Event 0 and 1 are repeated twice when interval = 2
+        s1 = release.Schedule(times=np.arange(3) * 3, events=np.arange(3))
+        s2 = s1.expand(interval=2, stop=8)
         assert s2.times.tolist() == [0, 2, 3, 5, 6]
         assert s2.events.tolist() == [0, 0, 1, 1, 2]
+
+        # No elements in array; no expansion is possible
+        s1 = release.Schedule(times=np.array([]), events=np.array([]))
+        s2 = s1.expand(interval=2, stop=8)
+        assert s2.times.tolist() == []
+        assert s2.events.tolist() == []
 
     def test_is_invalid_if_nondecreasing(self):
         s = release.Schedule(times=np.array([3, 2, 1]), events=np.arange(3))
@@ -245,11 +256,71 @@ class Test_Schedule:
         assert s1.trim_tail(3.0).times.tolist() == [0, 1, 2]
         assert s1.trim_tail(2.5).times.tolist() == [0, 1, 2]
 
-    def test_can_trim_head(self):
-        s1 = release.Schedule(np.arange(5), np.arange(5))
+    def test_can_rightshift_time_values(self):
+        s1 = release.Schedule(np.array([0, 10, 10, 20, 30]), np.arange(5))
 
-        assert s1.trim_head(1.0).times.tolist() == [1, 2, 3, 4]
-        assert s1.trim_head(0.5).times.tolist() == [0, 1, 2, 3, 4]
+        # Largest time value smaller than or equal to 17 is 10
+        # We add N=4 intervals to this time so that it becomes >= 17
+        s2 = s1.rightshift_closest_time_value(time=17, interval=2)
+        assert s2.times.tolist() == [0, 18, 18, 20, 30]
+
+        # Largest time value smaller than or equal to 17 is 10
+        # We could add N=1 intervals to this time so that it becomes >= 17
+        # ..but then the new value would become 25, which is larger than the
+        # next value, so this is not done. Instead, no elements are changed.
+        s2 = s1.rightshift_closest_time_value(time=17, interval=15)
+        assert s2.times.tolist() == [0, 10, 10, 20, 30]
+
+        # Largest time value smaller than or equal to 10 is 10
+        # This element does not have to change, it is already <= 10
+        s2 = s1.rightshift_closest_time_value(time=10, interval=2)
+        assert s2.times.tolist() == [0, 10, 10, 20, 30]
+
+        # No time value is smaller than -5
+        # No elements are changed
+        s2 = s1.rightshift_closest_time_value(time=-5, interval=2)
+        assert s2.times.tolist() == [0, 10, 10, 20, 30]
+
+        # Interval = 0 means nothing should change
+        s2 = s1.rightshift_closest_time_value(time=17, interval=0)
+        assert s2.times.tolist() == [0, 10, 10, 20, 30]
+
+        # No elements in schedule; nothing should change
+        s3 = release.Schedule(times=np.array([]), events=np.array([]))
+        s2 = s3.rightshift_closest_time_value(time=17, interval=2)
+        assert s2.times.tolist() == []
+
+        # One element in schedule; should be shifted
+        s3 = release.Schedule(times=np.array([10]), events=np.array([0]))
+        s2 = s3.rightshift_closest_time_value(time=17, interval=2)
+        assert s2.times.tolist() == [18]
+
+    def test_can_trim_head(self):
+        s = release.Schedule(
+            times=np.array([10, 10, 20, 20, 20, 30, 40]),
+            events=np.array([0, 1, 2, 3, 4, 5, 6]),
+        )
+
+        # Start time equals first time; no trimming
+        s2 = s.trim_head(start_time=10)
+        assert s2.times.tolist() == [10, 10, 20, 20, 20, 30, 40]
+        assert s2.events.tolist() == [0, 1, 2, 3, 4, 5, 6]
+
+        # Start time before first time; no trimming
+        s2 = s.trim_head(start_time=5)
+        assert s2.times.tolist() == [10, 10, 20, 20, 20, 30, 40]
+        assert s2.events.tolist() == [0, 1, 2, 3, 4, 5, 6]
+
+        # Start time after first time; remove first entries
+        s2 = s.trim_head(start_time=30)
+        assert s2.times.tolist() == [30, 40]
+        assert s2.events.tolist() == [5, 6]
+
+        # Start time after last time; remove all entries
+        s2 = s.trim_head(start_time=50)
+        assert s2.times.tolist() == []
+        assert s2.events.tolist() == []
+
 
 class MockObj:
     pass
