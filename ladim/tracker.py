@@ -1,21 +1,23 @@
-from .model import Model, Module
 import numpy as np
+import typing
+if typing.TYPE_CHECKING:
+    from .model import Model
 
 
-class Tracker(Module):
-    pass
-
-
-class HorizontalTracker:
+class Tracker:
     """The physical particle tracking kernel"""
+    def __init__(self, integrator, diffusion):
+        self.integrator = integrator
+        self.diffusion = diffusion  # [m2.s-1]
 
-    def __init__(self, method, diffusion) -> None:
+    @staticmethod
+    def from_config(method, diffusion):
         if not diffusion:
             method += "_nodiff"
-        self.integrator = StochasticDifferentialEquationIntegrator.from_keyword(method)
-        self.D = diffusion  # [m2.s-1]
+        integrator = StochasticDifferentialEquationIntegrator.from_keyword(method)
+        return Tracker(integrator, diffusion)
 
-    def update(self, model: Model):
+    def update(self, model: "Model"):
         state = model.state
         grid = model.grid
         forcing = model.forcing
@@ -31,7 +33,7 @@ class HorizontalTracker:
         # Set diffusion function
         def mixing(t, r):
             _ = t
-            stddev = (2 * self.D) ** 0.5
+            stddev = (2 * self.diffusion) ** 0.5
             u_diff = stddev / dx
             return np.broadcast_to(u_diff, r.shape)
 

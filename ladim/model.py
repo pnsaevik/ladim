@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Hashable, Any
 if TYPE_CHECKING:
     from ladim.ibms import IBM
     from ladim.output import RaggedOutput as Output
-    from ladim.tracker import HorizontalTracker as Tracker
     from ladim.solver import Solver
 
 
@@ -15,6 +14,7 @@ from ladim.release import Releaser
 from ladim.grid import Grid
 from ladim.forcing import Forcing
 from ladim.state import State
+from ladim.tracker import Tracker
 
 
 class Model:
@@ -55,10 +55,10 @@ class Model:
         release = Releaser.from_textfile(
             lonlat_converter=grid.ll2xy, **config['release']
         )
+        tracker = Tracker.from_config(**config['tracker'])
 
         output = Module.from_config(config['output'])
         ibm = Module.from_config(config['ibm'])
-        tracker = Module.from_config(config['tracker'])
         solver = Module.from_config(config['solver'])
 
         state = State()

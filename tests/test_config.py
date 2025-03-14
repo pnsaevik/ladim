@@ -93,7 +93,6 @@ class Test_convert_1_to_2:
             'tracker': {
                 'diffusion': 0.1,
                 'method': 'RK4',
-                'module': 'ladim.tracker.HorizontalTracker',
             },
             'version': 2
         }

@@ -8,18 +8,6 @@ different versions of config file formats.
 import numpy as np
 
 
-DEFAULT_MODULES = dict(
-    grid='ladim.grid.RomsGrid',
-    forcing='ladim.forcing.RomsForcing',
-    release='ladim.release.TextFileReleaser',
-    state='ladim.state.DynamicState',
-    output='ladim.output.RaggedOutput',
-    ibm='ladim.ibms.IBM',
-    tracker='ladim.tracker.HorizontalTracker',
-    solver='ladim.solver.Solver',
-)
-
-
 def configure(module_conf):
     import yaml
 
@@ -136,7 +124,6 @@ def convert_1_to_2(c):
     out['tracker'] = {}
     out['tracker']['method'] = dict_get(c, 'numerics.advection')
     out['tracker']['diffusion'] = dict_get(c, 'numerics.diffusion')
-    out['tracker']['module'] = 'ladim.tracker.HorizontalTracker'
 
     # Read release config
     out['release'] = {}

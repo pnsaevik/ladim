@@ -44,12 +44,8 @@ output:
             'positive': 'down'}
 
 tracker:
-    module: ladim.tracker.HorizontalTracker
     method: 'RK4'
     diffusion: 0.1
 
 ibm:
     module: ladim.ibms.IBM
-
-state:
-    module: ladim.state.DynamicState
