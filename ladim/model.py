@@ -5,16 +5,16 @@ from pathlib import Path
 
 from typing import TYPE_CHECKING, Hashable, Any
 if TYPE_CHECKING:
-    from ladim.forcing import RomsForcing as Forcing
     from ladim.ibms import IBM
     from ladim.output import RaggedOutput as Output
-    from ladim.state import DynamicState as State
     from ladim.tracker import HorizontalTracker as Tracker
     from ladim.solver import Solver
 
 
 from ladim.release import Releaser
 from ladim.grid import Grid
+from ladim.forcing import Forcing
+from ladim.state import State
 
 
 class Model:
@@ -50,17 +50,18 @@ class Model:
         """
 
         grid = Grid.from_roms(**config['grid'])
-        forcing = Module.from_config(config['forcing'])
+        forcing = Forcing.from_roms(**config['forcing'])
 
         release = Releaser.from_textfile(
             lonlat_converter=grid.ll2xy, **config['release']
         )
 
-        state = Module.from_config(config['state'])
         output = Module.from_config(config['output'])
         ibm = Module.from_config(config['ibm'])
         tracker = Module.from_config(config['tracker'])
         solver = Module.from_config(config['solver'])
+
+        state = State()
 
         # noinspection PyTypeChecker
         return Model(grid, forcing, release, state, output, ibm, tracker, solver)

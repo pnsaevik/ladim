@@ -23,6 +23,5 @@ class Solver:
             model.output.update(model)
             model.tracker.update(model)
             model.ibm.update(model)
-            model.state.update(model)
 
             self.time += self.step

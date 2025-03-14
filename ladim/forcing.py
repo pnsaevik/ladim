@@ -1,8 +1,17 @@
-from .model import Model, Module
+import typing
+if typing.TYPE_CHECKING:
+    from ladim.model import Model
 
 
-class Forcing(Module):
+class Forcing:
+    @staticmethod
+    def from_roms(**conf):
+        return RomsForcing(**conf)
+
     def velocity(self, X, Y, Z, tstep=0.0):
+        raise NotImplementedError
+
+    def update(self, model: "Model"):
         raise NotImplementedError
 
 
@@ -63,7 +72,7 @@ class RomsForcing(Forcing):
         # self.U = self.forcing.U
         # self.V = self.forcing.V
 
-    def update(self, model: Model):
+    def update(self, model: "Model"):
         elapsed = model.solver.time - model.solver.start
         t = elapsed // model.solver.step
 

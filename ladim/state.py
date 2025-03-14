@@ -1,9 +1,8 @@
 import pandas as pd
 import numpy as np
-from .model import Model, Module
 
 
-class State(Module):
+class State:
     """
     The state module contains static and dynamic particle properties
 
@@ -12,19 +11,24 @@ class State(Module):
     depth of all particles by 1, use state['Z'] += 1
     """
 
+    def __init__(self):
+        self._num_released = 0
+        self._varnames = set()
+        self._data = pd.DataFrame()
+
     @property
     def size(self):
         """
         Current number of particles
         """
-        raise NotImplementedError
+        return len(self._data)
 
     @property
     def released(self):
         """
         Total number of released particles
         """
-        raise NotImplementedError
+        return self._num_released
 
     def append(self, particles: dict):
         """
@@ -34,41 +38,6 @@ class State(Module):
 
         :param particles: A mapping from variable names to values
         """
-        raise NotImplementedError
-
-    def remove(self, particles):
-        """
-        Remove particles
-
-        :param particles: Boolean index of particles to remove
-        :return:
-        """
-        raise NotImplementedError
-
-    def __getitem__(self, item):
-        raise NotImplementedError
-
-    def __setitem__(self, key, value):
-        raise NotImplementedError
-
-    def __len__(self):
-        return self.size
-
-    def __contains__(self, item):
-        raise NotImplementedError
-
-
-class DynamicState(State):
-    def __init__(self):
-        self._num_released = 0
-        self._varnames = set()
-        self._data = pd.DataFrame()
-
-    @property
-    def released(self):
-        return self._num_released
-
-    def append(self, particles: dict):
         # If there are no new particles, do nothing
         if not particles:
             return
@@ -92,21 +61,29 @@ class DynamicState(State):
         self._num_released += num_new_particles
 
     def remove(self, particles):
+        """
+        Remove particles
+
+        :param particles: Boolean index of particles to remove
+        :return:
+        """
         if not np.any(particles):
             return
 
         keep = ~particles
         self._data = self._data.iloc[keep]
 
-    @property
-    def size(self):
-        return len(self._data)
-
     def __getitem__(self, item):
         return self._data[item].values
 
     def __setitem__(self, item, value):
         self._data[item] = value
+
+    def __len__(self):
+        return self.size
+
+    def __contains__(self, item):
+        return item in self._data
 
     def __getattr__(self, item):
         if item not in self:
@@ -124,6 +101,3 @@ class DynamicState(State):
             self._data[item] = value
         else:
             raise AttributeError(f"Attribute not defined: '{item}'")
-
-    def __contains__(self, item):
-        return item in self._data

@@ -12,7 +12,7 @@ class Test_TextFileReleaser_update:
 
         model = MockObj()  # type: typing.Any
 
-        model.state = ladim.state.DynamicState()
+        model.state = ladim.state.State()
 
         model.grid = MockObj()
         model.grid.ll2xy = lambda lon, lat: (100*lon, 10*lat)

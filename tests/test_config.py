@@ -95,9 +95,6 @@ class Test_convert_1_to_2:
                 'method': 'RK4',
                 'module': 'ladim.tracker.HorizontalTracker',
             },
-            'state': {
-                'module': 'ladim.state.DynamicState',
-            },
             'version': 2
         }
 

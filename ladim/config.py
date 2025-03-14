@@ -172,7 +172,4 @@ def convert_1_to_2(c):
     else:
         out['ibm']['module'] = 'ladim.ibms.IBM'
 
-    out['state'] = {}
-    out['state']['module'] = 'ladim.state.DynamicState'
-
     return out
