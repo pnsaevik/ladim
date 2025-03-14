@@ -141,7 +141,6 @@ def convert_1_to_2(c):
 
     out['ibm'] = {}
     if 'ibm' in c:
-        out['ibm']['module'] = 'ladim.ibms.LegacyIBM'
         out['ibm']['legacy_module'] = dict_get(c, ['ibm.ibm_module', 'ibm.module'])
         if out['ibm']['legacy_module'] == 'ladim.ibms.ibm_salmon_lice':
             out['ibm']['legacy_module'] = 'ladim_plugins.salmon_lice'
@@ -153,7 +152,5 @@ def convert_1_to_2(c):
             for k, v in out['output']['variables'].items()
         }
         out['ibm']['conf']['ibm'] = {k: v for k, v in c['ibm'].items() if k != 'ibm_module'}
-    else:
-        out['ibm']['module'] = 'ladim.ibms.IBM'
 
     return out

@@ -191,7 +191,7 @@ class RomsGrid(Grid):
         if subgrid is not None:
             legacy_conf['gridforce']['subgrid'] = subgrid
 
-        from .model import load_class
+        from .utilities import load_class
         LegacyGrid = load_class(legacy_module)
 
         # Allow gridforce module in current directory

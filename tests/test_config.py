@@ -51,9 +51,7 @@ class Test_convert_1_to_2:
                 'start_time': np.datetime64('2015-09-07T01:00:00'),
                 'subgrid': None,
             },
-            'ibm': {
-                'module': 'ladim.ibms.IBM',
-            },
+            'ibm': {},
             'output': {
                 'file': 'out.nc',
                 'frequency': [60, 's'],

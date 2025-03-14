@@ -59,7 +59,7 @@ class RomsForcing(Forcing):
         if conf.get('subgrid', None) is not None:
             legacy_conf['gridforce']['subgrid'] = conf['subgrid']
 
-        from .model import load_class
+        from .utilities import load_class
         LegacyForcing = load_class(conf.get('legacy_module', 'ladim.gridforce.ROMS.Forcing'))
 
         # Allow gridforce module in current directory

@@ -1,12 +1,4 @@
-import importlib
-import importlib.util
-import sys
-from pathlib import Path
-
-from typing import TYPE_CHECKING, Hashable, Any
-if TYPE_CHECKING:
-    from ladim.ibms import IBM
-
+from ladim.ibms import IBM
 from ladim.solver import Solver
 from ladim.release import Releaser
 from ladim.grid import Grid
@@ -57,7 +49,7 @@ class Model:
         tracker = Tracker.from_config(**config['tracker'])
 
         output = Output(**config['output'])
-        ibm = Module.from_config(config['ibm'])
+        ibm = IBM(**config['ibm'])
         solver = Solver(**config['solver'])
 
         state = State()
@@ -85,66 +77,3 @@ class Model:
         for m in self.modules.values():
             if hasattr(m, 'close') and callable(m.close):
                 m.close()
-
-
-def load_class(name):
-    pkg, cls = name.rsplit(sep='.', maxsplit=1)
-
-    # Check if "pkg" is an existing file
-    spec = None
-    module_name = None
-    file_name = pkg + '.py'
-    if Path(file_name).exists():
-        # This can return None if there were import errors
-        module_name = pkg
-        spec = importlib.util.spec_from_file_location(module_name, file_name)
-
-    # If pkg can not be interpreted as a file, use regular import
-    if spec is None:
-        return getattr(importlib.import_module(pkg), cls)
-
-    # File import
-    else:
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-        return getattr(module, cls)
-
-
-class Module:
-    @staticmethod
-    def from_config(conf: dict) -> "Module":
-        """
-        Initialize a module using a configuration dict.
-
-        The configuration dict should contain the keyword ``module``,
-        which is the fully qualified name of the module. The other
-        keys should be the named parameters of the module's init
-        method.
-
-        :param conf: The configuration parameters of the module
-        :return: An initialized module
-        """
-        conf2, module = dict_pop_pure(conf, 'module')
-        cls = load_class(module)
-        return cls(**conf2)
-
-    def update(self, model: Model):
-        pass
-
-    def close(self):
-        pass
-
-
-def dict_pop_pure(d: dict, key: Hashable) -> tuple[dict, Any]:
-    """
-    Same as dict.pop, but does not modify the input dict
-
-    :param d: Input dict
-    :param key: Key to pop
-    :return: A tuple (d2, val) where d2 is the dict without the key,
-        and val is d[key]
-    """
-    d2 = {k: v for k, v in d.items() if k != key}
-    val = d[key]
-    return d2, val

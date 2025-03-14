@@ -45,5 +45,4 @@ tracker:
     method: 'RK4'
     diffusion: 0.1
 
-ibm:
-    module: ladim.ibms.IBM
+ibm: {}
