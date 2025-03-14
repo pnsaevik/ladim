@@ -102,13 +102,11 @@ def convert_1_to_2(c):
     out['forcing']['subgrid'] = dict_get(c, 'gridforce.subgrid', None)
     out['forcing']['dt'] = dt_sec
     out['forcing']['ibm_forcing'] = dict_get(c, 'gridforce.ibm_forcing', [])
-    out['forcing']['module'] = 'ladim.forcing.RomsForcing'
 
     out['output'] = {}
     out['output']['file'] = dict_get(c, 'files.output_file')
     out['output']['frequency'] = dict_get(c, 'output_variables.outper')
     out['output']['variables'] = {}
-    out['output']['module'] = 'ladim.output.RaggedOutput'
 
     # Convert output variable format spec
     outvar_names = dict_get(c, 'output_variables.particle', []).copy()

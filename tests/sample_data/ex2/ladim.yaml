@@ -22,7 +22,6 @@ forcing:
     dt: 60
 
 output:
-    module: ladim.output.RaggedOutput
     file: 'out.nc'
     frequency: [1, 'm']
     variables:

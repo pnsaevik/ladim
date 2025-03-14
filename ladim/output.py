@@ -1,13 +1,11 @@
-from .model import Model, Module
 import netCDF4 as nc
 import numpy as np
+import typing
+if typing.TYPE_CHECKING:
+    from .model import Model
 
 
-class Output(Module):
-    pass
-
-
-class RaggedOutput(Output):
+class Output:
     def __init__(self, variables: dict, file: str, frequency):
         """
         Writes simulation output to netCDF file in ragged array format
@@ -52,7 +50,7 @@ class RaggedOutput(Output):
         """Returns a handle to the netCDF dataset currently being written to"""
         return self._dset
 
-    def update(self, model: Model):
+    def update(self, model: "Model"):
         if self._dset is None:
             self._create_dset()
 

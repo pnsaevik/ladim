@@ -30,7 +30,7 @@ class Test_RaggedOutput_update:
         model.solver.time = np.datetime64('2000-01-01', 's').astype('int64')
         model.solver.step = 60
 
-        out = output.RaggedOutput(variables=dict(), file="", frequency=0)
+        out = output.Output(variables=dict(), file="", frequency=0)
 
         try:
             # Run update
@@ -72,7 +72,7 @@ class Test_RaggedOutput_update:
         model.solver.time = np.datetime64('2000-01-01', 's').astype('int64')
         model.solver.step = 60
         model.output = MockObj()
-        model.output = output.RaggedOutput(variables=dict(), file="", frequency=0)
+        model.output = output.Output(variables=dict(), file="", frequency=0)
 
         try:
             # Run update
@@ -122,7 +122,7 @@ class Test_RaggedOutput_update:
         model.solver.time = np.datetime64('2000-01-01', 's').astype('int64')
         model.solver.step = 60
         model.output = MockObj()
-        model.output = output.RaggedOutput(
+        model.output = output.Output(
             variables=dict(X=dict(units='m', long_name='x coord', kind=kind)),
             file="",
             frequency=0,
@@ -172,7 +172,7 @@ class Test_RaggedOutput_update:
         model.solver.time = np.datetime64('2000-01-01', 's').astype('int64')
         model.solver.step = 60
         model.output = MockObj()
-        model.output = output.RaggedOutput(
+        model.output = output.Output(
             variables=dict(X=dict(units='m', long_name='x coord')),
             file="",
             frequency=120,
@@ -210,7 +210,7 @@ class Test_RaggedOutput_update:
         model.grid = MockObj()
         model.grid.xy2ll = lambda x, y: (x + 10, y + 70)
         model.output = MockObj()
-        model.output = output.RaggedOutput(
+        model.output = output.Output(
             variables=dict(lat=dict(), lon=dict()),
             file="",
             frequency=0,

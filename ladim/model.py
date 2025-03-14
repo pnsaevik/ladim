@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Hashable, Any
 if TYPE_CHECKING:
     from ladim.ibms import IBM
-    from ladim.output import RaggedOutput as Output
 
 from ladim.solver import Solver
 from ladim.release import Releaser
@@ -14,6 +13,7 @@ from ladim.grid import Grid
 from ladim.forcing import Forcing
 from ladim.state import State
 from ladim.tracker import Tracker
+from ladim.output import Output
 
 
 class Model:
@@ -56,7 +56,7 @@ class Model:
         )
         tracker = Tracker.from_config(**config['tracker'])
 
-        output = Module.from_config(config['output'])
+        output = Output(**config['output'])
         ibm = Module.from_config(config['ibm'])
         solver = Solver(**config['solver'])
 
