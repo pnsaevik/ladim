@@ -7,9 +7,8 @@ from typing import TYPE_CHECKING, Hashable, Any
 if TYPE_CHECKING:
     from ladim.ibms import IBM
     from ladim.output import RaggedOutput as Output
-    from ladim.solver import Solver
 
-
+from ladim.solver import Solver
 from ladim.release import Releaser
 from ladim.grid import Grid
 from ladim.forcing import Forcing
@@ -59,7 +58,7 @@ class Model:
 
         output = Module.from_config(config['output'])
         ibm = Module.from_config(config['ibm'])
-        solver = Module.from_config(config['solver'])
+        solver = Solver(**config['solver'])
 
         state = State()
 

@@ -88,7 +88,6 @@ class Test_convert_1_to_2:
                 'seed': 0,
                 'start': datetime.datetime(2015, 9, 7, 1, 0),
                 'step': 60,
-                'module': 'ladim.solver.Solver',
                 'stop': datetime.datetime(2015, 9, 7, 1, 5)},
             'tracker': {
                 'diffusion': 0.1,

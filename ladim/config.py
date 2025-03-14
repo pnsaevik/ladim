@@ -82,7 +82,6 @@ def convert_1_to_2(c):
     out['solver']['stop'] = dict_get(c, 'time_control.stop_time')
     out['solver']['step'] = dt_sec
     out['solver']['seed'] = dict_get(c, 'numerics.seed')
-    out['solver']['module'] = 'ladim.solver.Solver'
 
     out['grid'] = {}
     out['grid']['file'] = dict_get(c, [
