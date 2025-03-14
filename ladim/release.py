@@ -1,75 +1,80 @@
 import contextlib
-import typing
-
-from .model import Model, Module
 import numpy as np
 import pandas as pd
 from .utilities import read_timedelta
 import logging
+import typing
+
+if typing.TYPE_CHECKING:
+    from ladim.model import Model
 
 
 logger = logging.getLogger(__name__)
 
 
-class Releaser(Module):
-    pass
+class Releaser:
+    def __init__(self, particle_generator: typing.Callable[[float, float], pd.DataFrame]):
+        self.particle_generator = particle_generator
 
-
-class TextFileReleaser(Releaser):
-    def __init__(
-            self, file, colnames: list = None, formats: dict = None,
-            frequency=(0, 's'), defaults=None,
+    @staticmethod
+    def from_textfile(
+            file, colnames: list = None, formats: dict = None,
+            frequency=(0, 's'), defaults=None, lonlat_converter=None,
     ):
         """
         Release module which reads from a text file
 
         The text file must be a whitespace-separated csv file
 
+        :param lonlat_converter: Function that converts lon, lat coordinates to
+            x, y coordinates
+
         :param file: Release file
 
         :param colnames: Column names, if the release file does not contain any
 
         :param formats: Data column formats, one dict entry per column. If any column
-        is missing, the default format is used. Keys should correspond to column names.
-        Values should be either ``"float"``, ``"int"`` or ``"time"``. Default value
-        is ``"float"`` for all columns except ``release_time``, which has default
-        value ``"time"``.
+            is missing, the default format is used. Keys should correspond to column names.
+            Values should be either ``"float"``, ``"int"`` or ``"time"``. Default value
+            is ``"float"`` for all columns except ``release_time``, which has default
+            value ``"time"``.
 
         :param frequency: A two-element list with entries ``[value, unit]``, where
-        ``unit`` can be any numpy-compatible timedelta unit (such as "s", "m", "h", "D").
+            ``unit`` can be any numpy-compatible timedelta unit (such as "s", "m", "h", "D").
 
         :param defaults: A dict of variables to be added to each particle. The keys
             are the variable names, the values are the initial values at particle
             release.
         """
 
-        self.release_table = ReleaseTable.from_filename_or_stream(
+        release_table = ReleaseTable.from_filename_or_stream(
             file=file,
             column_names=colnames,
             column_formats=formats or dict(),
             interval=read_timedelta(frequency) / np.timedelta64(1, 's'),
             defaults=defaults or dict(),
+            lonlat_converter=lonlat_converter,
         )
+        return Releaser(particle_generator=release_table.subset)
 
-    def update(self, model: Model):
+    def update(self, model: "Model"):
         self._add_new(model)
         self._kill_old(model)
 
     # noinspection PyMethodMayBeStatic
-    def _kill_old(self, model: Model):
+    def _kill_old(self, model: "Model"):
         state = model.state
         if 'alive' in state:
             alive = state['alive']
             alive &= model.grid.ingrid(state['X'], state['Y'])
             state.remove(~alive)
 
-    def _add_new(self, model: Model):
+    def _add_new(self, model: "Model"):
         # Get the portion of the release dataset that corresponds to
         # current simulation time
-        df = self.release_table.subset(
-            start_time=model.solver.time,
-            stop_time=model.solver.time + model.solver.step,
-            lonlat_converter=model.grid.ll2xy,
+        df = self.particle_generator(
+            model.solver.time,
+            model.solver.time + model.solver.step,
         )
 
         # If there are no new particles, but the state is empty, we should
@@ -152,12 +157,19 @@ def get_converters(varnames: list, conf: dict) -> dict:
 
 
 class ReleaseTable:
-    def __init__(self, dataframe: pd.DataFrame, interval, defaults):
+    def __init__(
+            self,
+            dataframe: pd.DataFrame,
+            interval: float,
+            defaults: dict[str, typing.Any],
+            lonlat_converter: typing.Callable[[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]],
+    ):
         self.dataframe = dataframe
         self.interval = interval
         self.defaults = defaults
+        self.lonlat_converter = lonlat_converter
 
-    def subset(self, start_time, stop_time, lonlat_converter):
+    def subset(self, start_time, stop_time):
         events = resolve_schedule(
             times=self.dataframe['release_time'].values,
             interval=self.interval,
@@ -166,22 +178,22 @@ class ReleaseTable:
         )
 
         df = self.dataframe.iloc[events].copy(deep=True)
-        df = replace_lonlat_in_release_table(df, lonlat_converter)
+        df = replace_lonlat_in_release_table(df, self.lonlat_converter)
         df = add_default_variables_in_release_table(df, self.defaults)
         df = expand_multiplicity_in_release_table(df)
 
         return df
 
     @staticmethod
-    def from_filename_or_stream(file, column_names, column_formats, interval, defaults):
+    def from_filename_or_stream(file, column_names, column_formats, interval, defaults, lonlat_converter):
         with open_or_relay(file, 'r', encoding='utf-8') as fp:
             return ReleaseTable.from_stream(
-                fp, column_names, column_formats, interval, defaults)
+                fp, column_names, column_formats, interval, defaults, lonlat_converter)
 
     @staticmethod
-    def from_stream(fp, column_names, column_formats, interval, defaults):
+    def from_stream(fp, column_names, column_formats, interval, defaults, lonlat_converter):
         df = load_release_file(stream=fp, names=column_names, formats=column_formats)
-        return ReleaseTable(df, interval, defaults)
+        return ReleaseTable(df, interval, defaults, lonlat_converter)
 
 
 def replace_lonlat_in_release_table(df, lonlat_converter):

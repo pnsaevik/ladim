@@ -12,7 +12,6 @@ grid:
     file: '../forcing.nc'
 
 release:
-    module: ladim.release.TextFileReleaser
     file: particles.rls
     frequency: [1, 'm']
 

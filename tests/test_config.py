@@ -84,7 +84,6 @@ class Test_convert_1_to_2:
                 'defaults': {},
                 'file': 'particles.rls',
                 'formats': {'time': 'release_time'},
-                'module': 'ladim.release.TextFileReleaser',
                 'frequency': [1, 'm']},
             'solver': {
                 'seed': 0,

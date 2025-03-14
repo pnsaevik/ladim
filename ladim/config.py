@@ -155,7 +155,6 @@ def convert_1_to_2(c):
         for k in dict_get(c, 'state.ibm_variables', []) + dict_get(c, 'ibm.variables', [])
         if k not in out['release']['colnames']
     }
-    out['release']['module'] = 'ladim.release.TextFileReleaser'
 
     out['ibm'] = {}
     if 'ibm' in c:

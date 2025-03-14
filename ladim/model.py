@@ -9,10 +9,12 @@ if TYPE_CHECKING:
     from ladim.forcing import RomsForcing as Forcing
     from ladim.ibms import IBM
     from ladim.output import RaggedOutput as Output
-    from ladim.release import TextFileReleaser as Releaser
     from ladim.state import DynamicState as State
     from ladim.tracker import HorizontalTracker as Tracker
     from ladim.solver import Solver
+
+
+from ladim.release import Releaser
 
 
 class Model:
@@ -47,17 +49,21 @@ class Model:
         :return: An initialized Model class
         """
 
-        # noinspection PyTypeChecker
-        return Model(
-            grid=Module.from_config(config['grid']),
-            forcing=Module.from_config(config['forcing']),
-            release=Module.from_config(config['release']),
-            state=Module.from_config(config['state']),
-            output=Module.from_config(config['output']),
-            ibm=Module.from_config(config['ibm']),
-            tracker=Module.from_config(config['tracker']),
-            solver=Module.from_config(config['solver']),
+        grid = Module.from_config(config['grid'])  # type: Grid
+        forcing = Module.from_config(config['forcing'])
+
+        release = Releaser.from_textfile(
+            lonlat_converter=grid.ll2xy, **config['release']
         )
+
+        state = Module.from_config(config['state'])
+        output = Module.from_config(config['output'])
+        ibm = Module.from_config(config['ibm'])
+        tracker = Module.from_config(config['tracker'])
+        solver = Module.from_config(config['solver'])
+
+        # noinspection PyTypeChecker
+        return Model(grid, forcing, release, state, output, ibm, tracker, solver)
 
     @property
     def modules(self) -> dict:
