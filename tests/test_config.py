@@ -51,7 +51,6 @@ class Test_convert_1_to_2:
                 'legacy_module': 'ladim.gridforce.ROMS.Grid',
                 'start_time': np.datetime64('2015-09-07T01:00:00'),
                 'subgrid': None,
-                'module': 'ladim.grid.RomsGrid',
             },
             'ibm': {
                 'module': 'ladim.ibms.IBM',

@@ -5,7 +5,6 @@ from pathlib import Path
 
 from typing import TYPE_CHECKING, Hashable, Any
 if TYPE_CHECKING:
-    from ladim.grid import RomsGrid as Grid
     from ladim.forcing import RomsForcing as Forcing
     from ladim.ibms import IBM
     from ladim.output import RaggedOutput as Output
@@ -15,6 +14,7 @@ if TYPE_CHECKING:
 
 
 from ladim.release import Releaser
+from ladim.grid import Grid
 
 
 class Model:
@@ -49,7 +49,7 @@ class Model:
         :return: An initialized Model class
         """
 
-        grid = Module.from_config(config['grid'])  # type: Grid
+        grid = Grid.from_roms(**config['grid'])
         forcing = Module.from_config(config['forcing'])
 
         release = Releaser.from_textfile(

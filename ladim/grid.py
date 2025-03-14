@@ -1,15 +1,18 @@
-from .model import Module
 import numpy as np
 from typing import Sequence
 from scipy.ndimage import map_coordinates
 
 
-class Grid(Module):
+class Grid:
     """
     The grid class represents the coordinate system used for particle tracking.
     It contains methods for converting between global coordinates (latitude,
     longitude, depth and posix time) and internal coordinates.
     """
+
+    @staticmethod
+    def from_roms(**conf):
+        return RomsGrid(**conf)
 
     def ingrid(self, X, Y):
         raise NotImplementedError
