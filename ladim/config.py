@@ -92,7 +92,7 @@ def convert_1_to_2(c):
     out['grid']['start_time'] = np.datetime64(dict_get(c, 'time_control.start_time', '1970'), 's')
     out['grid']['subgrid'] = dict_get(c, 'gridforce.subgrid', None)
 
-    out['forcing'] = c.get('gridforce', {})
+    out['forcing'] = {k: v for k, v in c.get('gridforce', {}).items() if k not in ('input_file', 'module')}
     out['forcing']['file'] = dict_get(c, ['gridforce.input_file', 'files.input_file'])
     out['forcing']['first_file'] = dict_get(c, 'gridforce.first_file', "")
     out['forcing']['last_file'] = dict_get(c, 'gridforce.last_file', "")
