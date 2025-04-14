@@ -62,7 +62,7 @@ class Grid:
         # Here, imax, jmax refers to whole grid
         jmax, imax = ncid.variables["h"].shape
         whole_grid = [1, imax - 1, 1, jmax - 1]
-        if "subgrid" in config["gridforce"]:
+        if config["gridforce"].get('subgrid', None):
             limits = list(config["gridforce"]["subgrid"])
         else:
             limits = whole_grid
