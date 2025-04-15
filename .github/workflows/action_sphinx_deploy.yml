@@ -1,6 +1,6 @@
 name: Release workflow
 
-on: workflow_dispatch
+on: workflow_call
 
 jobs:
   # Deploy job

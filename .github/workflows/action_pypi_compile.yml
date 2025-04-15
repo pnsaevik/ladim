@@ -1,6 +1,6 @@
 name: Compile python package
 
-on: workflow_dispatch
+on: workflow_call
 
 jobs:
   build-pypi-package:

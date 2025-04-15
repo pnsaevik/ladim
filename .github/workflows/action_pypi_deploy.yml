@@ -1,6 +1,6 @@
 name: Publish python package
 
-on: workflow_dispatch
+on: workflow_call
 
 jobs:
   publish-to-pypi:

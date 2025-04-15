@@ -1,7 +1,6 @@
 name: Build sphinx documentation
 
-on:
-  workflow_call: {}
+on: workflow_call
 
 jobs:
   sphinx-build:
