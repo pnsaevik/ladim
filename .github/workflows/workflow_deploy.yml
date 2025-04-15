@@ -1,4 +1,4 @@
-name: Main branch merge
+name: Deploy main branch
 
 
 on:
@@ -10,8 +10,6 @@ on:
 
 jobs:
   deploy_pypi:
-    if: github.event.pull_request.merged == true
     uses: ./.github/workflows/action_pypi_deploy.yml
   deploy_sphinx:
-    if: github.event.pull_request.merged == true
     uses: ./.github/workflows/action_sphinx_deploy.yml
