@@ -8,7 +8,7 @@ first_version_line=$(grep '^__version__' ladim/__init__.py | head -n 1)
 
 # Step 2: Extract the substring within quotes from the __version__ line
 version_value=$(echo "$first_version_line" | sed -n "s/^__version__ = '\(.*\)'/\1/p")
-search_text="## [$version] -"
+search_text="## [$version_value] -"
 echo "Search for changelog entry: $search_text"
 
 # Step 3: Check if the contents of the variable exist within the text file
