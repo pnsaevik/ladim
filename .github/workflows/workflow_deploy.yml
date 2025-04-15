@@ -1,11 +1,17 @@
-name: Deploy package
+name: Pull request merge into main branch
 
 
-on: workflow_dispatch
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types: [closed]
+    branches: [master]
 
 
 jobs:
   deploy_pypi:
+    if: github.event.pull_request.merged == true
     uses: ./.github/workflows/action_pypi_deploy.yml
   deploy_sphinx:
+    if: github.event.pull_request.merged == true
     uses: ./.github/workflows/action_sphinx_deploy.yml
