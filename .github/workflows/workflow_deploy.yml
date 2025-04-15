@@ -1,4 +1,4 @@
-name: Main branch pull request
+name: Deploy package
 
 
 on: workflow_dispatch
