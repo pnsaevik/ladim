@@ -1,0 +1,17 @@
+name: Check changelog update
+
+on: workflow_dispatch
+
+
+jobs:
+  check-changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+           fetch-depth: 2
+      - name: Check version has changed
+        run: ./.github/scripts/version.sh
+      - name: Check changelog entry exists
+        run: ./.github/scripts/changelog.sh

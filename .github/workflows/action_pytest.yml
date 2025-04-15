@@ -4,7 +4,7 @@ on:
   workflow_call: {}
 
 jobs:
-  sphinx:
+  pytest-jobs:
     runs-on: ubuntu-latest
     name: Run pytest
     steps:

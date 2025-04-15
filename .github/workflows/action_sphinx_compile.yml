@@ -1,12 +1,12 @@
-name: Build sphinx
+name: Build sphinx documentation
 
 on:
   workflow_call: {}
 
 jobs:
-  sphinx:
+  sphinx-build:
     runs-on: ubuntu-latest
-    name: Build sphinx
+    name: Build sphinx documentation
     steps:
       - name: Checkout
         uses: actions/checkout@v4
