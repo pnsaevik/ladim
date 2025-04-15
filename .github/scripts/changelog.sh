@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Exit immediately if a command exits with a non-zero status
+set -e
+
 # Step 1: Extract the first line starting with __version__
 first_version_line=$(grep '^__version__' ladim/__init__.py | head -n 1)
 
