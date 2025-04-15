@@ -3,9 +3,6 @@
 # Exit immediately if a command exits with a non-zero status
 set -e
 
-git show HEAD^1:ladim/__init__.py
-git show HEAD^2:ladim/__init__.py
-
 # Step 1: Extract the file firstfile.txt from branch master and store it as comparefile.txt
 git show HEAD^1:ladim/__init__.py > init.py.compare
 
