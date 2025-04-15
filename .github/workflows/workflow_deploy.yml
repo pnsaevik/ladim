@@ -13,9 +13,26 @@ jobs:
     uses: ./.github/workflows/action_pypi_compile.yml
   build_sphinx:
     uses: ./.github/workflows/action_sphinx_compile.yml
-  deploy_pypi:
-    needs: build_pypi
-    uses: ./.github/workflows/action_pypi_deploy.yml
   deploy_sphinx:
     needs: build_sphinx
     uses: ./.github/workflows/action_sphinx_deploy.yml
+  
+  # Cannot be using an action, needs to be written explicitly here
+  # because of the trusted publishers deployment mechanism
+  deploy_pypi:
+    needs: build_pypi
+    name: Publish Python distribution to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/ladim  # Replace <package-name> with your PyPI project name
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
