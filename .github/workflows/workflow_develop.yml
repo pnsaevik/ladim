@@ -1,0 +1,11 @@
+name: Feature branch update
+
+on:
+  push:
+    branches:
+      - "**"
+      - "!master"
+
+jobs:
+  run_pytest:
+    uses: ./.github/workflows/action_pytest.yml

@@ -1,0 +1,21 @@
+name: Check changelog update
+
+on: workflow_call
+
+
+jobs:
+  check-changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+           fetch-depth: 2
+      - name: Make version script executable
+        run: chmod +x ./.github/scripts/version.sh
+      - name: Make changelog script executable
+        run: chmod +x ./.github/scripts/changelog.sh
+      - name: Check version has changed
+        run: ./.github/scripts/version.sh
+      - name: Check changelog entry exists
+        run: ./.github/scripts/changelog.sh

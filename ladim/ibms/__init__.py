@@ -1,18 +1,22 @@
-from ..model import Model, Module
 import numpy as np
+import typing
+
+if typing.TYPE_CHECKING:
+    from ..model import Model
 
 
-class IBM(Module):
-    pass
+class IBM:
+    def __init__(self, legacy_module=None, conf: dict = None):
+        from ..utilities import load_class
 
+        if legacy_module is None:
+            UserIbmClass = EmptyIBM
+        else:
+            UserIbmClass = load_class(legacy_module + '.IBM')
 
-class LegacyIBM(IBM):
-    def __init__(self, legacy_module, conf):
-        from ..model import load_class
-        LegacyIbmClass = load_class(legacy_module + '.IBM')
-        self._ibm = LegacyIbmClass(conf)
+        self.user_ibm = UserIbmClass(conf or {})
 
-    def update(self, model: Model):
+    def update(self, model: "Model"):
         grid = model.grid
         state = model.state
 
@@ -23,4 +27,12 @@ class LegacyIBM(IBM):
         )
 
         forcing = model.forcing
-        self._ibm.update_ibm(grid, state, forcing)
+        self.user_ibm.update_ibm(grid, state, forcing)
+
+
+class EmptyIBM:
+    def __init__(self, _):
+        pass
+
+    def update_ibm(self, grid, state, forcing):
+        return

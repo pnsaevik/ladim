@@ -1,7 +1,6 @@
 # New version of configuration file
 
 solver:
-    module: ladim.solver.Solver
     start: '2015-09-07T01:00:00'
     stop: '2015-09-07T01:05:00'
     step: 60
@@ -12,7 +11,6 @@ grid:
     file: '../forcing.nc'
 
 release:
-    module: ladim.release.TextFileReleaser
     file: particles.rls
     frequency: [1, 'm']
 
@@ -24,7 +22,6 @@ forcing:
     dt: 60
 
 output:
-    module: ladim.output.RaggedOutput
     file: 'out.nc'
     frequency: [1, 'm']
     variables:
@@ -45,12 +42,7 @@ output:
             'positive': 'down'}
 
 tracker:
-    module: ladim.tracker.HorizontalTracker
     method: 'RK4'
     diffusion: 0.1
 
-ibm:
-    module: ladim.ibms.IBM
-
-state:
-    module: ladim.state.DynamicState
+ibm: {}

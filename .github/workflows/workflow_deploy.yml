@@ -1,0 +1,11 @@
+name: Main branch pull request
+
+
+on: workflow_dispatch
+
+
+jobs:
+  deploy_pypi:
+    uses: ./.github/workflows/action_pypi_deploy.yml
+  deploy_sphinx:
+    uses: ./.github/workflows/action_sphinx_deploy.yml

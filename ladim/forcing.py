@@ -1,8 +1,17 @@
-from .model import Model, Module
+import typing
+if typing.TYPE_CHECKING:
+    from ladim.model import Model
 
 
-class Forcing(Module):
+class Forcing:
+    @staticmethod
+    def from_roms(**conf):
+        return RomsForcing(**conf)
+
     def velocity(self, X, Y, Z, tstep=0.0):
+        raise NotImplementedError
+
+    def update(self, model: "Model"):
         raise NotImplementedError
 
 
@@ -37,11 +46,7 @@ class RomsForcing(Forcing):
 
         grid_ref = GridReference()
         legacy_conf = dict(
-            gridforce=dict(
-                input_file=file,
-                first_file=conf.get('first_file', ""),
-                last_file=conf.get('last_file', ""),
-            ),
+            gridforce=dict(input_file=file, **conf),
             ibm_forcing=conf.get('ibm_forcing', []),
             start_time=conf.get('start_time', None),
             stop_time=conf.get('stop_time', None),
@@ -50,7 +55,7 @@ class RomsForcing(Forcing):
         if conf.get('subgrid', None) is not None:
             legacy_conf['gridforce']['subgrid'] = conf['subgrid']
 
-        from .model import load_class
+        from .utilities import load_class
         LegacyForcing = load_class(conf.get('legacy_module', 'ladim.gridforce.ROMS.Forcing'))
 
         # Allow gridforce module in current directory
@@ -63,7 +68,7 @@ class RomsForcing(Forcing):
         # self.U = self.forcing.U
         # self.V = self.forcing.V
 
-    def update(self, model: Model):
+    def update(self, model: "Model"):
         elapsed = model.solver.time - model.solver.start
         t = elapsed // model.solver.step
 

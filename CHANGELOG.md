@@ -14,6 +14,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   fields.
 
 
+## [2.1.0] - 2025-04-14
+### Added
+- Allow custom parameters in custom gridforce modules
+
+
 ## [2.0.9] - 2025-03-01
 ### Fixed
 - Subgrid configuration was ignored when loading velocities, this is now fixed

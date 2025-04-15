@@ -1,5 +1,4 @@
-
-from ladim import model
+from ladim import utilities
 import pytest
 import os
 
@@ -14,7 +13,7 @@ def tmp_path_with_chdir(tmp_path):
 
 class Test_load_class:
     def test_can_load_fully_qualified_class(self):
-        numpy_dtype_class = model.load_class('numpy.dtype')
+        numpy_dtype_class = utilities.load_class('numpy.dtype')
         numpy_dtype_i4 = numpy_dtype_class('i4')
         assert numpy_dtype_i4.itemsize == 4
 
@@ -28,6 +27,6 @@ class Test_load_class:
         )
 
         # Run and test code
-        MyClass = model.load_class('my_module.MyClass')
+        MyClass = utilities.load_class('my_module.MyClass')
         obj = MyClass()
         assert obj.timestwo(4) == 8

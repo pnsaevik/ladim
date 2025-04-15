@@ -82,7 +82,6 @@ def convert_1_to_2(c):
     out['solver']['stop'] = dict_get(c, 'time_control.stop_time')
     out['solver']['step'] = dt_sec
     out['solver']['seed'] = dict_get(c, 'numerics.seed')
-    out['solver']['order'] = ['release', 'forcing', 'output', 'tracker', 'ibm', 'state']
 
     out['grid'] = {}
     out['grid']['file'] = dict_get(c, [
@@ -93,7 +92,7 @@ def convert_1_to_2(c):
     out['grid']['start_time'] = np.datetime64(dict_get(c, 'time_control.start_time', '1970'), 's')
     out['grid']['subgrid'] = dict_get(c, 'gridforce.subgrid', None)
 
-    out['forcing'] = {}
+    out['forcing'] = {k: v for k, v in c.get('gridforce', {}).items() if k not in ('input_file', 'module')}
     out['forcing']['file'] = dict_get(c, ['gridforce.input_file', 'files.input_file'])
     out['forcing']['first_file'] = dict_get(c, 'gridforce.first_file', "")
     out['forcing']['last_file'] = dict_get(c, 'gridforce.last_file', "")
@@ -142,7 +141,6 @@ def convert_1_to_2(c):
 
     out['ibm'] = {}
     if 'ibm' in c:
-        out['ibm']['module'] = 'ladim.ibms.LegacyIBM'
         out['ibm']['legacy_module'] = dict_get(c, ['ibm.ibm_module', 'ibm.module'])
         if out['ibm']['legacy_module'] == 'ladim.ibms.ibm_salmon_lice':
             out['ibm']['legacy_module'] = 'ladim_plugins.salmon_lice'

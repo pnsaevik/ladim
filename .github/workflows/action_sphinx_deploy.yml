@@ -1,18 +1,10 @@
 name: Release workflow
 
-on:
-  push:
-    branches:
-      - "master"
+on: workflow_call
 
 jobs:
-  build_sphinx:
-    uses: ./.github/workflows/sphinx.yml
-
   # Deploy job
   deploy_sphinx:
-    needs: build_sphinx
-
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
       pages: write      # to deploy to Pages
