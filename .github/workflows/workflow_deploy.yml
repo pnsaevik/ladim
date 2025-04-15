@@ -9,7 +9,13 @@ on:
 
 
 jobs:
+  build_pypi:
+    uses: ./.github/workflows/action_pypi_compile.yml
+  build_sphinx:
+    uses: ./.github/workflows/action_sphinx_compile.yml
   deploy_pypi:
+    needs: build_pypi
     uses: ./.github/workflows/action_pypi_deploy.yml
   deploy_sphinx:
+    needs: build_sphinx
     uses: ./.github/workflows/action_sphinx_deploy.yml
