@@ -1,11 +1,11 @@
-name: Pull request merge into main branch
+name: Main branch merge
 
 
 on:
   workflow_dispatch: {}
-  pull_request:
-    types: [closed]
-    branches: [master]
+  push:
+    branches:
+      - master
 
 
 jobs:

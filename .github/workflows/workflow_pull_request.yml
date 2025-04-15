@@ -8,9 +8,11 @@ on:
 jobs:
   check_changelog:
     uses: ./.github/workflows/action_changelog.yml
-  run_pytest:
-    uses: ./.github/workflows/action_pytest.yml
   build_sphinx:
     uses: ./.github/workflows/action_sphinx_compile.yml
   build_pypi:
     uses: ./.github/workflows/action_pypi_compile.yml
+
+  # The pytest check is already run elsewhere
+  # run_pytest:
+  #   uses: ./.github/workflows/action_pytest.yml
