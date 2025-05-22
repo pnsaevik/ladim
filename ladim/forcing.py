@@ -103,6 +103,18 @@ class GridReference:
         return getattr(self.modules.grid.grid, item)
 
 
+def load_netcdf_chunk(url, varname, subset):
+    """
+    Download, unzip and decode a netcdf chunk from file or url
+    """
+    import xarray as xr
+    with xr.open_dataset(url) as dset:
+        values = dset.variables[varname][subset].values
+    if varname in ['u', 'v', 'w']:
+        values = np.nan_to_num(values)
+    return values
+
+
 def timestring_formatter(pattern, time):
     """
     Format a time string
@@ -116,12 +128,11 @@ def timestring_formatter(pattern, time):
     class PosixFormatter(string.Formatter):
         def get_value(self, key: int | str, args: typing.Sequence[typing.Any], kwargs: typing.Mapping[str, typing.Any]) -> typing.Any:
             return numexpr.evaluate(
-                key, local_dict=dict(time=posix_time), global_dict=dict())
+                key, local_dict=kwargs, global_dict=dict())
         
         def format_field(self, value: typing.Any, format_spec: str) -> typing.Any:
-            print(value)
             dt = np.int64(value).astype('datetime64[s]').astype(object)
             return dt.strftime(format_spec)
         
     fmt = PosixFormatter()
-    return fmt.format(pattern)
+    return fmt.format(pattern, time=posix_time)
