@@ -1,6 +1,9 @@
 import typing
 if typing.TYPE_CHECKING:
     from ladim.model import Model
+import numexpr
+import string
+import numpy as np
 
 
 class Forcing:
@@ -98,3 +101,27 @@ class GridReference:
 
     def __getattr__(self, item):
         return getattr(self.modules.grid.grid, item)
+
+
+def timestring_formatter(pattern, time):
+    """
+    Format a time string
+
+    :param pattern: f-string style formatting pattern
+    :param time: Numpy convertible time specification
+    :returns: A formatted time string
+    """
+    posix_time = np.datetime64(time, 's').astype(int)
+
+    class PosixFormatter(string.Formatter):
+        def get_value(self, key: int | str, args: typing.Sequence[typing.Any], kwargs: typing.Mapping[str, typing.Any]) -> typing.Any:
+            return numexpr.evaluate(
+                key, local_dict=dict(time=posix_time), global_dict=dict())
+        
+        def format_field(self, value: typing.Any, format_spec: str) -> typing.Any:
+            print(value)
+            dt = np.int64(value).astype('datetime64[s]').astype(object)
+            return dt.strftime(format_spec)
+        
+    fmt = PosixFormatter()
+    return fmt.format(pattern)
