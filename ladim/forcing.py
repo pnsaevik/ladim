@@ -115,6 +115,82 @@ def load_netcdf_chunk(url, varname, subset):
     return values
 
 
+class ChunkCache:
+    def __init__(self, name):
+        from multiprocessing.shared_memory import SharedMemory
+        mem = SharedMemory(name=name, create=False)
+        self.mem = mem
+
+        # Header block
+        self.num_chunks = np.ndarray(shape=(), dtype=np.int64, buffer=mem.buf[0:8])
+        self.chunksize = np.ndarray(shape=(), dtype=np.int64, buffer=mem.buf[8:16])
+        self.datatype = np.ndarray(shape=(), dtype='S8', buffer=mem.buf[16:24])
+        self.itemsize = np.ndarray(shape=(), dtype=np.int64, buffer=mem.buf[24:32])
+        self.num_chunks.setflags(write=False)
+        self.chunksize.setflags(write=False)
+        self.datatype.setflags(write=False)
+        self.itemsize.setflags(write=False)
+
+        # Index block
+        start = 32
+        stop = start + 8*self.num_chunks
+        self.chunk_id = np.ndarray(
+            shape=(self.num_chunks, ),
+            dtype=np.int64,
+            buffer=mem.buf[start:stop])
+        
+        # Data block
+        start = stop
+        stop = start + self.num_chunks * self.chunksize * self.itemsize
+        self.data = np.ndarray(
+            shape=(self.num_chunks, self.chunksize),
+            dtype=self.datatype.item().decode('ascii'),
+            buffer=mem.buf[start:stop])
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, tb):
+        self.close()
+
+    def __setattr__(self, name, value):
+        if hasattr(self, name):
+            raise AttributeError(f"Cannot reassign attribute '{name}'")
+        super().__setattr__(name, value)
+
+    @staticmethod
+    def create(slots, chunksize, datatype='f4'):
+        from multiprocessing.shared_memory import SharedMemory
+
+        test_item = np.empty((), dtype=datatype)
+        str_dtype = str(test_item.dtype)
+        if len(str_dtype) > 8:
+            raise ValueError('Unsupported data type: {str_dtype}')
+        
+        # Reserve memory space for the cache block
+        size_header_block = 32
+        size_index_block = 8 * slots
+        size_data_block = slots * chunksize * test_item.itemsize
+        bytes = size_header_block + size_index_block + size_data_block
+        mem = SharedMemory(create=True, size=bytes)
+
+        # Write some header information
+        mem_slots = np.ndarray(shape=(), dtype=np.int64, buffer=mem.buf[0:8])
+        mem_slots[...] = slots
+        mem_chunksize = np.ndarray(shape=(), dtype=np.int64, buffer=mem.buf[8:16])
+        mem_chunksize[...] = chunksize
+        mem_datatype = np.ndarray(shape=(), dtype='S8', buffer=mem.buf[16:24])
+        mem_datatype[...] = str_dtype
+        mem_itemsize = np.ndarray(shape=(), dtype=np.int64, buffer=mem.buf[24:32])
+        mem_itemsize[...] = test_item.itemsize
+
+        return ChunkCache(mem.name)
+
+    
+    def close(self):
+        self.mem.close()
+
+
 def timestring_formatter(pattern, time):
     """
     Format a time string
