@@ -4,6 +4,7 @@ if typing.TYPE_CHECKING:
 import numexpr
 import string
 import numpy as np
+from numba import njit
 
 
 class Forcing:
@@ -150,21 +151,55 @@ class ChunkCache:
         self.datatype.setflags(write=False)
         self.itemsize.setflags(write=False)
 
+        # LRU block
+        lru_start = 32
+        lru_stop = lru_start + 2*self.num_chunks
+        self.lru = np.ndarray(
+            shape=(self.num_chunks,),
+            dtype=np.int16,
+            buffer=mem.buf[lru_start:lru_stop])
+
         # Index block
-        start = 32
-        stop = start + 8*self.num_chunks
+        idx_start = lru_stop
+        idx_stop = idx_start + 8*self.num_chunks
         self.chunk_id = np.ndarray(
             shape=(self.num_chunks, ),
             dtype=np.int64,
-            buffer=mem.buf[start:stop])
+            buffer=mem.buf[idx_start:idx_stop])
         
         # Data block
-        start = stop
-        stop = start + self.num_chunks * self.chunksize * self.itemsize
+        dat_start = idx_stop
+        dat_stop = dat_start + self.num_chunks * self.chunksize * self.itemsize
         self.data = np.ndarray(
             shape=(self.num_chunks, self.chunksize),
             dtype=self.datatype.item().decode('ascii'),
-            buffer=mem.buf[start:stop])
+            buffer=mem.buf[dat_start:dat_stop])
+
+    def _update_lru(self, slot: int) -> None:
+        """
+        Move the given slot to the front (most recently used) in the LRU table.
+        """
+        update_lru(self.lru, slot)
+
+    def read(self, slot: int) -> np.ndarray:
+        """
+        Read data from the given slot and update the LRU table.
+
+        :param slot: The slot index to read
+        :return: The data in the slot
+        """
+        self._update_lru(slot)
+        return self.data[slot, :]
+
+    def write(self, data: np.ndarray, slot: int) -> None:
+        """
+        Overwrite the data in the given slot and update the LRU table.
+
+        :param data: 1D numpy array of length self.chunksize and dtype self.datatype
+        :param slot: The slot index to overwrite
+        """
+        self._update_lru(slot)
+        self.data[slot, :] = data
 
     def __enter__(self) -> "ChunkCache":
         """
@@ -217,9 +252,10 @@ class ChunkCache:
         
         # Reserve memory space for the cache block
         size_header_block = 32
+        size_lru_block = 2 * slots  # int16
         size_index_block = 8 * slots
         size_data_block = slots * chunksize * test_item.itemsize
-        bytes = size_header_block + size_index_block + size_data_block
+        bytes = size_header_block + size_lru_block + size_index_block + size_data_block
         mem = SharedMemory(create=True, size=bytes)
 
         # Write some header information
@@ -232,6 +268,24 @@ class ChunkCache:
         mem_itemsize = np.ndarray(shape=(), dtype=np.int64, buffer=mem.buf[24:32])
         mem_itemsize[...] = test_item.itemsize
 
+        # LRU block
+        lru_start = size_header_block
+        mem_lru = np.ndarray(
+            shape=(slots,),
+            dtype=np.int16,
+            buffer=mem.buf[lru_start:lru_start + size_lru_block])
+        mem_lru[...] = np.arange(slots, dtype=np.int16)
+
+        # Index block
+        index_start = lru_start + size_lru_block
+        mem_chunkid = np.ndarray(
+            shape=(slots, ),
+            dtype=np.int64,
+            buffer=mem.buf[index_start:index_start + size_index_block])
+        mem_chunkid[...] = -1
+        
+        # Data block
+        # (no need to initialize, will be written on use)
         return ChunkCache(mem.name)
 
     
@@ -240,6 +294,45 @@ class ChunkCache:
         Close the shared memory block.
         """
         self.mem.close()
+
+    def contains(self, id: int) -> bool:
+        """
+        Check if the cache contains a chunk with the given id.
+
+        :param id: The chunk id to check
+        :return: True if the chunk is in the cache, False otherwise
+        """
+        return indexof(self.chunk_id, id) >= 0
+
+    def push(self, data: np.ndarray, id: int) -> None:
+        """
+        Push a chunk of data into the cache with the given id.
+
+        :param data: 1D numpy array of length self.chunksize and dtype self.datatype
+        :param id: The chunk id to associate with this data
+        :note: If no free slots are available, evict the least recently used slot.
+        """
+        free_slots = np.where(self.chunk_id == -1)[0]
+        if len(free_slots) > 0:
+            slot = free_slots[0]
+        else:
+            # Evict the least recently used slot (last in lru)
+            slot = self.lru[-1]
+        self.write(data, slot)
+        self.chunk_id[slot] = id
+
+    def pull(self, id: int) -> np.ndarray:
+        """
+        Retrieve the data for the given chunk id and update the LRU table.
+
+        :param id: The chunk id to retrieve
+        :return: The data array for the chunk
+        :raises KeyError: If the chunk id is not found in the cache
+        """
+        slot = indexof(self.chunk_id, id)
+        if slot < 0:
+            raise KeyError(f"Chunk id {id} not found in cache")
+        return self.read(slot)
 
 
 def timestring_formatter(pattern, time):
@@ -263,3 +356,35 @@ def timestring_formatter(pattern, time):
         
     fmt = PosixFormatter()
     return fmt.format(pattern, time=posix_time)
+
+
+@njit
+def update_lru(lru: np.ndarray, slot: int) -> None:
+    """
+    Update the LRU (Least Recently Used) list by moving the specified slot to the front.
+
+    :param lru: The LRU array
+    :param slot: The slot index to move to the front
+    """
+    v = slot
+    for i in range(len(lru)):
+        u = lru[i]
+        lru[i] = v
+        if u == slot:
+            break
+        v = u
+
+
+@njit
+def indexof(array: np.ndarray, value: int) -> int:
+    """
+    Find the index of the first occurrence of a value in an array.
+
+    :param array: The input array
+    :param value: The value to find
+    :return: The index of the first occurrence, or -1 if not found
+    """
+    for i in range(len(array)):
+        if array[i] == value:
+            return i
+    return -1
