@@ -116,7 +116,26 @@ def load_netcdf_chunk(url, varname, subset):
 
 
 class ChunkCache:
-    def __init__(self, name):
+    """
+    A cache for storing and sharing chunks of data using shared memory.
+
+    This class manages a memory block divided into a header, index, and data section.
+    It is designed for efficient inter-process communication of chunked data arrays.
+
+    :ivar mem: SharedMemory object representing the memory block.
+    :ivar num_chunks: Number of slots/chunks in the cache (read-only).
+    :ivar chunksize: Size of each chunk (read-only).
+    :ivar datatype: Data type of the stored chunks (read-only).
+    :ivar itemsize: Size in bytes of each data item (read-only).
+    :ivar chunk_id: Array of chunk IDs for tracking which data is stored in each slot.
+    :ivar data: 2D array holding the actual chunked data.
+    """
+    def __init__(self, name: str):
+        """
+        Attach to an existing shared memory block and map the cache structure.
+
+        :param name: The name of the shared memory block to attach to.
+        """
         from multiprocessing.shared_memory import SharedMemory
         mem = SharedMemory(name=name, create=False)
         self.mem = mem
@@ -147,19 +166,48 @@ class ChunkCache:
             dtype=self.datatype.item().decode('ascii'),
             buffer=mem.buf[start:stop])
 
-    def __enter__(self):
+    def __enter__(self) -> "ChunkCache":
+        """
+        Enter the runtime context related to this object.
+        Returns self for use in 'with' statements.
+
+        :return: self
+        """
         return self
 
-    def __exit__(self, type, value, tb):
+    def __exit__(self, type: type, value: Exception, tb: object) -> None:
+        """
+        Exit the runtime context and close the shared memory.
+
+        :param type: Exception type
+        :param value: Exception value
+        :param tb: Traceback object
+        """
         self.close()
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: object) -> None:
+        """
+        Prevent reassignment of attributes after initialization.
+        Raises AttributeError if an attribute is already set.
+
+        :param name: Attribute name
+        :param value: Attribute value
+        :raises AttributeError: If attribute is already set
+        """
         if hasattr(self, name):
             raise AttributeError(f"Cannot reassign attribute '{name}'")
         super().__setattr__(name, value)
 
     @staticmethod
-    def create(slots, chunksize, datatype='f4'):
+    def create(slots: int, chunksize: int, datatype: str = 'f4') -> "ChunkCache":
+        """
+        Create a new shared memory block and initialize a ChunkCache.
+
+        :param slots: Number of slots/chunks in the cache.
+        :param chunksize: Size of each chunk.
+        :param datatype: Numpy dtype string for the data (default 'f4').
+        :return: An instance attached to the new shared memory block.
+        """
         from multiprocessing.shared_memory import SharedMemory
 
         test_item = np.empty((), dtype=datatype)
@@ -187,7 +235,10 @@ class ChunkCache:
         return ChunkCache(mem.name)
 
     
-    def close(self):
+    def close(self) -> None:
+        """
+        Close the shared memory block.
+        """
         self.mem.close()
 
 
