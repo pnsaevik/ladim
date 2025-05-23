@@ -388,3 +388,161 @@ def indexof(array: np.ndarray, value: int) -> int:
         if array[i] == value:
             return i
     return -1
+
+
+@njit(inline="always", fastmath=True)
+def get_chunk_id(i, j, l, size_x, size_y, num_x, num_y):
+    """
+    Calculate the chunk ID based on the indices and sizes.
+
+    We assume that the array is chunked in the x and y dimensions,
+    but not in the z dimension. The t dimension is assumed to be
+    chunked with size_t = 1.
+
+    For instance, if the chunk size is x:10, y:5 and the number of chunks
+    in the x and y dimensions is 6 and 7 respectively, then the chunk
+    ID for the coordinates (31, 14, 0) would be calculated as follows:
+        
+        chunk id in x direction: 31 // 10 = 3
+        chunk id in y direction: 14 // 5 = 2
+        chunk id in t direction: 0 // 1 = 0
+        chunk id = 3 + 6*2 + 6*7*0 = 15
+    
+    This means that the chunk ID is a unique identifier for the chunk
+    containing the coordinates (31, 14, 0) in the array.
+
+    :param i: Integer x coordinate (global index)
+    :param j: Integer y coordinate (global index)
+    :param l: Integer t coordinate (global index)
+    :param size_x: Chunk size in x dimension
+    :param size_y: Chunk size in y dimension
+    :param num_x: Number of chunks in x dimension
+    :param num_y: Number of chunks in y dimension
+    :return: Chunk ID
+    """
+
+    # The global index is divided by the chunk size to get the chunk ID
+    # for each dimension. The chunk ID is then combined into a single
+    # integer value.
+    return (i // size_x) + num_x * ((j // size_y) + num_y * l)
+
+
+@njit(inline="always", fastmath=True)
+def interp_xyzt(x, y, z, t, v, ncx, ncy, ncz, nct, cache, ids):
+    """
+    Interpolate the data in the x, y, z, and t dimensions.
+    
+    :param x: x coordinate (global index)
+    :param y: y coordinate (global index)
+    :param z: z coordinate (global index)
+    :param t: t coordinate (global index)
+    :param v: v coordinate (global index)
+    :param ncx: Number of chunks in x dimension
+    :param ncy: Number of chunks in y dimension
+    :param ncz: Number of chunks in z dimension
+    :param nct: Number of chunks in t dimension
+    :param cache: Chunk cache array
+    :param ids: Array of chunk ids for each slot in the cache
+    :return: Interpolated value
+    """
+    _, _, st, sz, sy, sx = cache.shape
+    
+    max_x = ncx * sx
+    max_y = ncy * sy
+    max_z = ncz * sz
+    max_t = nct * st    
+
+    i0 = max(0, min(max_x - 2, np.int32(x)))
+    j0 = max(0, min(max_y - 2, np.int32(y)))
+    k0 = max(0, min(max_z - 2, np.int32(z)))
+    l0 = max(0, min(max_t - 2, np.int32(t)))
+
+    i1 = i0 + 1
+    j1 = j0 + 1
+    k1 = k0 + 1
+    l1 = l0 + 1
+
+    # Chunk ID (chid) for the surrounding points
+    chid0000 = get_chunk_id(i0, j0, l0, sx, sy, ncx, ncy)
+    chid0001 = get_chunk_id(i1, j0, l0, sx, sy, ncx, ncy)
+    chid0010 = get_chunk_id(i0, j1, l0, sx, sy, ncx, ncy)
+    chid0011 = get_chunk_id(i1, j1, l0, sx, sy, ncx, ncy)
+    chid1000 = get_chunk_id(i0, j0, l1, sx, sy, ncx, ncy)
+    chid1001 = get_chunk_id(i1, j0, l1, sx, sy, ncx, ncy)
+    chid1010 = get_chunk_id(i0, j1, l1, sx, sy, ncx, ncy)
+    chid1011 = get_chunk_id(i1, j1, l1, sx, sy, ncx, ncy)
+
+    # Memory offset into cache for each chunk
+    slot0000 = indexof(ids, chid0000)
+    slot0001 = indexof(ids, chid0001)
+    slot0010 = indexof(ids, chid0010)
+    slot0011 = indexof(ids, chid0011)
+    slot1000 = indexof(ids, chid1000)
+    slot1001 = indexof(ids, chid1001)
+    slot1010 = indexof(ids, chid1010)
+    slot1011 = indexof(ids, chid1011)
+
+    # Return nan if any of the slots are not found
+    if (slot0000 < 0 or slot0001 < 0 or slot0010 < 0 or slot0011 < 0 or
+        slot1000 < 0 or slot1001 < 0 or slot1010 < 0 or slot1011 < 0):
+        return np.nan
+
+    # Within-chunk indices
+    ii0 = i0 % sx
+    ii1 = i1 % sx
+    jj0 = j0 % sy
+    jj1 = j1 % sy
+    kk0 = k0 % sz
+    kk1 = k1 % sz
+    ll0 = l0 % st
+    ll1 = l1 % st
+
+    # Memory extraction
+    u0000 = cache[slot0000, v, ll0, kk0, jj0, ii0]
+    u0001 = cache[slot0001, v, ll0, kk0, jj0, ii1]
+    u0010 = cache[slot0010, v, ll0, kk1, jj0, ii0]
+    u0011 = cache[slot0011, v, ll0, kk1, jj0, ii1]
+    u0100 = cache[slot0000, v, ll1, kk0, jj1, ii0]
+    u0101 = cache[slot0001, v, ll1, kk0, jj1, ii1]
+    u0110 = cache[slot0010, v, ll1, kk1, jj1, ii0]
+    u0111 = cache[slot0011, v, ll1, kk1, jj1, ii1]
+    u1000 = cache[slot1000, v, ll0, kk0, jj0, ii0]
+    u1001 = cache[slot1001, v, ll0, kk0, jj0, ii1]
+    u1010 = cache[slot1010, v, ll0, kk1, jj0, ii0]
+    u1011 = cache[slot1011, v, ll0, kk1, jj0, ii1]
+    u1100 = cache[slot1000, v, ll1, kk0, jj1, ii0]
+    u1101 = cache[slot1001, v, ll1, kk0, jj1, ii1]
+    u1110 = cache[slot1010, v, ll1, kk1, jj1, ii0]
+    u1111 = cache[slot1011, v, ll1, kk1, jj1, ii1]
+
+    # Interpolation weights
+    # The weights are calculated as the distance from the lower bound
+    p = x - i0
+    q = y - j0
+    r = z - k0
+    s = t - l0
+
+    w0000 = (1 - s) * (1 - r) * (1 - q) * (1 - p)
+    w0001 = (1 - s) * (1 - r) * (1 - q) * p
+    w0010 = (1 - s) * (1 - r) * q * (1 - p)
+    w0011 = (1 - s) * (1 - r) * q * p
+    w0100 = (1 - s) * r * (1 - q) * (1 - p)
+    w0101 = (1 - s) * r * (1 - q) * p
+    w0110 = (1 - s) * r * q * (1 - p)
+    w0111 = (1 - s) * r * q * p
+    w1000 = s * (1 - r) * (1 - q) * (1 - p)
+    w1001 = s * (1 - r) * (1 - q) * p
+    w1010 = s * (1 - r) * q * (1 - p)
+    w1011 = s * (1 - r) * q * p
+    w1100 = s * r * (1 - q) * (1 - p)
+    w1101 = s * r * (1 - q) * p
+    w1110 = s * r * q * (1 - p)
+    w1111 = s * r * q * p    
+    
+    # Interpolation
+    result = (w0000 * u0000 + w0001 * u0001 + w0010 * u0010 + w0011 * u0011 +
+              w0100 * u0100 + w0101 * u0101 + w0110 * u0110 + w0111 * u0111 +
+              w1000 * u1000 + w1001 * u1001 + w1010 * u1010 + w1011 * u1011 +
+              w1100 * u1100 + w1101 * u1101 + w1110 * u1110 + w1111 * u1111)
+
+    return result
