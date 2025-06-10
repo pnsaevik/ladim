@@ -5,6 +5,7 @@ build/
 
 # IDE files
 .idea/
+settings.json
 
 # Data files
 examples/data/*
