@@ -14,6 +14,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   fields.
 
 
+## [2.1.6] - 2025-06-10
+### Added
+- Experimental njit functions
+
+
 ## [2.1.5] - 2025-04-14
 ### Added
 - Allow custom parameters in custom gridforce modules
