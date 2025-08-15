@@ -45,6 +45,21 @@ class Output:
         self._num_writes = 0
         self._last_write_time = np.int64(-4611686018427387904)
 
+    @staticmethod
+    def create(variables: dict, file: str, frequency):
+        """
+        Writes simulation output to netCDF file in ragged array format
+
+        :param variables: Simulation variables to include in output, and their formatting
+        :param file: Name of output file, or empty if a diskless dataset is desired
+        :param frequency: Output frequency in seconds. Alternatively, as a two-element
+        tuple (freq_value, freq_unit) where freq_unit can be any numpy-compatible time
+        unit.
+
+        """
+        return Output(variables, file, frequency)
+
+
     @property
     def dataset(self) -> nc.Dataset:
         """Returns a handle to the netCDF dataset currently being written to"""

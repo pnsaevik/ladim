@@ -15,6 +15,10 @@ class Solver:
         if seed is not None:
             np.random.seed(seed)
 
+    @staticmethod
+    def create(start, stop, step, seed=None):
+        return Solver(start, stop, step, seed)
+
     def run(self, model: "Model"):
         self.time = self.start
         while self.time <= self.stop:

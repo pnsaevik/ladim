@@ -38,7 +38,7 @@ class Test_TextFileReleaser_update:
         )
 
         # Create continuous releaser
-        releaser = release.Releaser.from_textfile(
+        releaser = release.Releaser.create(
             file=buf,
             frequency=(2, 'm'),
         )
@@ -83,7 +83,7 @@ class Test_TextFileReleaser_update:
         )
 
         # Run releaser update
-        releaser = release.Releaser.from_textfile(
+        releaser = release.Releaser.create(
             file=buf, lonlat_converter=mock_model.grid.ll2xy)
         releaser.update(mock_model)
 
@@ -101,7 +101,7 @@ class Test_TextFileReleaser_update:
         )
 
         # Run releaser update
-        releaser = release.Releaser.from_textfile(
+        releaser = release.Releaser.create(
             file=buf,
             defaults=dict(myvar=23),
         )
@@ -119,7 +119,7 @@ class Test_TextFileReleaser_update:
         )
 
         # Run releaser update
-        releaser = release.Releaser.from_textfile(file=buf)
+        releaser = release.Releaser.create(file=buf)
         releaser.update(mock_model)
 
         # Confirm effect on state module
@@ -134,7 +134,7 @@ class Test_TextFileReleaser_update:
         )
 
         # Run releaser update
-        releaser = release.Releaser.from_textfile(file=buf)
+        releaser = release.Releaser.create(file=buf)
         releaser.update(mock_model)
         assert list(mock_model.state['X']) == [60, 61]
 

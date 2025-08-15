@@ -11,7 +11,7 @@ class Grid:
     """
 
     @staticmethod
-    def from_roms(**conf):
+    def create(**conf):
         return RomsGrid(**conf)
 
     def ingrid(self, X, Y):

@@ -31,7 +31,7 @@ class Model:
         self.solver = solver
 
     @staticmethod
-    def from_config(config: dict) -> "Model":
+    def create(config: dict) -> "Model":
         """
         Initialize a model class by supplying the configuration parameters
         of each submodule.
@@ -40,22 +40,17 @@ class Model:
         :return: An initialized Model class
         """
 
-        grid = Grid.from_roms(**config['grid'])
-        forcing = Forcing.from_roms(**config['forcing'])
-
-        release = Releaser.from_textfile(
-            lonlat_converter=grid.ll2xy, **config['release']
-        )
-        tracker = Tracker.from_config(**config['tracker'])
-
-        output = Output(**config['output'])
-        ibm = IBM(**config['ibm'])
-        solver = Solver(**config['solver'])
-
-        state = State()
+        grid = Grid.create(**config['grid'])
+        forc = Forcing.create(**config['forcing'])
+        rele = Releaser.create(lonlat_converter=grid.ll2xy, **config['release'])
+        trac = Tracker.create(**config['tracker'])
+        outp = Output.create(**config['output'])
+        ibms = IBM.create(**config['ibm'])
+        solv = Solver.create(**config['solver'])
+        stat = State()
 
         # noinspection PyTypeChecker
-        return Model(grid, forcing, release, state, output, ibm, tracker, solver)
+        return Model(grid, forc, rele, stat, outp, ibms, trac, solv)
 
     @property
     def modules(self) -> dict:

@@ -9,7 +9,7 @@ from numba import njit
 
 class Forcing:
     @staticmethod
-    def from_roms(**conf):
+    def create(**conf):
         return RomsForcing(**conf)
 
     def velocity(self, X, Y, Z, tstep=0.0):

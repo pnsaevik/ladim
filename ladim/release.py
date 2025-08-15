@@ -17,7 +17,7 @@ class Releaser:
         self.particle_generator = particle_generator
 
     @staticmethod
-    def from_textfile(
+    def create(
             file, colnames: list = None, formats: dict = None,
             frequency=(0, 's'), defaults=None, lonlat_converter=None,
     ):
