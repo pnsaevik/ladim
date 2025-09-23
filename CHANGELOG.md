@@ -14,6 +14,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   fields.
 
 
+## [2.2.0] - Unreleased
+### Added
+- Output can now be split between several files
+
+
 ## [2.1.6] - 2025-06-10
 ### Added
 - Experimental njit functions
