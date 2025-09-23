@@ -4,7 +4,7 @@ import typing
 from ladim import output
 
 
-class Test_RaggedOutput_update:
+class Test_Output_update:
     @pytest.fixture()
     def mock_model(self):
         model = MockObj()  # type: typing.Any
@@ -37,7 +37,7 @@ class Test_RaggedOutput_update:
             out.update(model)
 
             # Confirm effect on output file
-            dset = out.dataset
+            dset = out.writer.paths[0]
             assert 'release_time' in dset.variables
             assert dset['release_time'].dimensions == ('particle', )
             assert dset['release_time'].units == "seconds since 1970-01-01"
@@ -79,7 +79,7 @@ class Test_RaggedOutput_update:
             model.output.update(model)
 
             # Confirm effect on output file
-            dset = model.output.dataset
+            dset = model.output.writer.paths[0]
             assert 'particle_count' in dset.variables
             assert dset['particle_count'].dimensions == ('time',)
             assert dset['particle_count'].long_name == "number of particles in a given timestep"
@@ -133,7 +133,7 @@ class Test_RaggedOutput_update:
             model.output.update(model)
 
             # Confirm effect on output file
-            dset = model.output.dataset
+            dset = model.output.writer.paths[0]
             assert 'X' in dset.variables
             assert dset['X'].units == "m"
             assert dset['X'].long_name == "x coord"
@@ -181,17 +181,18 @@ class Test_RaggedOutput_update:
         try:
             # Writes output on first step (0 sec)
             model.output.update(model)
-            assert model.output.dataset['X'][:].tolist() == [10, 20]
+            dset = model.output.writer.paths[0]
+            assert dset['X'][:].tolist() == [10, 20]
 
             # Does not write output on second step (60 sec)
             model.solver.time += model.solver.step
             model.output.update(model)
-            assert model.output.dataset['X'][:].tolist() == [10, 20]
+            assert dset['X'][:].tolist() == [10, 20]
 
             # Writes output on third step (120 sec)
             model.solver.time += model.solver.step
             model.output.update(model)
-            assert model.output.dataset['X'][:].tolist() == [10, 20, 10, 20]
+            assert dset['X'][:].tolist() == [10, 20, 10, 20]
 
         finally:
             model.output.close()
@@ -221,7 +222,7 @@ class Test_RaggedOutput_update:
             model.output.update(model)
 
             # Confirm effect on output file
-            dset = model.output.dataset
+            dset = model.output.writer.paths[0]
             assert dset['lat'].dimensions == ('particle_instance',)
             assert dset['lat'][:].tolist() == [73, 74]
             assert dset['lon'].dimensions == ('particle_instance',)
@@ -243,3 +244,18 @@ class MockObj:
 
     def __contains__(self, item):
         return item in self._dict
+
+
+class Test_Writer:
+    def test_netcdf_writer(self):
+        variables = dict(
+            x=output.OutputFormat(ncformat='f4', dimensions='mydim')
+        )
+        w = output.Writer.netcdf(file="", formats=variables)
+        w.write(dict(x=np.array([1.0, 2.0, 3.0])))
+        w.write(dict(x=np.array([4.0, 5.0])))
+
+        assert w.paths[0].variables['x'][:].tolist() == [1.0, 2.0, 3.0, 4.0, 5.0]
+        assert w.sizes == {'mydim': 5}
+        assert len(w.paths) == 1
+        w.close()
