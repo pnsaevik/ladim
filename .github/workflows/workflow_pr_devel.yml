@@ -1,9 +1,9 @@
-name: Main branch pull request
+name: PR devel
 
 on:
   pull_request:
     branches:
-      - "master"
+      - "devel"
 
 jobs:
   check_changelog:
