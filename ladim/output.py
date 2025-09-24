@@ -4,6 +4,7 @@ import typing
 if typing.TYPE_CHECKING:
     from .model import Model
 import os
+import xarray as xr
 
 
 class Output:
@@ -388,7 +389,20 @@ class _MFNCWriter(Writer):
             base_name, ext = os.path.splitext(str(self.file))
             file = f"{base_name}_{len(self._paths):0{self._padding}d}{ext}"
 
+        old_release_time = None
+        if len(self._paths) > 0:
+            if not diskless:
+                with nc.Dataset(self._paths[-1], mode='r') as dset:
+                    if 'release_time' in dset.variables:
+                        old_release_time = dset.variables['release_time'][:]
+            else:
+                dset = self._paths[-1]
+                if 'release_time' in dset.variables:
+                    old_release_time = dset.variables['release_time'][:]
+
         dset = create_netcdf_file(fname=file, formats=self.formats, diskless=diskless)
+        if old_release_time is not None:
+            dset.variables['release_time'][:] = old_release_time
         dset.sync()
         self._sizes = {k: v.size for k, v in dset.dimensions.items()}
 
@@ -408,26 +422,45 @@ class _MFNCWriter(Writer):
 
     def write(self, data: dict[str, np.ndarray]):
         self._step_counter += 1
-        if (self._step_counter != 1) and not((self._step_counter - 1) % self.numrec):
+        particle_instance = 0
+        if (self._step_counter > 1) and not((self._step_counter - 1) % (self.numrec * 2)):
+            particle_instance = self._get_instance_offset()
             self._append_next_file()
 
         if isinstance(self._paths[-1], str):
             with nc.Dataset(self._paths[-1], mode='a') as dset:
-                self._write(dset, data)
+                self._write(dset, data, particle_instance)
                 self._sizes = {k: v.size for k, v in dset.dimensions.items()}
         else:
             dset = self._paths[-1]
-            self._write(dset, data)
+            self._write(dset, data, particle_instance)
             self._sizes = {k: v.size for k, v in dset.dimensions.items()}
 
-    @staticmethod
-    def _write(dset: nc.Dataset, data: dict[str, np.ndarray]):
-        old_sizes = {k: v.size for k, v in dset.dimensions.items()}
+    def _get_instance_offset(self):
+        old_instance_offset = 0
+        if isinstance(self._paths[-1], str):
+            with nc.Dataset(self._paths[-1], mode='r') as dset:
+                if 'instance_offset' in dset.variables:
+                    old_instance_offset = dset.variables['instance_offset'][...]
+        else:
+            dset = self._paths[-1]
+            if 'instance_offset' in dset.variables:
+                old_instance_offset = dset.variables['instance_offset'][...]
 
+        if 'particle_instance' in self._sizes:
+            return self._sizes.get('particle_instance') + old_instance_offset
+        else:
+            return 0
+
+    @staticmethod
+    def _write(dset: nc.Dataset, data: dict[str, np.ndarray], particle_instance: int):
+        old_sizes = {k: v.size for k, v in dset.dimensions.items()}
         for k, v in data.items():
             dimname, = dset.variables[k].dimensions  # Assume single dimension
             sz = old_sizes[dimname]
             dset.variables[k][sz:sz + len(v)] = v
+        if 'instance_offset' in dset.variables and (particle_instance > 0):
+            dset.variables['instance_offset'][...] = particle_instance
         dset.sync()
 
     def close(self):
