@@ -259,3 +259,22 @@ class Test_Writer:
         assert w.sizes == {'mydim': 5}
         assert len(w.paths) == 1
         w.close()
+
+    def test_multi_file_netcdf_writer(self):
+        variables = dict(
+            x=output.OutputFormat(ncformat='f4', dimensions='mydim')
+        )
+        w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
+        w.write(dict(x=np.array([1.0, 2.0, 3.0])))
+        assert w.sizes == {'mydim': 3}
+
+        w.write(dict(x=np.array([4.0, 5.0])))
+        assert w.sizes == {'mydim': 5}
+
+        w.write(dict(x=np.array([6.0, 7.0])))
+        assert w.sizes == {'mydim': 2}
+
+        assert w.paths[0].variables['x'][:].tolist() == [1.0, 2.0, 3.0, 4.0, 5.0]
+        assert w.paths[1].variables['x'][:].tolist() == [6.0, 7.0]
+        assert len(w.paths) == 2
+        w.close()

@@ -3,10 +3,11 @@ import numpy as np
 import typing
 if typing.TYPE_CHECKING:
     from .model import Model
+import os
 
 
 class Output:
-    def __init__(self, variables: dict, file: str, frequency):
+    def __init__(self, variables: dict, file: str, frequency, numrec: int=0):
         """
         Writes simulation output to netCDF file in ragged array format
 
@@ -15,6 +16,7 @@ class Output:
         :param frequency: Output frequency in seconds. Alternatively, as a two-element
             tuple (freq_value, freq_unit) where freq_unit can be any numpy-compatible time
             unit.
+        :param numrec: Number of records per output file. Zero means a single output file.
 
         """
         # Convert output format specification from ladim.yaml config to OutputFormat
@@ -24,7 +26,10 @@ class Output:
         }
         formats = {**self._default_formats(), **user_formats}
 
-        self.writer = Writer.netcdf(file, formats)
+        if numrec == 0:
+            self.writer = Writer.netcdf(file, formats)
+        else:
+            self.writer = Writer.mf_netcdf(file, formats, numrec)
 
         self._init_vars = {k for k, v in formats.items() if v.is_initial()}
         self._inst_vars = {k for k, v in formats.items() if v.is_instance()}
@@ -40,7 +45,7 @@ class Output:
         self._last_write_time = np.int64(-4611686018427387904)
 
     @staticmethod
-    def create(variables: dict, file: str, frequency):
+    def create(variables: dict, file: str, frequency, numrec: int=0):
         """
         Writes simulation output to netCDF file in ragged array format
 
@@ -49,9 +54,10 @@ class Output:
         :param frequency: Output frequency in seconds. Alternatively, as a two-element
         tuple (freq_value, freq_unit) where freq_unit can be any numpy-compatible time
         unit.
+        :param numrec: Number of records per output file. Zero means a single output file.
 
         """
-        return Output(variables, file, frequency)
+        return Output(variables, file, frequency, numrec)
 
     def update(self, model: "Model"):
         self._write_init_vars(model)
@@ -252,12 +258,13 @@ class Writer:
         return _NCWriter(file, formats)
     
     @staticmethod
-    def mf_netcdf() -> "Writer":
+    def mf_netcdf(file: str, formats: dict[str, OutputFormat], numrec) -> "Writer":
         """
         Create a multi-file netCDF writer
         """
-        raise NotImplementedError("Multi-file netCDF writer not implemented yet")
-    
+
+        return _MFNCWriter(file, formats, numrec)
+
     def write(self, data: dict[str, np.ndarray]):
         """
         Write data to file(s)
@@ -334,6 +341,82 @@ class _NCWriter(Writer):
                 self._sizes = {k: v.size for k, v in dset.dimensions.items()}
         else:
             dset = self._paths[0]
+            self._write(dset, data)
+            self._sizes = {k: v.size for k, v in dset.dimensions.items()}
+
+    @staticmethod
+    def _write(dset: nc.Dataset, data: dict[str, np.ndarray]):
+        old_sizes = {k: v.size for k, v in dset.dimensions.items()}
+
+        for k, v in data.items():
+            dimname, = dset.variables[k].dimensions  # Assume single dimension
+            sz = old_sizes[dimname]
+            dset.variables[k][sz:sz + len(v)] = v
+        dset.sync()
+
+    def close(self):
+        # Have already closed files after each write
+        pass
+
+
+class _MFNCWriter(Writer):
+    def __init__(self, file: str, formats: dict[str, OutputFormat], numrec: int):
+        """
+        Create a multi-file netCDF writer
+
+        :param file: File name, or empty string if in-memory object is desired
+        :param formats: Formats, one entry for each variable
+        :param numrec: Number of records per output file. Zero means a single output file.
+        """
+
+        self.file = file
+        self.formats = formats
+        self.numrec = numrec
+        self._paths = []
+        self._step_counter = 0
+        self._padding = 4
+
+        self._append_next_file()
+
+    def _append_next_file(self):
+        diskless = False
+        if not self.file:
+            from uuid import uuid4
+            file = str(uuid4())
+            diskless = True
+        else:
+            base_name, ext = os.path.splitext(str(self.file))
+            file = f"{base_name}_{len(self._paths):0{self._padding}d}{ext}"
+
+        dset = create_netcdf_file(fname=file, formats=self.formats, diskless=diskless)
+        dset.sync()
+        self._sizes = {k: v.size for k, v in dset.dimensions.items()}
+
+        if diskless:
+            self._paths.append(dset)
+        else:
+            self._paths.append(file)
+            dset.close()
+
+    @property
+    def sizes(self) -> dict[str, int]:
+        return self._sizes
+
+    @property
+    def paths(self) -> list[typing.Any]:
+        return self._paths
+
+    def write(self, data: dict[str, np.ndarray]):
+        self._step_counter += 1
+        if (self._step_counter != 1) and not((self._step_counter - 1) % self.numrec):
+            self._append_next_file()
+
+        if isinstance(self._paths[-1], str):
+            with nc.Dataset(self._paths[-1], mode='a') as dset:
+                self._write(dset, data)
+                self._sizes = {k: v.size for k, v in dset.dimensions.items()}
+        else:
+            dset = self._paths[-1]
             self._write(dset, data)
             self._sizes = {k: v.size for k, v in dset.dimensions.items()}
 
