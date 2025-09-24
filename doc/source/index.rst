@@ -1,32 +1,66 @@
-.. LADiM documentation master file, created by
-   sphinx-quickstart on Tue Jan 24 16:14:24 2017.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+====================================================
+Ladim: Lagrangian Advection and Diffusion Module
+====================================================
 
-LADiM documentation
+Current version: |package_version|
+
+
+What is Ladim?
 ===================
 
-.. only: html
+This is ladim.
 
-  .. image:: logo.png
-     :align: center
+.. _citation:
+
+Citation
+========
+
+This is how you cite.
 
 
+Installation
+============
+
+The package is installed using pip:
+
+::
+
+  pip install ladim
+
+If you use Ladim on Windows, consider installing the prerequisites using
+conda-forge instead:
+
+::
+
+  conda install -c conda-forge netCDF4 numba numexpr numpy pandas pyarrow pyproj pyyaml scipy xarray
+
+
+Usage
+=====
+
+The software can be started from the command line as
+
+.. code-block::
+
+    ladim ladim.yaml
+
+or from within python as
+
+.. code-block:: python
+
+    import ladim
+    ladim.run("ladim.yaml")
+
+In both cases, simulation details are specified in the
+file ``ladim.yaml``, written in the `YAML file format <https://yaml.org/spec/>`_.
+The :ref:`examples_page` section includes many examples of valid config files,
+for various types of problems.
+
+
+Documentation
+=============
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+    :maxdepth: 2
 
-   intro.rst
-   manual.rst
-   modules.rst
-   implementation.rst
-
-
-.. only: html
-
-  Indices and tables
-  ==================
-
-  * :ref:`genindex`
-  * :ref:`modindex`
-  * :ref:`search`
+    examples
+    autoapi/index

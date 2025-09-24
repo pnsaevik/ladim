@@ -1,0 +1,30 @@
+table.docutils td {
+    border: none;
+}
+
+table.docutils th {
+    border-left-style: none;
+    border-right-style: none;
+    border-top-style: none;
+    border-color: black;
+}
+
+table.docutils {
+    border-left-style: none;
+    border-right-style: none;
+    box-shadow: none;
+    border-color: black;
+}
+
+div.body h3 {
+    font-size: 100%;
+    font-weight: bold;
+}
+
+dl.function, dl.confval, dl.class, dl.method, dl.data, dl.property {
+    margin-top: 3em;
+}
+
+div.footer {
+    margin-top: 3rem;
+}

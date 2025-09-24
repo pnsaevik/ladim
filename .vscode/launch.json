@@ -10,6 +10,7 @@
             "type": "debugpy",
             "request": "launch",
             "module": "sphinx",
+            "justMyCode": false,
             "args": [
                 "--builder", "html",
                 "--jobs", "auto",
@@ -18,10 +19,13 @@
                 "--nitpicky",
                 "--verbose",
                 "--fail-on-warning",
-                "source", 
-                "build"
+                "--exception-on-warning",
+                "--show-traceback",
+                "--pdb",
+                "doc/source", 
+                "doc/build"
             ],
-            "cwd": "${workspaceFolder}/doc"
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
