@@ -10,7 +10,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install sphinx
-        run: pip install sphinx
+        run: pip install sphinx sphinx-autoapi
       - name: Build documentation
         run: sphinx-build -v -b html -n doc/source doc/build
       - name: Upload documentation
