@@ -22,14 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 class Grid:
-    """Simple ROMS grid object
+    """
+    Simple ROMS grid object.
 
-    Possible grid arguments:
-      subgrid = [i0, i1, j0, j1]
-        Ordinary python style, start points included, not end points
-        Each of the elements can be replaced with None, for no limitation
-      Vinfo: dictionary with N, hc, theta_s and theta_b
-
+    Possible grid arguments are subgrid and Vinfo. subgrid = [i0, i1, j0, j1].
+    Ordinary python style, start points included, not end points. Each of the
+    elements can be replaced with None, for no limitation. Vinfo: dictionary
+    with N, hc, theta_s and theta_b.
     """
 
     # Lagrer en del unødige attributter
@@ -248,7 +247,6 @@ class Grid:
 class Forcing:
     """
     Class for ROMS forcing
-
     """
 
     def __init__(self, config, _):
@@ -364,9 +362,9 @@ class Forcing:
     def scan_file_times(files):
         """Check files and scan the times
 
-        Returns:
-          all_frames: List of all time frames
-          num_frames: Mapping: filename -> number of time frames in file
+        :return: (all_frames, num_frames), where all_frames is list of all time
+            frames, num_frames is a mapping from filename to number of time
+            frames in file.
 
         """
         all_frames = []  # All time frames
@@ -585,18 +583,15 @@ class Forcing:
 # ----------------------------------------------
 
 def s_stretch(N, theta_s, theta_b, stagger="rho", Vstretching=1):
-    """Compute a s-level stretching array
+    """
+    Compute an s-level stretching array.
 
-    *N* : Number of vertical levels
-
-    *theta_s* : Surface stretching factor
-
-    *theta_b* : Bottom stretching factor
-
-    *stagger* : "rho"|"w"
-
-    *Vstretching* : 1|2|3|4|5
-
+    :param int N: Number of vertical levels.
+    :param float theta_s: Surface stretching factor.
+    :param float theta_b: Bottom stretching factor.
+    :param str stagger: Grid staggering option ("rho" or "w").
+    :param int Vstretching: Stretching function choice (1, 2, 3, 4, or 5).
+    :return: Computed s-level stretching array.
     """
 
     # if stagger == "rho":
@@ -652,34 +647,28 @@ def s_stretch(N, theta_s, theta_b, stagger="rho", Vstretching=1):
         raise
 
 def sdepth(H, Hc, C, stagger="rho", Vtransform=1):
-    """Return depth of rho-points in s-levels
+    """
+    Return depth of rho-points in s-levels.
 
-    *H* : arraylike
-      Bottom depths [meter, positive]
+    :param arraylike H: Bottom depths [meter, positive].
+    :param float Hc: Critical depth.
+    :param numpy.ndarray cs_r: 1D array of s-level stretching curve.
+    :param str stagger: Grid staggering option ("rho" or "w").
+    :param int Vtransform: Defines the transform used.
+        Defaults to 1 = Song-Haidvogel.
 
-    *Hc* : scalar
-       Critical depth
-
-    *cs_r* : 1D array
-       s-level stretching curve
-
-    *stagger* : [ 'rho' | 'w' ]
-
-    *Vtransform* : [ 1 | 2 ]
-       defines the transform used, defaults 1 = Song-Haidvogel
-
-    Returns an array with ndim = H.ndim + 1 and
-    shape = cs_r.shape + H.shape with the depths of the
-    mid-points in the s-levels.
+    :return: Depths of mid-points in the s-levels with
+        ``ndim = H.ndim + 1`` and
+        ``shape = cs_r.shape + H.shape``.
+    :rtype: numpy.ndarray
 
     Typical usage::
 
-    >>> fid = Dataset(roms_file)
-    >>> H = fid.variables['h'][:, :]
-    >>> C = fid.variables['Cs_r'][:]
-    >>> Hc = fid.variables['hc'].getValue()
-    >>> z_rho = sdepth(H, Hc, C)
-
+        fid = Dataset(roms_file)
+        H = fid.variables['h'][:, :]
+        C = fid.variables['Cs_r'][:]
+        Hc = fid.variables['hc'].getValue()
+        z_rho = sdepth(H, Hc, C)
     """
     H = np.asarray(H)
     Hshape = H.shape  # Save the shape of H
@@ -715,33 +704,39 @@ def sdepth(H, Hc, C, stagger="rho", Vtransform=1):
 
 def z2s(z_rho, X, Y, Z):
     """
-    Find s-level and coefficients for vertical interpolation
+    Find s-level and coefficients for vertical interpolation.
 
-    input:
-        z_rho  3D array with vertical s-coordinate structure at rho-points
-        X, Y   1D arrays, horizontal position in grid coordinates
-        Z      1D array, particle depth, meters, positive
+    :param z_rho: 3D array with vertical s-coordinate structure at rho-points.
+    :param X: 1D array, horizontal position in grid coordinates.
+    :param Y: 1D array, horizontal position in grid coordinates.
+    :param Z: 1D array, particle depth [meters, positive].
 
-    Returns
-        K      1D integer array
-        A      1D float array
+    :return:  (K, A), where K is integer and A is float, both 1D arrays.
 
+    Notes
+    -----
     With:
-        1 <= K < kmax = z_rho.shape[0]
-        z_rho[K-1] < -Z < z_rho[K] for 1 < K < kmax - 1
-        -Z < z_rho[1] for K = 1
-        z_rho[-1] < -Z for K = kmax - 1
-        0.0 <= A <= 1
-        Interior linear interpolation:
-            A * z_rho[K - 1] + (1 - A) * z_rho[K] = -Z
-            for z_rho[0] < -Z < z_rho[-1]
-        Extend constant below lowest:
-            A * z_rho[K - 1] + (1 - A) * z_rho[K] = z_rho[0]
-            for -Z < z_rho[0]  (K=1, A=1)
-        Extend constantly above highest:
-            A * z_rho[K - 1] + (1 - A) * z_rho[K] = z_rho[-1]
-            for -Z > z_rho[-1]  (K=kmax-1, A=0)
 
+    * ``1 <= K < kmax = z_rho.shape[0]``
+    * ``z_rho[K-1] < -Z < z_rho[K]`` for ``1 < K < kmax - 1``
+    * ``-Z < z_rho[1]`` for ``K = 1``
+    * ``z_rho[-1] < -Z`` for ``K = kmax - 1``
+    * ``0.0 <= A <= 1``
+
+    Interior linear interpolation::
+
+        A * z_rho[K - 1] + (1 - A) * z_rho[K] = -Z
+        for z_rho[0] < -Z < z_rho[-1]
+
+    Extend constant below lowest::
+
+        A * z_rho[K - 1] + (1 - A) * z_rho[K] = z_rho[0]
+        for -Z < z_rho[0]  (K=1, A=1)
+
+    Extend constant above highest::
+
+        A * z_rho[K - 1] + (1 - A) * z_rho[K] = z_rho[-1]
+        for -Z > z_rho[-1]  (K=kmax-1, A=0)
     """
 
     kmax = z_rho.shape[0]  # Number of vertical levels
@@ -766,22 +761,30 @@ def z2s(z_rho, X, Y, Z):
 
 def sample3D(F, X, Y, K, A, method="bilinear"):
     """
-    Sample a 3D field on the (sub)grid
+    Sample a 3D field on the (sub)grid.
 
-    F = 3D field
-    S = depth structure matrix
-    X, Y = 1D arrays of horizontal grid coordinates
-    Z = 1D array of depth [m, positive downwards]
+    :param F: 3D field.
+    :param S: Depth structure matrix.
+    :param X: 1D array of horizontal grid coordinates.
+    :param Y: 1D array of horizontal grid coordinates.
+    :param Z: 1D array of depth [m, positive downwards].
+    :param interpolation: Interpolation method.
+        - ``'bilinear'`` for trilinear interpolation.
+        - ``'nearest'`` for value in 3D grid cell.
 
-    Everything in rho-points
+    :return: Sampled values on the (sub)grid.
 
-    F.shape = S.shape = (kmax, jmax, imax)
-    S.shape = (kmax, jmax, imax)
-    X.shape = Y.shape = Z.shape = (pmax,)
+    Notes
+    -----
+    Everything is in rho-points.
 
-    # Interpolation = 'bilinear' for trilinear Interpolation
-    # = 'nearest' for value in 3D grid cell
+    Shapes:
 
+    * ``F.shape = (kmax, jmax, imax)``
+    * ``S.shape = (kmax, jmax, imax)``
+    * ``X.shape = (pmax,)``
+    * ``Y.shape = (pmax,)``
+    * ``Z.shape = (pmax,)``
     """
 
     if method == "bilinear":

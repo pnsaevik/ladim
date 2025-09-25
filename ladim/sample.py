@@ -2,16 +2,6 @@
 
 """Utilities functions for sampling output from the ROMS
 
-Horizontal sampling
--------------------
-
-:func:`sample2D`
-  Sample a 2D field given at rho-points
-:func:`sample2DU`
-  Sample a 2D field given at u-points
-:func:`sample2DV`
-  Sample a 2D field given at v-points
-
 """
 
 # -----------------------------------

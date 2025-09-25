@@ -108,20 +108,19 @@ html_static_path = ['_static']
 
 # -- Options for Sphinx AutoAPI -----------------------------------------------
 
-autoapi_dirs = ['../..']
+autoapi_dirs = ['../../ladim']
 autoapi_ignore = [
     '*/build/*',
-    '*/tests/*',
-    '*/examples/*',
+    '*/gridforce/*',
 ]
-# autoapi_add_toctree_entry = True
-autoapi_member_order = 'alphabetical'
+autoapi_add_toctree_entry = True
+autoapi_member_order = 'groupwise'
 autoapi_template_dir = '_templates/autoapi'
+autoapi_keep_files = False
+autoapi_generate_api_docs = True
+autoapi_own_page_level = 'module'
 autoapi_options = [
     'members',
-    'undoc-members', # include members without docstrings
-    'special-members',
-    'show-inheritance',
     'show-module-summary',
     'imported-members',
 ]
@@ -133,4 +132,5 @@ autodoc_typehints = 'description'
 intersphinx_mapping = {
     'xarray': ('https://docs.xarray.dev/en/stable/', None),
     'pandas': ('https://pandas.pydata.org/docs/', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
 }

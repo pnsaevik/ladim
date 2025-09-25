@@ -63,4 +63,3 @@ Documentation
     :maxdepth: 2
 
     examples
-    autoapi/index
