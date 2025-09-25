@@ -287,6 +287,15 @@ class Writer:
         raise NotImplementedError()
 
     @property
+    def offsets(self) -> dict[str, int]:
+        """
+        Return accumulated number of rows written in each table
+
+        :return: Dictionary with variable names as keys and number of rows as values
+        """
+        raise NotImplementedError()
+
+    @property
     def paths(self) -> list[typing.Any]:
         """
         Return list of paths to written files, or in-memory objects
@@ -332,7 +341,11 @@ class _NCWriter(Writer):
     @property
     def sizes(self) -> dict[str, int]:
         return self._sizes
-    
+
+    @property
+    def offsets(self) -> dict[str, int]:
+        return self._sizes
+
     @property
     def paths(self) -> list[typing.Any]:
         return self._paths
@@ -370,13 +383,14 @@ class _MFNCWriter(Writer):
         self.file = file
         self.formats = formats
         self.numrec = numrec
+        self._sizes = {}
+        self._offsets = {}
         self._paths = []
-        self._offsets = []
         self._step_counter = 0
         self._padding = 4
         self._tables_to_be_copied = ["particle"]
         self._offset_variables = {"particle_instance": "instance_offset", "time": "time_offset"}
-        self._offset_variables = {k: v for k, v in self._offset_variables.items() if k in formats}
+        self._offset_variables = {k: v for k, v in self._offset_variables.items() if v in formats}
 
         self._append_next_file()
 
@@ -399,8 +413,12 @@ class _MFNCWriter(Writer):
         dset = create_netcdf_file(fname=file, formats=self.formats, diskless=diskless)
         if old_release_time is not None:
             dset.variables['release_time'][:] = old_release_time
+        if len(self._offsets) > 0:
+            self._offsets = {k:v+self._sizes[k] for k, v in self._offsets.items()}
         dset.sync()
         self._sizes = {k: v.size for k, v in dset.dimensions.items()}
+        if len(self._offsets) == 0:
+            self._offsets = self._sizes.copy()
 
         if diskless:
             self._paths.append(dset)
@@ -413,41 +431,34 @@ class _MFNCWriter(Writer):
         return self._sizes
 
     @property
+    def offsets(self) -> dict[str, int]:
+        return self._offsets
+
+    @property
     def paths(self) -> list[typing.Any]:
         return self._paths
 
     def write(self, data: dict[str, np.ndarray]):
-        particle_instance = 0
         if (self._step_counter > 0) and not(self._step_counter % self.numrec):
-            particle_instance = self._get_instance_offset()
             self._append_next_file()
 
         with _open_or_relay(self._paths[-1], mode='a') as dset:
-            self._write(dset, data, particle_instance)
+            self._write(dset, data)
             self._sizes = {k: v.size for k, v in dset.dimensions.items()}
 
         self._step_counter += 1
 
-    def _get_instance_offset(self):
-        old_instance_offset = 0
-        with _open_or_relay(self._paths[-1], mode='r') as dset:
-            if 'instance_offset' in dset.variables:
-                old_instance_offset = dset.variables['instance_offset'][...]
-
-        if 'particle_instance' in self._sizes:
-            return self._sizes.get('particle_instance') + old_instance_offset
-        else:
-            return 0
-
-    @staticmethod
-    def _write(dset: nc.Dataset, data: dict[str, np.ndarray], particle_instance: int):
+    def _write(self, dset: nc.Dataset, data: dict[str, np.ndarray]):
         old_sizes = {k: v.size for k, v in dset.dimensions.items()}
         for k, v in data.items():
             dimname, = dset.variables[k].dimensions  # Assume single dimension
             sz = old_sizes[dimname]
             dset.variables[k][sz:sz + len(v)] = v
-        if 'instance_offset' in dset.variables and (particle_instance > 0):
-            dset.variables['instance_offset'][...] = particle_instance
+
+        for k, v in self._offset_variables.items():
+            if v in dset.variables:
+                dset.variables[v][...] = self._offsets[k]
+
         dset.sync()
 
     def close(self):

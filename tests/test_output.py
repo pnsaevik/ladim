@@ -274,18 +274,21 @@ class Test_Writer:
         w.write(dict(release_time=np.array([release_time, release_time]),
                      x=np.array([4.0, 5.0])))
         assert w.sizes == {'particle': 3, 'particle_instance': 5}
+        assert w.offsets == {'particle': 0, 'particle_instance': 0}
 
         w.write(dict(release_time=np.array([release_time, release_time]),
                      x=np.array([6.0, 7.0])))
         w.write(dict(release_time=np.array([release_time, release_time]),
                      x=np.array([8.0, 9.0])))
         assert w.sizes == {'particle': 7, 'particle_instance': 4}
+        assert w.offsets == {'particle': 3, 'particle_instance': 5}
 
         w.write(dict(release_time=np.array([release_time]),
                      x=np.array([10.0])))
         w.write(dict(release_time=np.array([release_time]),
                      x=np.array([11.0])))
         assert w.sizes == {'particle': 9, 'particle_instance': 2}
+        assert w.offsets == {'particle': 10, 'particle_instance': 9}
 
         assert w.paths[0].variables['instance_offset'][...] == 0
         assert w.paths[0].variables['x'][:].tolist() == [1.0, 2.0, 3.0, 4.0, 5.0]
