@@ -351,7 +351,7 @@ class _NCWriter(Writer):
         return self._paths
 
     def write(self, data: dict[str, np.ndarray]):
-        with _open_or_relay(self._paths[-1], mode='r') as dset:
+        with _open_or_relay(self._paths[0], mode='a') as dset:
             self._write(dset, data)
             self._sizes = {k: v.size for k, v in dset.dimensions.items()}
 
@@ -404,27 +404,35 @@ class _MFNCWriter(Writer):
             base_name, ext = os.path.splitext(str(self.file))
             file = f"{base_name}_{len(self._paths):0{self._padding}d}{ext}"
 
-        old_release_time = None
-        if len(self._paths) > 0:
-            with _open_or_relay(self._paths[-1], mode='r') as dset:
-                if 'release_time' in dset.variables:
-                    old_release_time = dset.variables['release_time'][:]
-
         dset = create_netcdf_file(fname=file, formats=self.formats, diskless=diskless)
-        if old_release_time is not None:
-            dset.variables['release_time'][:] = old_release_time
-        if len(self._offsets) > 0:
-            self._offsets = {k:v+self._sizes[k] for k, v in self._offsets.items()}
+        self._copy_tables(dset)
+        self._set_offsets(dset)
         dset.sync()
-        self._sizes = {k: v.size for k, v in dset.dimensions.items()}
-        if len(self._offsets) == 0:
-            self._offsets = self._sizes.copy()
 
         if diskless:
             self._paths.append(dset)
         else:
             self._paths.append(file)
             dset.close()
+
+    def _set_offsets(self, dset: nc.Dataset):
+        if len(self._paths) > 0:
+            self._offsets = {k:v+self._sizes[k] for k, v in self._offsets.items()}
+        self._sizes = {k: v.size for k, v in dset.dimensions.items()}
+        if len(self._paths) == 0:
+            self._offsets = self._sizes.copy()
+
+    def _copy_tables(self, dset: nc.Dataset) -> nc.Dataset:
+        if len(self._paths) == 0:
+            return dset
+
+        with _open_or_relay(self._paths[-1], mode='r') as old_dset:
+            vars = [k for k, v in dset.variables.items()
+                    if (len(v.dimensions) > 0) and (v.dimensions[0] in self._tables_to_be_copied)]
+            for x in vars:
+                dset.variables[x][:] = old_dset.variables[x][:]
+
+        return dset
 
     @property
     def sizes(self) -> dict[str, int]:
@@ -467,7 +475,7 @@ class _MFNCWriter(Writer):
 
 
 @contextlib.contextmanager
-def _open_or_relay(path_or_object: str | nc.Dataset, mode='r'):
+def _open_or_relay(path_or_object: str | nc.Dataset, mode='r') -> nc.Dataset:
     if isinstance(path_or_object, str):
         with nc.Dataset(path_or_object, mode=mode) as dset:
             yield dset
