@@ -2,7 +2,6 @@ from datetime import datetime
 from sphinx.application import Sphinx
 from sphinx.util.docfields import Field
 import os
-import sys
 
 
 def setup(app: Sphinx):
@@ -32,7 +31,7 @@ def setup(app: Sphinx):
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-sys.path.insert(0, os.path.abspath('../../ladim'))
+# sys.path.insert(0, os.path.abspath('..'))
 
 
 # -- Project information -----------------------------------------------------
@@ -46,8 +45,24 @@ source_suffix = '.rst'
 
 # The full version, including alpha/beta/rc tags
 def getversion():
-    import ladim
-    return ladim.__version__
+    version_file = os.path.abspath('../../ladim/__init__.py')
+    version_line = ''
+    with open(version_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.startswith('__version__'):
+                version_line = line
+                break
+    
+    if not version_line:
+        raise RuntimeError("Could not find __version__ in ladim/__init__.py")
+    
+    # Extract version string between quotes
+    import re
+    match = re.search(r"['\"]([^'\"]+)['\"]", line)
+    if match:
+        return match.group(1)
+    else:
+        raise RuntimeError("Could not find __version__ in ladim/__init__.py")
 
 
 release = getversion()
