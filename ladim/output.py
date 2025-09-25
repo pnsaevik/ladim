@@ -5,6 +5,7 @@ if typing.TYPE_CHECKING:
     from .model import Model
 import os
 import xarray as xr
+import contextlib
 
 
 class Output:
@@ -466,3 +467,12 @@ class _MFNCWriter(Writer):
     def close(self):
         # Have already closed files after each write
         pass
+
+
+@contextlib.contextmanager
+def _open_or_relay(path_or_object: str | nc.Dataset, mode='r'):
+    if isinstance(path_or_object, str):
+        with nc.Dataset(path_or_object, mode=mode) as dset:
+            yield dset
+    else:
+        yield path_or_object
