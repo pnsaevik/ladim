@@ -4,7 +4,6 @@ import typing
 if typing.TYPE_CHECKING:
     from .model import Model
 import os
-import xarray as xr
 import contextlib
 
 
@@ -62,19 +61,21 @@ class Output:
         return Output(variables, file, frequency, numrec)
 
     def update(self, model: "Model"):
-        self._write_init_vars(model)
-        self._write_instance_vars(model)
+        data_dict_init = self._update_init_vars(model)
+        data_dict_inst = self._update_instance_vars(model)
 
-    def _write_init_vars(self, model):
+        self.writer.write(data_dict_init | data_dict_inst)
+
+    def _update_init_vars(self, model) -> dict[str, np.ndarray]:
         """
-        Write the initial state of new particles
+        Update the initial state of new particles
         """
 
         # Check if there are any new particles
         part_size = self.writer.sizes['particle']
         num_new = model.state.released - part_size
         if num_new == 0:
-            return
+            return dict()
 
         # Extract data
         idx = model.state['pid'] > part_size - 1
@@ -90,18 +91,18 @@ class Output:
             data_dict[v] = data
         data_dict['release_time'] = np.broadcast_to(model.solver.time, shape=(num_new, ))
 
-        self.writer.write(data_dict)
+        return data_dict
 
-    def _write_instance_vars(self, model):
+    def _update_instance_vars(self, model) -> dict[str, np.ndarray]:
         """
-        Write the current state of dynamic varaibles
+        Update the current state of dynamic variables
         """
 
         # Check if this is a write time step
         current_time = model.solver.time
         elapsed_since_last_write = current_time - self._last_write_time
         if elapsed_since_last_write < self._write_frequency:
-            return
+            return dict()
         self._last_write_time = current_time
 
         # Get variable values
@@ -112,7 +113,7 @@ class Output:
             x, y = model.state['X'], model.state['Y']
             data_dict['lon'], data_dict['lat'] = model.grid.xy2ll(x, y)
 
-        self.writer.write(data_dict)
+        return data_dict
 
     @staticmethod
     def _default_formats() -> dict[str, "OutputFormat"]:
@@ -375,8 +376,11 @@ class _MFNCWriter(Writer):
         self.formats = formats
         self.numrec = numrec
         self._paths = []
+        self._offsets = []
         self._step_counter = 0
         self._padding = 4
+        self._tables_to_be_copied = ["particle"]
+        self._offset_variables = {"particle_instance": "instance_offset", "time": "time_offset"}
 
         self._append_next_file()
 
@@ -422,9 +426,8 @@ class _MFNCWriter(Writer):
         return self._paths
 
     def write(self, data: dict[str, np.ndarray]):
-        self._step_counter += 1
         particle_instance = 0
-        if (self._step_counter > 1) and not((self._step_counter - 1) % (self.numrec * 2)):
+        if (self._step_counter > 0) and not(self._step_counter % self.numrec):
             particle_instance = self._get_instance_offset()
             self._append_next_file()
 
@@ -436,6 +439,8 @@ class _MFNCWriter(Writer):
             dset = self._paths[-1]
             self._write(dset, data, particle_instance)
             self._sizes = {k: v.size for k, v in dset.dimensions.items()}
+
+        self._step_counter += 1
 
     def _get_instance_offset(self):
         old_instance_offset = 0

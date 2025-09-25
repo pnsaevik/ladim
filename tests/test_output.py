@@ -269,22 +269,22 @@ class Test_Writer:
         release_time = np.datetime64('2000-01-01', 's').astype('int64')
         w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
 
-        w.write(dict(release_time=np.array([release_time])))
-        w.write(dict(x=np.array([1.0, 2.0, 3.0])))
-        w.write(dict(release_time=np.array([release_time, release_time])))
-        w.write(dict(x=np.array([4.0, 5.0])))
+        w.write(dict(release_time=np.array([release_time]),
+                     x=np.array([1.0, 2.0, 3.0])))
+        w.write(dict(release_time=np.array([release_time, release_time]),
+                     x=np.array([4.0, 5.0])))
         assert w.sizes == {'particle': 3, 'particle_instance': 5}
 
-        w.write(dict(release_time=np.array([release_time, release_time])))
-        w.write(dict(x=np.array([6.0, 7.0])))
-        w.write(dict(release_time=np.array([release_time, release_time])))
-        w.write(dict(x=np.array([8.0, 9.0])))
+        w.write(dict(release_time=np.array([release_time, release_time]),
+                     x=np.array([6.0, 7.0])))
+        w.write(dict(release_time=np.array([release_time, release_time]),
+                     x=np.array([8.0, 9.0])))
         assert w.sizes == {'particle': 7, 'particle_instance': 4}
 
-        w.write(dict(release_time=np.array([release_time])))
-        w.write(dict(x=np.array([10.0])))
-        w.write(dict(release_time=np.array([release_time])))
-        w.write(dict(x=np.array([11.0])))
+        w.write(dict(release_time=np.array([release_time]),
+                     x=np.array([10.0])))
+        w.write(dict(release_time=np.array([release_time]),
+                     x=np.array([11.0])))
         assert w.sizes == {'particle': 9, 'particle_instance': 2}
 
         assert w.paths[0].variables['instance_offset'][...] == 0
