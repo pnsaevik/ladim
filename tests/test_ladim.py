@@ -36,7 +36,7 @@ class Test_ladim_script:
         dset_dict = None
         try:
             os.chdir(testpath)
-            ladim.main(io.StringIO(conf_str))
+            ladim.main.main(io.StringIO(conf_str))
             dset = xr.load_dataset(str(outfile))
             dset_txt = json.dumps(obj=dset.to_dict(), default=str, indent=4)
             dset_dict = json.loads(dset_txt)
