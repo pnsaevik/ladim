@@ -1,8 +1,8 @@
 """This is the main ladim module"""
 
 
-from .main import run
+from .cli import run, main
 
 
 __version__ = '2.1.7'
-__all__ = ['run']
+__all__ = ['run', 'main']

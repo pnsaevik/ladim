@@ -3,7 +3,7 @@
 import netCDF4
 
 import subprocess
-import ladim.main
+import ladim.cli
 from pathlib import Path
 import os
 import xarray as xr
@@ -36,7 +36,7 @@ class Test_ladim_script:
         dset_dict = None
         try:
             os.chdir(testpath)
-            ladim.main.main(io.StringIO(conf_str))
+            ladim.cli.main(io.StringIO(conf_str))
             dset = xr.load_dataset(str(outfile))
             dset_txt = json.dumps(obj=dset.to_dict(), default=str, indent=4)
             dset_dict = json.loads(dset_txt)

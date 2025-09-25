@@ -12,9 +12,6 @@ Lagrangian Advection and Diffusion Model
 # ---------------------------------
 
 import logging
-import ladim
-from .config import configure
-from .model import Model
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 def main(config_stream, loglevel=logging.INFO):
     """Main function for LADiM"""
+    from .config import configure
+    from .model import Model
 
     # Logging
     logging.getLogger().setLevel(loglevel)
@@ -40,6 +39,8 @@ def run():
     import logging
     import datetime
     from pathlib import Path
+    import ladim
+    from . import main as ladim_main
 
     # ===========
     # Logging
@@ -98,7 +99,7 @@ def run():
     logger.info(f'LADiM simulation starting, wall time={now}')
 
     fp = open(args.config_file, encoding='utf8')
-    ladim.main(config_stream=fp, loglevel=args.loglevel)
+    ladim_main(config_stream=fp, loglevel=args.loglevel)
 
     # Reset logging and print final message
     logging.getLogger().setLevel(logging.INFO)
