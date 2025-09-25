@@ -338,12 +338,7 @@ class _NCWriter(Writer):
         return self._paths
 
     def write(self, data: dict[str, np.ndarray]):
-        if isinstance(self._paths[0], str):
-            with nc.Dataset(self._paths[0], mode='a') as dset:
-                self._write(dset, data)
-                self._sizes = {k: v.size for k, v in dset.dimensions.items()}
-        else:
-            dset = self._paths[0]
+        with _open_or_relay(self._paths[-1], mode='r') as dset:
             self._write(dset, data)
             self._sizes = {k: v.size for k, v in dset.dimensions.items()}
 
@@ -381,6 +376,7 @@ class _MFNCWriter(Writer):
         self._padding = 4
         self._tables_to_be_copied = ["particle"]
         self._offset_variables = {"particle_instance": "instance_offset", "time": "time_offset"}
+        self._offset_variables = {k: v for k, v in self._offset_variables.items() if k in formats}
 
         self._append_next_file()
 
@@ -396,12 +392,7 @@ class _MFNCWriter(Writer):
 
         old_release_time = None
         if len(self._paths) > 0:
-            if not diskless:
-                with nc.Dataset(self._paths[-1], mode='r') as dset:
-                    if 'release_time' in dset.variables:
-                        old_release_time = dset.variables['release_time'][:]
-            else:
-                dset = self._paths[-1]
+            with _open_or_relay(self._paths[-1], mode='r') as dset:
                 if 'release_time' in dset.variables:
                     old_release_time = dset.variables['release_time'][:]
 
@@ -431,12 +422,7 @@ class _MFNCWriter(Writer):
             particle_instance = self._get_instance_offset()
             self._append_next_file()
 
-        if isinstance(self._paths[-1], str):
-            with nc.Dataset(self._paths[-1], mode='a') as dset:
-                self._write(dset, data, particle_instance)
-                self._sizes = {k: v.size for k, v in dset.dimensions.items()}
-        else:
-            dset = self._paths[-1]
+        with _open_or_relay(self._paths[-1], mode='a') as dset:
             self._write(dset, data, particle_instance)
             self._sizes = {k: v.size for k, v in dset.dimensions.items()}
 
@@ -444,12 +430,7 @@ class _MFNCWriter(Writer):
 
     def _get_instance_offset(self):
         old_instance_offset = 0
-        if isinstance(self._paths[-1], str):
-            with nc.Dataset(self._paths[-1], mode='r') as dset:
-                if 'instance_offset' in dset.variables:
-                    old_instance_offset = dset.variables['instance_offset'][...]
-        else:
-            dset = self._paths[-1]
+        with _open_or_relay(self._paths[-1], mode='r') as dset:
             if 'instance_offset' in dset.variables:
                 old_instance_offset = dset.variables['instance_offset'][...]
 
