@@ -90,6 +90,12 @@ html_css_files = [
     'css/custom.css',
 ]
 
+# Ignore known broken or inaccesible links
+linkcheck_ignore = [
+    r'https://doi.org/10.17895/ices.pub.19271159',  # Behind paywall
+    r'https://www.hi.no/forskning/marine-data-forskningsdata/lakseluskart/html/lakseluskart.html',  # Timeout issues
+]
+
 # Matplotlib extension options
 plot_html_show_source_link = False
 plot_formats = ['png']
