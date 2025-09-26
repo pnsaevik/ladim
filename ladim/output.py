@@ -406,7 +406,12 @@ class _MFNCWriter(Writer):
 
         dset = create_netcdf_file(fname=file, formats=self.formats, diskless=diskless)
         self._copy_tables(dset)
-        self._set_offsets(dset)
+        if len(self._paths) > 0:
+            self._offsets = {k: v + self._sizes[k] for k, v in self._offsets.items()}
+        else:
+            self._sizes = {k: v.size for k, v in dset.dimensions.items()}
+            self._offsets = self._sizes.copy()
+
         dset.sync()
 
         if diskless:
@@ -414,13 +419,6 @@ class _MFNCWriter(Writer):
         else:
             self._paths.append(file)
             dset.close()
-
-    def _set_offsets(self, dset: nc.Dataset):
-        if len(self._paths) > 0:
-            self._offsets = {k:v+self._sizes[k] for k, v in self._offsets.items()}
-        self._sizes = {k: v.size for k, v in dset.dimensions.items()}
-        if len(self._paths) == 0:
-            self._offsets = self._sizes.copy()
 
     def _copy_tables(self, dset: nc.Dataset) -> nc.Dataset:
         if len(self._paths) == 0:
@@ -452,7 +450,11 @@ class _MFNCWriter(Writer):
 
         with _open_or_relay(self._paths[-1], mode='a') as dset:
             self._write(dset, data)
-            self._sizes = {k: v.size for k, v in dset.dimensions.items()}
+            for k, v in dset.dimensions.items():
+                if k in self._tables_to_be_copied:
+                    self._sizes[k] = v.size
+                else:
+                    self._sizes[k] = v.size + self._offsets[k]
 
         self._step_counter += 1
 
