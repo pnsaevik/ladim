@@ -260,41 +260,85 @@ class Test_Writer:
         assert len(w.paths) == 1
         w.close()
 
-    def test_multi_file_netcdf_writer(self):
-        variables = dict(
-            release_time=output.OutputFormat(ncformat='i8', dimensions='particle'),
-            x=output.OutputFormat(ncformat='f4', dimensions='particle_instance'),
-            instance_offset=output.OutputFormat(ncformat='i8', dimensions=())
-        )
-        release_time = np.datetime64('2000-01-01', 's').astype('int64')
+    def test_mf_netcdf_writer_can_append_particles(self):
+        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='xd'))
+        
+        # Write four times with numrec = 2
         w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
+        w.write(dict(x=np.array([1, 2, 3])))
+        w.write(dict(x=np.array([4, 5])))
+        w.write(dict(x=np.array([6, 7, 8])))
+        w.write(dict(x=np.array([9])))
 
-        w.write(dict(release_time=np.array([release_time]),
-                     x=np.array([1.0, 2.0, 3.0])))
-        w.write(dict(release_time=np.array([release_time, release_time]),
-                     x=np.array([4.0, 5.0])))
-        assert w.sizes == {'particle': 3, 'particle_instance': 5}
-        assert w.offsets == {'particle': 0, 'particle_instance': 0}
+        # Read x values
+        x_values = []
+        for dset in w.paths:
+            x_values += dset.variables['x'][:].tolist()
+        
+        assert x_values == [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
-        w.write(dict(release_time=np.array([release_time, release_time]),
-                     x=np.array([6.0, 7.0])))
-        w.write(dict(release_time=np.array([release_time, release_time]),
-                     x=np.array([8.0, 9.0])))
-        assert w.sizes == {'particle': 7, 'particle_instance': 4}
-        assert w.offsets == {'particle': 3, 'particle_instance': 5}
+        w.close()
 
-        w.write(dict(release_time=np.array([release_time]),
-                     x=np.array([10.0])))
-        w.write(dict(release_time=np.array([release_time]),
-                     x=np.array([11.0])))
-        assert w.sizes == {'particle': 9, 'particle_instance': 2}
-        assert w.offsets == {'particle': 10, 'particle_instance': 9}
+    def test_mf_netcdf_writer_splits_output_on_multiple_files(self):
+        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='xd'))
+        
+        # Write two times with numrec = 2; single file
+        w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
+        w.write(dict(x=np.array([1, 2, 3])))
+        w.write(dict(x=np.array([4, 5])))
+        assert len(w.paths) == 1
+        assert w.paths[0].variables['x'][:].tolist() == [1, 2, 3, 4, 5]
+
+        # Write once more; two files
+        w.write(dict(x=np.array([6, 7, 8])))
+        assert len(w.paths) == 2
+        assert w.paths[1].variables['x'][:].tolist() == [6, 7, 8]
+
+        w.close()
+
+    def test_mf_netcdf_writer_returns_total_sizes(self):
+        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='xd'))
+        
+        # Write three times with numrec = 2; two files
+        w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
+        w.write(dict(x=np.array([1, 2, 3])))
+        w.write(dict(x=np.array([4, 5])))
+        w.write(dict(x=np.array([6, 7, 8])))
+
+        assert w.sizes['xd'] == 8
+
+        w.close()
+
+    def test_mf_netcdf_writer_copies_particle_table(self):
+        # 'particle' is a special keyword: These variables should be copied
+        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='particle'))
+        
+        # Write three times with numrec = 2
+        w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
+        w.write(dict(x=np.array([1, 2, 3])))
+        w.write(dict(x=np.array([4, 5])))
+        w.write(dict(x=np.array([6, 7, 8])))
+
+        assert w.paths[0].variables['x'][:].tolist() == [1, 2, 3, 4, 5]
+        assert w.paths[1].variables['x'][:].tolist() == [1, 2, 3, 4, 5, 6, 7, 8]
+        assert w.sizes['particle'] == 8
+
+        w.close()
+
+    def test_mf_netcdf_writer_updates_offset_variable(self):
+        # 'particle_instance' is a special keyword: This dimension has an offset variable
+        variables = dict(
+            x=output.OutputFormat(ncformat='f4', dimensions='particle_instance'),
+            instance_offset=output.OutputFormat(ncformat='i4', dimensions='')
+            )
+        
+        # Write three times with numrec = 2
+        w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
+        w.write(dict(x=np.array([1, 2, 3])))
+        w.write(dict(x=np.array([4, 5])))
+        w.write(dict(x=np.array([6, 7, 8])))
 
         assert w.paths[0].variables['instance_offset'][...] == 0
-        assert w.paths[0].variables['x'][:].tolist() == [1.0, 2.0, 3.0, 4.0, 5.0]
         assert w.paths[1].variables['instance_offset'][...] == 5
-        assert w.paths[1].variables['x'][:].tolist() == [6.0, 7.0, 8.0, 9.0]
-        assert w.paths[2].variables['instance_offset'][...] == 9
-        assert w.paths[2].variables['x'][:].tolist() == [10.0, 11.0]
-        assert len(w.paths) == 3
+
         w.close()

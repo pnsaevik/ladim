@@ -475,7 +475,7 @@ class _MFNCWriter(Writer):
 
 
 @contextlib.contextmanager
-def _open_or_relay(path_or_object: str | nc.Dataset, mode='r') -> nc.Dataset:
+def _open_or_relay(path_or_object: str | nc.Dataset, mode='r') -> typing.Generator[nc.Dataset, typing.Any, typing.Any]:
     if isinstance(path_or_object, str):
         with nc.Dataset(path_or_object, mode=mode) as dset:
             yield dset
