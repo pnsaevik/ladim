@@ -1,0 +1,12 @@
+dependencies:
+ - netCDF4
+ - numba
+ - numexpr
+ - numpy
+ - pandas
+ - pyarrow
+ - pyproj
+ - python
+ - pyyaml
+ - scipy
+ - xarray
