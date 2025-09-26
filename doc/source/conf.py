@@ -17,6 +17,7 @@ def setup(app: Sphinx):
         ]
     )
     app.add_config_value('package_version', release, 'env')
+    app.connect('builder-inited', copy_environment_file_to_static)
 
 
 # Configuration file for the Sphinx documentation builder.
@@ -63,6 +64,16 @@ def getversion():
         return match.group(1)
     else:
         raise RuntimeError("Could not find __version__ in ladim/__init__.py")
+
+
+def copy_environment_file_to_static(app: Sphinx):
+    _ = app
+    import shutil
+    from pathlib import Path
+    env_file = Path(app.srcdir / '../../environment.yml')
+    dst_file = Path(app.outdir / '_static/environment.yml')
+    dst_file.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(env_file, dst_file)
 
 
 release = getversion()
@@ -154,4 +165,6 @@ intersphinx_mapping = {
     'xarray': ('https://docs.xarray.dev/en/stable/', None),
     'pandas': ('https://pandas.pydata.org/docs/', None),
     'numpy': ('https://numpy.org/doc/stable/', None),
+    "python": ("https://docs.python.org/3", None),
+    'pydantic': ('https://docs.pydantic.dev/latest', None), 
 }

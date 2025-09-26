@@ -1,7 +1,7 @@
 ==============
 Configuration
 ==============
-
+   
 The software can be started from the command line as
 
 .. code-block::

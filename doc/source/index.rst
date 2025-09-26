@@ -50,11 +50,11 @@ The package is installed using pip:
   pip install ladim
 
 If you use Ladim on Windows, consider installing the prerequisites using
-conda-forge instead:
+conda and the in-repo file `environment.yml <_static/environment.yml>`_:
 
 ::
 
-  conda install -c conda-forge netCDF4 numba numexpr numpy pandas pyarrow pyproj pyyaml scipy xarray
+  conda env create -f environment.yml
 
 
 Usage
