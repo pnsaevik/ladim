@@ -10,7 +10,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install sphinx
-        run: pip install sphinx sphinx-autoapi matplotlib
+        run: pip install sphinx sphinx-autoapi matplotlib pydantic
       - name: Build documentation
         run: python -m sphinx --verbose --builder html --nitpicky --fail-on-warning doc/source doc/build
       - name: Check links
