@@ -22,3 +22,4 @@ for various types of problems.
 Here we describe the different options available:
 
 
+.. include:: schemadoc.rst

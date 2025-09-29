@@ -28,3 +28,19 @@ dl.function, dl.confval, dl.class, dl.method, dl.data, dl.property {
 div.footer {
     margin-top: 3rem;
 }
+
+.ladimdoc {
+    font-weight: normal;
+}
+
+.ladimdoc-key {
+    font-weight: bold;
+}
+
+.ladimdoc-sig {
+    font-style: italic;
+}
+
+.ladimdoc-dsc {
+    font-style: normal;
+}

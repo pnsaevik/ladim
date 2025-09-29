@@ -19,6 +19,8 @@ def setup(app: Sphinx):
     app.add_config_value('package_version', release, 'env')
     app.connect('builder-inited', copy_environment_file_to_static)
     app.connect('build-finished', remove_environment_file_from_static)
+    app.connect('builder-inited', create_schema_doc)
+    app.connect('build-finished', remove_schema_doc)
 
 
 # Configuration file for the Sphinx documentation builder.
@@ -68,19 +70,54 @@ def getversion():
 
 
 def copy_environment_file_to_static(app: Sphinx):
+    """
+    Copy conda environment file to folder of static files, for further reference
+    """
     import shutil
     from pathlib import Path
-    env_file = Path(app.srcdir / '../../environment.yml')
-    dst_file = Path(app.srcdir / '_static/environment.yml')
+    env_file = Path(app.srcdir) / '../../environment.yml'
+    dst_file = Path(app.srcdir) / '_static/environment.yml'
     dst_file.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(env_file, dst_file)
 
 
 def remove_environment_file_from_static(app: Sphinx, exception):
+    """
+    Remove temporary conda environment file
+    """
     _ = exception
     from pathlib import Path
-    dst_file = Path(app.srcdir / '_static/environment.yml')
+    dst_file = Path(app.srcdir) / '_static/environment.yml'
     dst_file.unlink(missing_ok=True)
+
+
+def create_schema_doc(app: Sphinx):
+    """
+    Create rst file for schema documentation
+    """
+    from pathlib import Path
+    import importlib.util
+    schema_module_file = Path(app.srcdir) / '../../ladim/schema.py'
+    schema_module_spec = importlib.util.spec_from_file_location('ladim_schema', schema_module_file)
+    assert schema_module_spec is not None
+    schema_module = importlib.util.module_from_spec(schema_module_spec)
+    schema_loader = schema_module_spec.loader
+    assert schema_loader is not None
+    schema_loader.exec_module(schema_module)
+    rst_text = schema_module.rest_doc()
+
+    rst_file = Path(app.srcdir) / 'schemadoc.rst'
+    rst_file.write_text(rst_text)
+
+
+def remove_schema_doc(app: Sphinx, exception):
+    """
+    Remove temporary schema doc file
+    """
+    _ = exception
+    from pathlib import Path
+    rst_file = Path(app.srcdir) / 'schemadoc.rst'
+    rst_file.unlink()
 
 
 release = getversion()

@@ -6,29 +6,6 @@ parameters, appending default values and converting between
 different versions of config file formats.
 """
 import numpy as np
-import pydantic
-import datetime
-
-
-class SolverConfig(pydantic.BaseModel):
-    """
-    Solver configuration
-    """
-
-    start: datetime.date
-    """Start time of simulation"""
-
-
-class Configuration(pydantic.BaseModel):
-    """
-    Ladim configuration
-
-    """
-    
-    solver: SolverConfig
-    """Solver configurations"""
-
-
 
 
 def configure(module_conf):
