@@ -20,7 +20,7 @@ class GridConfig(BaseModel):
     Grid configuration
     """
 
-    file: str = Field(..., description="File name, see also :ref:`output.file`")
+    file: str = Field(..., description="File name, see also :any:`output.file`")
 
 
 def _descr(txt):
