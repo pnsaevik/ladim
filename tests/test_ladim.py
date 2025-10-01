@@ -1,9 +1,9 @@
 # Pre-import netCDF4 to avoid stupid warning
 # noinspection PyUnresolvedReferences
-import netCDF4
+import netCDF4 as _
 
 import subprocess
-import ladim.main
+import ladim
 from pathlib import Path
 import os
 import xarray as xr
