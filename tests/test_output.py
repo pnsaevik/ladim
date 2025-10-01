@@ -311,34 +311,44 @@ class Test_Writer:
 
     def test_mf_netcdf_writer_copies_particle_table(self):
         # 'particle' is a special keyword: These variables should be copied
-        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='particle'))
+        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='xd'))
         
         # Write three times with numrec = 2
-        w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
+        w = output.Writer.mf_netcdf(
+            file="",
+            formats=variables,
+            numrec=2,
+            copy_dims=('xd', ),
+            )
         w.write(dict(x=np.array([1, 2, 3])))
         w.write(dict(x=np.array([4, 5])))
         w.write(dict(x=np.array([6, 7, 8])))
 
         assert w.paths[0].variables['x'][:].tolist() == [1, 2, 3, 4, 5]
         assert w.paths[1].variables['x'][:].tolist() == [1, 2, 3, 4, 5, 6, 7, 8]
-        assert w.sizes['particle'] == 8
+        assert w.sizes['xd'] == 8
 
         w.close()
 
     def test_mf_netcdf_writer_updates_offset_variable(self):
         # 'particle_instance' is a special keyword: This dimension has an offset variable
         variables = dict(
-            x=output.OutputFormat(ncformat='f4', dimensions='particle_instance'),
-            instance_offset=output.OutputFormat(ncformat='i4', dimensions='')
+            x=output.OutputFormat(ncformat='f4', dimensions='xd'),
+            xd_offset=output.OutputFormat(ncformat='i4', dimensions='')
             )
         
         # Write three times with numrec = 2
-        w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
+        w = output.Writer.mf_netcdf(
+            file="",
+            formats=variables,
+            numrec=2,
+            offset_variables={'xd': 'xd_offset'}
+        )
         w.write(dict(x=np.array([1, 2, 3])))
         w.write(dict(x=np.array([4, 5])))
         w.write(dict(x=np.array([6, 7, 8])))
 
-        assert w.paths[0].variables['instance_offset'][...] == 0
-        assert w.paths[1].variables['instance_offset'][...] == 5
+        assert w.paths[0].variables['xd_offset'][...] == 0
+        assert w.paths[1].variables['xd_offset'][...] == 5
 
         w.close()

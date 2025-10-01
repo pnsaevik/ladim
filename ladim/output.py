@@ -30,7 +30,9 @@ class Output:
         if numrec == 0:
             self.writer = Writer.netcdf(file, formats)
         else:
-            self.writer = Writer.mf_netcdf(file, formats, numrec)
+            copy_tabs = ('particle', )
+            offset_vars = {'particle_instance': 'instance_offset'}
+            self.writer = Writer.mf_netcdf(file, formats, numrec, offset_vars, copy_tabs)
 
         self._init_vars = {k for k, v in formats.items() if v.is_initial()}
         self._inst_vars = {k for k, v in formats.items() if v.is_instance()}
@@ -261,12 +263,29 @@ class Writer:
         return _NCWriter(file, formats)
     
     @staticmethod
-    def mf_netcdf(file: str, formats: dict[str, OutputFormat], numrec) -> "Writer":
+    def mf_netcdf(
+        file: str,
+        formats: dict[str, OutputFormat],
+        numrec,
+        offset_variables: dict | None = None,
+        copy_dims: tuple[str] = (),
+        ) -> "Writer":
         """
         Create a multi-file netCDF writer
+
+        :param file: File name, or empty string if in-memory object is desired
+        :param formats: Formats, one entry for each variable
+        :param numrec: Number of records per output file. Zero means a single output file.
+        :param offset_variables: A mapping from dimension names to offset variables.
+            An offset variable is a variable inside a multi-file dataset that
+            indicates how many previous records have already been written to
+            prior files. The format of the offset variable must be specified
+            in the ``formats`` param.
+        :param copy_dims: Tables that should be copied from the previous 
+            file to the next one, when a new file is created.
         """
 
-        return _MFNCWriter(file, formats, numrec)
+        return _MFNCWriter(file, formats, numrec, offset_variables, copy_dims)
 
     def write(self, data: dict[str, np.ndarray]):
         """
@@ -371,66 +390,70 @@ class _NCWriter(Writer):
 
 
 class _MFNCWriter(Writer):
-    def __init__(self, file: str, formats: dict[str, OutputFormat], numrec: int):
+    def __init__(
+            self,
+            file: str,
+            formats: dict[str, OutputFormat],
+            numrec: int,
+            offset_variables: dict | None = None,
+            copy_dims: tuple[str] = (),
+            ):
         """
         Create a multi-file netCDF writer
 
         :param file: File name, or empty string if in-memory object is desired
         :param formats: Formats, one entry for each variable
         :param numrec: Number of records per output file. Zero means a single output file.
+        :param offset_variables: A mapping from dimension names to offset variables.
+            An offset variable is a variable inside a multi-file dataset that
+            indicates how many previous records have already been written to
+            prior files. The format of the offset variable must be specified
+            in the ``formats`` param.
+        :param copy_dims: Tables that should be copied from the previous 
+            file to the next one, when a new file is created.
         """
+
+        offset_variables = offset_variables or dict()  # Empty dict if None
 
         self.file = file
         self.formats = formats
         self.numrec = numrec
-        self._sizes = {}
-        self._offsets = {}
+        self._sizes = {fmt.dimensions: 0 for fmt in formats.values() if fmt.dimensions}
+        self._offsets = self.sizes.copy()
         self._paths = []
         self._step_counter = 0
         self._padding = 4
-        self._tables_to_be_copied = ["particle"]
-        self._offset_variables = {"particle_instance": "instance_offset", "time": "time_offset"}
-        self._offset_variables = {k: v for k, v in self._offset_variables.items() if v in formats}
+        self._tables_to_be_copied = copy_dims
+        self._offset_variables = offset_variables
 
-        self._append_next_file()
+        self._initialize_next_file()
 
-    def _append_next_file(self):
-        diskless = False
+    def _initialize_next_file(self):
         if not self.file:
             from uuid import uuid4
-            file = str(uuid4())
+            file_name = str(uuid4())
             diskless = True
         else:
             base_name, ext = os.path.splitext(str(self.file))
-            file = f"{base_name}_{len(self._paths):0{self._padding}d}{ext}"
+            file_name = f"{base_name}_{len(self._paths):0{self._padding}d}{ext}"
+            diskless = False
 
-        dset = create_netcdf_file(fname=file, formats=self.formats, diskless=diskless)
-        self._copy_tables(dset)
+        dset = create_netcdf_file(fname=file_name, formats=self.formats, diskless=diskless)
+
         if len(self._paths) > 0:
-            self._offsets = {k: v + self._sizes[k] for k, v in self._offsets.items()}
-        else:
-            self._sizes = {k: v.size for k, v in dset.dimensions.items()}
+            with _open_or_relay(self._paths[0]) as source_dataset:
+                _copy_nc_tables(source_dataset, dset, self._tables_to_be_copied)
             self._offsets = self._sizes.copy()
+            for k in self._tables_to_be_copied:
+                self._offsets[k] = 0
 
         dset.sync()
 
         if diskless:
             self._paths.append(dset)
         else:
-            self._paths.append(file)
+            self._paths.append(file_name)
             dset.close()
-
-    def _copy_tables(self, dset: nc.Dataset) -> nc.Dataset:
-        if len(self._paths) == 0:
-            return dset
-
-        with _open_or_relay(self._paths[-1], mode='r') as old_dset:
-            vars = [k for k, v in dset.variables.items()
-                    if (len(v.dimensions) > 0) and (v.dimensions[0] in self._tables_to_be_copied)]
-            for x in vars:
-                dset.variables[x][:] = old_dset.variables[x][:]
-
-        return dset
 
     @property
     def sizes(self) -> dict[str, int]:
@@ -446,15 +469,10 @@ class _MFNCWriter(Writer):
 
     def write(self, data: dict[str, np.ndarray]):
         if (self._step_counter > 0) and not(self._step_counter % self.numrec):
-            self._append_next_file()
+            self._initialize_next_file()
 
         with _open_or_relay(self._paths[-1], mode='a') as dset:
             self._write(dset, data)
-            for k, v in dset.dimensions.items():
-                if k in self._tables_to_be_copied:
-                    self._sizes[k] = v.size
-                else:
-                    self._sizes[k] = v.size + self._offsets[k]
 
         self._step_counter += 1
 
@@ -468,6 +486,8 @@ class _MFNCWriter(Writer):
         for k, v in self._offset_variables.items():
             if v in dset.variables:
                 dset.variables[v][...] = self._offsets[k]
+
+        self._sizes = {k: v.size + self._offsets[k] for k, v in dset.dimensions.items()}
 
         dset.sync()
 
@@ -483,3 +503,22 @@ def _open_or_relay(path_or_object: str | nc.Dataset, mode='r') -> typing.Generat
             yield dset
     else:
         yield path_or_object
+
+
+def _copy_nc_tables(src_dset: nc.Dataset, dst_dset: nc.Dataset, dims: tuple[str]):
+    """
+    Copy tables from one netCDF dataset to another
+
+    A "table" is a set of single-dimension netCDF variables sharing the same 
+    dimension.
+
+    :param src_dset: Source dataset
+    :param dst_dset: Destination dataset
+    :param dims: Dimensions to copy
+    """
+    for k, v in src_dset.variables.items():
+        if len(v.dimensions) != 1:
+            continue
+        if v.dimensions[0] not in dims:
+            continue
+        dst_dset[k][:] = src_dset[k][:]
