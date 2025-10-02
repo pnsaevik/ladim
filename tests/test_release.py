@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 import io
 import typing
+import netCDF4 as nc
 
 
 class Test_TextFileReleaser_update:
@@ -145,6 +146,27 @@ class Test_TextFileReleaser_update:
 
         # Confirm effect on state module
         assert list(mock_model.state['X']) == [61]
+
+    def test_warm_start_time(self, mock_model):
+        # Create mock release file
+        buf = io.StringIO(
+            'release_time X Y\n'
+            '2000-01-01 60 4\n'
+            '2000-01-01 61 5\n'
+        )
+
+        # Create mock warm start file
+        data_dict = dict(time=np.array([1441587720, 1441587780]))
+        dset = nc.Dataset(filename='inmemory.nc', mode='w', format='NETCDF4', diskless=True)
+        dset.createDimension('time', len(data_dict['time']))
+        time_var = dset.createVariable('time', 'i8', ('time',))
+        time_var[:] = data_dict['time']
+        time_var.units = 'seconds since 1970-01-01 00:00:00'
+
+        # Run releaser update
+        releaser = release.Releaser.create(file=buf, warm_start_file=dset)
+
+        assert releaser.warm_start_time() == 1441587780
 
 
 class Test_resolve_schedule:

@@ -4,6 +4,7 @@ import pandas as pd
 from .utilities import read_timedelta
 import logging
 import typing
+import netCDF4 as nc
 
 if typing.TYPE_CHECKING:
     from ladim.model import Model
@@ -13,13 +14,17 @@ logger = logging.getLogger(__name__)
 
 
 class Releaser:
-    def __init__(self, particle_generator: typing.Callable[[float, float], pd.DataFrame]):
+    def __init__(self,
+                 particle_generator: typing.Callable[[float, float], pd.DataFrame],
+                 warm_start_file: typing.Union[str, nc.Dataset, None] = None):
         self.particle_generator = particle_generator
+        self.warm_start_file = warm_start_file
 
     @staticmethod
     def create(
             file, colnames: list = None, formats: dict = None,
             frequency=(0, 's'), defaults=None, lonlat_converter=None,
+            warm_start_file: typing.Union[str, nc.Dataset, None] = None
     ):
         """
         Release module which reads from a text file
@@ -45,6 +50,9 @@ class Releaser:
         :param defaults: A dict of variables to be added to each particle. The keys
             are the variable names, the values are the initial values at particle
             release.
+
+        :param warm_start_file: Warm start file.
+
         """
 
         release_table = ReleaseTable.from_filename_or_stream(
@@ -55,7 +63,7 @@ class Releaser:
             defaults=defaults or dict(),
             lonlat_converter=lonlat_converter,
         )
-        return Releaser(particle_generator=release_table.subset)
+        return Releaser(particle_generator=release_table.subset, warm_start_file=warm_start_file)
 
     def update(self, model: "Model"):
         self._add_new(model)
@@ -94,6 +102,12 @@ class Releaser:
         new_particles = df.to_dict(orient='list')
         state = model.state
         state.append(new_particles)
+
+    def warm_start_time(self):
+        with _open_nc_or_relay(self.warm_start_file) as dset:
+            warm_start_time = dset.variables['time'][-1]
+
+        return warm_start_time
 
 
 def release_data_subset(dataframe, start_time, stop_time, interval: typing.Any = 0):
@@ -374,3 +388,12 @@ def open_or_relay(file_or_buf, *args, **kwargs):
     else:
         with open(file_or_buf, *args, **kwargs) as f:
             yield f
+
+
+@contextlib.contextmanager
+def _open_nc_or_relay(path_or_object: str | nc.Dataset, mode='r') -> typing.Generator[nc.Dataset, typing.Any, typing.Any]:
+    if isinstance(path_or_object, str):
+        with nc.Dataset(path_or_object, mode=mode) as dset:
+            yield dset
+    else:
+        yield path_or_object
