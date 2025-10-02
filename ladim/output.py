@@ -3,36 +3,39 @@ import numpy as np
 import typing
 if typing.TYPE_CHECKING:
     from .model import Model
+import os
+import contextlib
 
 
 class Output:
-    def __init__(self, variables: dict, file: str, frequency):
+    def __init__(self, variables: dict, file: str, frequency, numrec: int=0):
         """
         Writes simulation output to netCDF file in ragged array format
 
         :param variables: Simulation variables to include in output, and their formatting
         :param file: Name of output file, or empty if a diskless dataset is desired
         :param frequency: Output frequency in seconds. Alternatively, as a two-element
-        tuple (freq_value, freq_unit) where freq_unit can be any numpy-compatible time
-        unit.
+            tuple (freq_value, freq_unit) where freq_unit can be any numpy-compatible time
+            unit.
+        :param numrec: Number of records per output file. Zero means a single output file.
 
         """
         # Convert output format specification from ladim.yaml config to OutputFormat
-        self._formats = {
+        user_formats = {
             k: OutputFormat.from_ladim_conf(v)
             for k, v in variables.items()
         }
+        formats = {**self._default_formats(), **user_formats}
 
-        self._init_vars = {k for k, v in self._formats.items() if v.is_initial()}
-        self._inst_vars = {k for k, v in self._formats.items() if v.is_instance()}
-
-        if not file:
-            from uuid import uuid4
-            self._fname = uuid4()
-            self._diskless = True
+        if numrec == 0:
+            self.writer = Writer.netcdf(file, formats)
         else:
-            self._fname = file
-            self._diskless = False
+            copy_tabs = ('particle', )
+            offset_vars = {'particle_instance': 'instance_offset'}
+            self.writer = Writer.mf_netcdf(file, formats, numrec, offset_vars, copy_tabs)
+
+        self._init_vars = {k for k, v in formats.items() if v.is_initial()}
+        self._inst_vars = {k for k, v in formats.items() if v.is_instance()}
 
         try:
             freq_num, freq_unit = frequency
@@ -41,12 +44,11 @@ class Output:
             freq_unit = 's'
         self._write_frequency = np.timedelta64(freq_num, freq_unit).astype('timedelta64[s]').astype('int64')
 
-        self._dset = None  # type: nc.Dataset | None
         self._num_writes = 0
         self._last_write_time = np.int64(-4611686018427387904)
 
     @staticmethod
-    def create(variables: dict, file: str, frequency):
+    def create(variables: dict, file: str, frequency, numrec: int=0):
         """
         Writes simulation output to netCDF file in ragged array format
 
@@ -55,37 +57,32 @@ class Output:
         :param frequency: Output frequency in seconds. Alternatively, as a two-element
         tuple (freq_value, freq_unit) where freq_unit can be any numpy-compatible time
         unit.
+        :param numrec: Number of records per output file. Zero means a single output file.
 
         """
-        return Output(variables, file, frequency)
-
-
-    @property
-    def dataset(self) -> nc.Dataset:
-        """Returns a handle to the netCDF dataset currently being written to"""
-        return self._dset
+        return Output(variables, file, frequency, numrec)
 
     def update(self, model: "Model"):
-        if self._dset is None:
-            self._create_dset()
+        data_dict_init = self._update_init_vars(model)
+        data_dict_inst = self._update_instance_vars(model)
 
-        self._write_init_vars(model)
-        self._write_instance_vars(model)
+        self.writer.write(data_dict_init | data_dict_inst)
 
-    def _write_init_vars(self, model):
+    def _update_init_vars(self, model) -> dict[str, np.ndarray]:
         """
-        Write the initial state of new particles
+        Update the initial state of new particles
         """
 
         # Check if there are any new particles
-        part_size = self._dset.dimensions['particle'].size
+        part_size = self.writer.sizes['particle']
         num_new = model.state.released - part_size
         if num_new == 0:
-            return
+            return dict()
 
-        # Write variable data
+        # Extract data
         idx = model.state['pid'] > part_size - 1
         pid = model.state['pid'][idx]
+        data_dict = {}
         for v in set(self._init_vars) - {'release_time'}:
             # The idx array is not necessarily monotonically increasing by 1
             # all the way. We therefore copy the data into a temporary,
@@ -93,46 +90,36 @@ class Output:
             data_raw = model.state[v][idx]
             data = np.zeros(num_new, dtype=data_raw.dtype)
             data[pid - part_size] = data_raw
-            self._dset.variables[v][part_size:part_size + num_new] = data
+            data_dict[v] = data
+        data_dict['release_time'] = np.broadcast_to(model.solver.time, shape=(num_new, ))
 
-        # Write release time variable
-        data = np.broadcast_to(model.solver.time, shape=(num_new, ))
-        self._dset.variables['release_time'][part_size:part_size + num_new] = data
-        self._dset.sync()
+        return data_dict
 
-    def _write_instance_vars(self, model):
+    def _update_instance_vars(self, model) -> dict[str, np.ndarray]:
         """
-        Write the current state of dynamic varaibles
+        Update the current state of dynamic variables
         """
 
         # Check if this is a write time step
         current_time = model.solver.time
         elapsed_since_last_write = current_time - self._last_write_time
         if elapsed_since_last_write < self._write_frequency:
-            return
+            return dict()
         self._last_write_time = current_time
 
-        # Write current time
-        time_size = self._dset.dimensions['time'].size
-        time_value = current_time.astype('datetime64[s]').astype('int64')
-        self._dset.variables['time'][time_size] = time_value
-
-        # Write variable values
-        inst_size = self._dset.dimensions['particle_instance'].size
-        inst_num = model.state.size
-        inst_vars = {k: model.state[k] for k in set(self._inst_vars) - {'lat', 'lon'}}
+        # Get variable values
+        data_dict = {k: model.state[k] for k in set(self._inst_vars) - {'lat', 'lon'}}
+        data_dict['time'] = current_time.astype('datetime64[s]').astype('int64').ravel()
+        data_dict['particle_count'] = np.asarray(model.state.size).ravel()
         if {'lat', 'lon'}.intersection(self._inst_vars):
             x, y = model.state['X'], model.state['Y']
-            inst_vars['lon'], inst_vars['lat'] = model.grid.xy2ll(x, y)
-        for name, data in inst_vars.items():
-            self._dset.variables[name][inst_size:inst_size + inst_num] = data
+            data_dict['lon'], data_dict['lat'] = model.grid.xy2ll(x, y)
 
-        # Write particle count
-        self._dset.variables['particle_count'][time_size] = inst_num
-        self._dset.sync()
+        return data_dict
 
-    def _create_dset(self):
-        default_formats = dict(
+    @staticmethod
+    def _default_formats() -> dict[str, "OutputFormat"]:
+        return dict(
             time=OutputFormat(
                 ncformat='i8',
                 dimensions='time',
@@ -165,26 +152,16 @@ class Output:
             )
         )
 
-        self._dset = create_netcdf_file(
-            fname=self._fname,
-            formats={**default_formats, **self._formats},
-            diskless=self._diskless,
-        )
-
-        self._dset.variables['instance_offset'][:] = 0
-        self._dset.sync()
-
     def close(self):
-        if self._dset is not None:
-            self._dset.close()
-            self._dset = None
+        self.writer.close()
 
 
 class OutputFormat:
-    def __init__(self, ncformat, dimensions, attributes, kind=None):
+    def __init__(self, ncformat: str, dimensions: str, attributes: dict = None,
+                 kind: str = None):
         self.ncformat = ncformat
         self.dimensions = dimensions
-        self.attributes = attributes
+        self.attributes = attributes or {}
         self.kind = kind
 
     def is_initial(self):
@@ -240,18 +217,308 @@ def create_netcdf_file(fname: str, formats: dict[str, OutputFormat], diskless=Fa
     dset.date = str(np.datetime64('now', 'D'))
 
     # Create dimensions
-    dset.createDimension(dimname="particle", size=None)
-    dset.createDimension(dimname="particle_instance", size=None)
-    dset.createDimension(dimname="time", size=None)
+    dimnames = {f.dimensions for f in formats.values() if f.dimensions}
+    for dimname in dimnames:
+        dset.createDimension(dimname=dimname, size=None)
 
     # Create variables
     for varname, item in formats.items():
         dset.createVariable(
             varname=varname,
             datatype=item.ncformat,
-            dimensions=item.dimensions,
+            dimensions=item.dimensions or (),
         )
         dset.variables[varname].set_auto_mask(False)
         dset.variables[varname].setncatts(item.attributes)
 
+    if 'instance_offset' in dset.variables:
+        dset.variables['instance_offset'][...] = 0
+
     return dset
+
+
+class Writer:
+    """
+    Abstract base class for output writers
+
+    An output writer should be able to write tabular data in a thread-safe
+    way to the output storage backend. The output may be in the form of one or
+    more tables, distributed over one or more files. Each write operation should
+    be atomic, i.e. all data is written sequentially to the file at once. The
+    total number of rows in each table is not known at creation time.
+
+    Each table may have a number of columns, each with a unique name, data type
+    and potentially some metadata attributes. The number of columns and their
+    attributes should be known at creation time.
+    """
+    @staticmethod
+    def netcdf(file: str, formats: dict[str, OutputFormat]) -> "Writer":
+        """
+        Create a single-file netCDF writer
+
+        :param file: File name, or empty string if in-memory object is desired
+        :param formats: Formats, one entry for each variable
+        :return: Writer instance
+        """
+        return _NCWriter(file, formats)
+    
+    @staticmethod
+    def mf_netcdf(
+        file: str,
+        formats: dict[str, OutputFormat],
+        numrec,
+        offset_variables: dict | None = None,
+        copy_dims: tuple[str] = (),
+        ) -> "Writer":
+        """
+        Create a multi-file netCDF writer
+
+        :param file: File name, or empty string if in-memory object is desired
+        :param formats: Formats, one entry for each variable
+        :param numrec: Number of records per output file. Zero means a single output file.
+        :param offset_variables: A mapping from dimension names to offset variables.
+            An offset variable is a variable inside a multi-file dataset that
+            indicates how many previous records have already been written to
+            prior files. The format of the offset variable must be specified
+            in the ``formats`` param.
+        :param copy_dims: Tables that should be copied from the previous 
+            file to the next one, when a new file is created.
+        """
+
+        return _MFNCWriter(file, formats, numrec, offset_variables, copy_dims)
+
+    def write(self, data: dict[str, np.ndarray]):
+        """
+        Write data to file(s)
+
+        :param data: Dictionary with variable names as keys and numpy arrays as
+            data values
+        """
+        raise NotImplementedError()
+    
+    @property
+    def sizes(self) -> dict[str, int]:
+        """
+        Return number of rows written in each table
+
+        :return: Dictionary with variable names as keys and number of rows as values
+        """
+        raise NotImplementedError()
+
+    @property
+    def offsets(self) -> dict[str, int]:
+        """
+        Return accumulated number of rows written in each table
+
+        :return: Dictionary with variable names as keys and number of rows as values
+        """
+        raise NotImplementedError()
+
+    @property
+    def paths(self) -> list[typing.Any]:
+        """
+        Return list of paths to written files, or in-memory objects
+        
+        :return: List of file paths or in-memory objects
+        """
+        raise NotImplementedError()
+
+    def close(self):
+        """
+        Close all open files and release resources
+        """
+        raise NotImplementedError()
+        
+
+class _NCWriter(Writer):
+    def __init__(self, file: str, formats: dict[str, OutputFormat]):
+        """
+        Create a single-file netCDF writer
+
+        :param file: File name, or empty string if in-memory object is desired
+        :param formats: Formats, one entry for each variable
+        """
+
+        if not file:
+            from uuid import uuid4
+            file = str(uuid4())
+            diskless = True
+        else:
+            diskless = False
+            file = str(file)
+
+        dset = create_netcdf_file(fname=file, formats=formats, diskless=diskless)
+        dset.sync()
+        self._sizes = {k: v.size for k, v in dset.dimensions.items()}
+
+        if diskless:
+            self._paths = [dset]
+        else:
+            self._paths = [file]
+            dset.close()
+
+    @property
+    def sizes(self) -> dict[str, int]:
+        return self._sizes
+
+    @property
+    def offsets(self) -> dict[str, int]:
+        return self._sizes
+
+    @property
+    def paths(self) -> list[typing.Any]:
+        return self._paths
+
+    def write(self, data: dict[str, np.ndarray]):
+        with _open_or_relay(self._paths[0], mode='a') as dset:
+            self._write(dset, data)
+            self._sizes = {k: v.size for k, v in dset.dimensions.items()}
+
+    @staticmethod
+    def _write(dset: nc.Dataset, data: dict[str, np.ndarray]):
+        old_sizes = {k: v.size for k, v in dset.dimensions.items()}
+
+        for k, v in data.items():
+            dimname, = dset.variables[k].dimensions  # Assume single dimension
+            sz = old_sizes[dimname]
+            dset.variables[k][sz:sz + len(v)] = v
+        dset.sync()
+
+    def close(self):
+        # Have already closed files after each write
+        pass
+
+
+class _MFNCWriter(Writer):
+    def __init__(
+            self,
+            file: str,
+            formats: dict[str, OutputFormat],
+            numrec: int,
+            offset_variables: dict | None = None,
+            copy_dims: tuple[str] = (),
+            ):
+        """
+        Create a multi-file netCDF writer
+
+        :param file: File name, or empty string if in-memory object is desired
+        :param formats: Formats, one entry for each variable
+        :param numrec: Number of records per output file. Zero means a single output file.
+        :param offset_variables: A mapping from dimension names to offset variables.
+            An offset variable is a variable inside a multi-file dataset that
+            indicates how many previous records have already been written to
+            prior files. The format of the offset variable must be specified
+            in the ``formats`` param.
+        :param copy_dims: Tables that should be copied from the previous 
+            file to the next one, when a new file is created.
+        """
+
+        offset_variables = offset_variables or dict()  # Empty dict if None
+
+        self.file = file
+        self.formats = formats
+        self.numrec = numrec
+        self._sizes = {fmt.dimensions: 0 for fmt in formats.values() if fmt.dimensions}
+        self._offsets = self.sizes.copy()
+        self._paths = []
+        self._step_counter = 0
+        self._padding = 4
+        self._tables_to_be_copied = copy_dims
+        self._offset_variables = offset_variables
+
+        self._initialize_next_file()
+
+    def _initialize_next_file(self):
+        if not self.file:
+            from uuid import uuid4
+            file_name = str(uuid4())
+            diskless = True
+        else:
+            base_name, ext = os.path.splitext(str(self.file))
+            file_name = f"{base_name}_{len(self._paths):0{self._padding}d}{ext}"
+            diskless = False
+
+        dset = create_netcdf_file(fname=file_name, formats=self.formats, diskless=diskless)
+
+        if len(self._paths) > 0:
+            with _open_or_relay(self._paths[0]) as source_dataset:
+                _copy_nc_tables(source_dataset, dset, self._tables_to_be_copied)
+            self._offsets = self._sizes.copy()
+            for k in self._tables_to_be_copied:
+                self._offsets[k] = 0
+
+        dset.sync()
+
+        if diskless:
+            self._paths.append(dset)
+        else:
+            self._paths.append(file_name)
+            dset.close()
+
+    @property
+    def sizes(self) -> dict[str, int]:
+        return self._sizes
+
+    @property
+    def offsets(self) -> dict[str, int]:
+        return self._offsets
+
+    @property
+    def paths(self) -> list[typing.Any]:
+        return self._paths
+
+    def write(self, data: dict[str, np.ndarray]):
+        if (self._step_counter > 0) and not(self._step_counter % self.numrec):
+            self._initialize_next_file()
+
+        with _open_or_relay(self._paths[-1], mode='a') as dset:
+            self._write(dset, data)
+
+        self._step_counter += 1
+
+    def _write(self, dset: nc.Dataset, data: dict[str, np.ndarray]):
+        old_sizes = {k: v.size for k, v in dset.dimensions.items()}
+        for k, v in data.items():
+            dimname, = dset.variables[k].dimensions  # Assume single dimension
+            sz = old_sizes[dimname]
+            dset.variables[k][sz:sz + len(v)] = v
+
+        for k, v in self._offset_variables.items():
+            if v in dset.variables:
+                dset.variables[v][...] = self._offsets[k]
+
+        self._sizes = {k: v.size + self._offsets[k] for k, v in dset.dimensions.items()}
+
+        dset.sync()
+
+    def close(self):
+        # Have already closed files after each write
+        pass
+
+
+@contextlib.contextmanager
+def _open_or_relay(path_or_object: str | nc.Dataset, mode='r') -> typing.Generator[nc.Dataset, typing.Any, typing.Any]:
+    if isinstance(path_or_object, str):
+        with nc.Dataset(path_or_object, mode=mode) as dset:
+            yield dset
+    else:
+        yield path_or_object
+
+
+def _copy_nc_tables(src_dset: nc.Dataset, dst_dset: nc.Dataset, dims: tuple[str]):
+    """
+    Copy tables from one netCDF dataset to another
+
+    A "table" is a set of single-dimension netCDF variables sharing the same 
+    dimension.
+
+    :param src_dset: Source dataset
+    :param dst_dset: Destination dataset
+    :param dims: Dimensions to copy
+    """
+    for k, v in src_dset.variables.items():
+        if len(v.dimensions) != 1:
+            continue
+        if v.dimensions[0] not in dims:
+            continue
+        dst_dset[k][:] = src_dset[k][:]

@@ -4,7 +4,7 @@ import typing
 from ladim import output
 
 
-class Test_RaggedOutput_update:
+class Test_Output_update:
     @pytest.fixture()
     def mock_model(self):
         model = MockObj()  # type: typing.Any
@@ -37,7 +37,7 @@ class Test_RaggedOutput_update:
             out.update(model)
 
             # Confirm effect on output file
-            dset = out.dataset
+            dset = out.writer.paths[0]
             assert 'release_time' in dset.variables
             assert dset['release_time'].dimensions == ('particle', )
             assert dset['release_time'].units == "seconds since 1970-01-01"
@@ -79,7 +79,7 @@ class Test_RaggedOutput_update:
             model.output.update(model)
 
             # Confirm effect on output file
-            dset = model.output.dataset
+            dset = model.output.writer.paths[0]
             assert 'particle_count' in dset.variables
             assert dset['particle_count'].dimensions == ('time',)
             assert dset['particle_count'].long_name == "number of particles in a given timestep"
@@ -133,7 +133,7 @@ class Test_RaggedOutput_update:
             model.output.update(model)
 
             # Confirm effect on output file
-            dset = model.output.dataset
+            dset = model.output.writer.paths[0]
             assert 'X' in dset.variables
             assert dset['X'].units == "m"
             assert dset['X'].long_name == "x coord"
@@ -181,17 +181,18 @@ class Test_RaggedOutput_update:
         try:
             # Writes output on first step (0 sec)
             model.output.update(model)
-            assert model.output.dataset['X'][:].tolist() == [10, 20]
+            dset = model.output.writer.paths[0]
+            assert dset['X'][:].tolist() == [10, 20]
 
             # Does not write output on second step (60 sec)
             model.solver.time += model.solver.step
             model.output.update(model)
-            assert model.output.dataset['X'][:].tolist() == [10, 20]
+            assert dset['X'][:].tolist() == [10, 20]
 
             # Writes output on third step (120 sec)
             model.solver.time += model.solver.step
             model.output.update(model)
-            assert model.output.dataset['X'][:].tolist() == [10, 20, 10, 20]
+            assert dset['X'][:].tolist() == [10, 20, 10, 20]
 
         finally:
             model.output.close()
@@ -221,7 +222,7 @@ class Test_RaggedOutput_update:
             model.output.update(model)
 
             # Confirm effect on output file
-            dset = model.output.dataset
+            dset = model.output.writer.paths[0]
             assert dset['lat'].dimensions == ('particle_instance',)
             assert dset['lat'][:].tolist() == [73, 74]
             assert dset['lon'].dimensions == ('particle_instance',)
@@ -243,3 +244,111 @@ class MockObj:
 
     def __contains__(self, item):
         return item in self._dict
+
+
+class Test_Writer:
+    def test_netcdf_writer(self):
+        variables = dict(
+            x=output.OutputFormat(ncformat='f4', dimensions='mydim')
+        )
+        w = output.Writer.netcdf(file="", formats=variables)
+        w.write(dict(x=np.array([1.0, 2.0, 3.0])))
+        w.write(dict(x=np.array([4.0, 5.0])))
+
+        assert w.paths[0].variables['x'][:].tolist() == [1.0, 2.0, 3.0, 4.0, 5.0]
+        assert w.sizes == {'mydim': 5}
+        assert len(w.paths) == 1
+        w.close()
+
+    def test_mf_netcdf_writer_can_append_particles(self):
+        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='xd'))
+        
+        # Write four times with numrec = 2
+        w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
+        w.write(dict(x=np.array([1, 2, 3])))
+        w.write(dict(x=np.array([4, 5])))
+        w.write(dict(x=np.array([6, 7, 8])))
+        w.write(dict(x=np.array([9])))
+
+        # Read x values
+        x_values = []
+        for dset in w.paths:
+            x_values += dset.variables['x'][:].tolist()
+        
+        assert x_values == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+        w.close()
+
+    def test_mf_netcdf_writer_splits_output_on_multiple_files(self):
+        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='xd'))
+        
+        # Write two times with numrec = 2; single file
+        w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
+        w.write(dict(x=np.array([1, 2, 3])))
+        w.write(dict(x=np.array([4, 5])))
+        assert len(w.paths) == 1
+        assert w.paths[0].variables['x'][:].tolist() == [1, 2, 3, 4, 5]
+
+        # Write once more; two files
+        w.write(dict(x=np.array([6, 7, 8])))
+        assert len(w.paths) == 2
+        assert w.paths[1].variables['x'][:].tolist() == [6, 7, 8]
+
+        w.close()
+
+    def test_mf_netcdf_writer_returns_total_sizes(self):
+        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='xd'))
+        
+        # Write three times with numrec = 2; two files
+        w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
+        w.write(dict(x=np.array([1, 2, 3])))
+        w.write(dict(x=np.array([4, 5])))
+        w.write(dict(x=np.array([6, 7, 8])))
+
+        assert w.sizes['xd'] == 8
+
+        w.close()
+
+    def test_mf_netcdf_writer_copies_particle_table(self):
+        # 'particle' is a special keyword: These variables should be copied
+        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='xd'))
+        
+        # Write three times with numrec = 2
+        w = output.Writer.mf_netcdf(
+            file="",
+            formats=variables,
+            numrec=2,
+            copy_dims=('xd', ),
+            )
+        w.write(dict(x=np.array([1, 2, 3])))
+        w.write(dict(x=np.array([4, 5])))
+        w.write(dict(x=np.array([6, 7, 8])))
+
+        assert w.paths[0].variables['x'][:].tolist() == [1, 2, 3, 4, 5]
+        assert w.paths[1].variables['x'][:].tolist() == [1, 2, 3, 4, 5, 6, 7, 8]
+        assert w.sizes['xd'] == 8
+
+        w.close()
+
+    def test_mf_netcdf_writer_updates_offset_variable(self):
+        # 'particle_instance' is a special keyword: This dimension has an offset variable
+        variables = dict(
+            x=output.OutputFormat(ncformat='f4', dimensions='xd'),
+            xd_offset=output.OutputFormat(ncformat='i4', dimensions='')
+            )
+        
+        # Write three times with numrec = 2
+        w = output.Writer.mf_netcdf(
+            file="",
+            formats=variables,
+            numrec=2,
+            offset_variables={'xd': 'xd_offset'}
+        )
+        w.write(dict(x=np.array([1, 2, 3])))
+        w.write(dict(x=np.array([4, 5])))
+        w.write(dict(x=np.array([6, 7, 8])))
+
+        assert w.paths[0].variables['xd_offset'][...] == 0
+        assert w.paths[1].variables['xd_offset'][...] == 5
+
+        w.close()

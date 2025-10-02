@@ -106,6 +106,7 @@ def convert_1_to_2(c):
     out['output'] = {}
     out['output']['file'] = dict_get(c, 'files.output_file')
     out['output']['frequency'] = dict_get(c, 'output_variables.outper')
+    out['output']['numrec'] = dict_get(c, 'output_variables.numrec', 0)
     out['output']['variables'] = {}
 
     # Convert output variable format spec
