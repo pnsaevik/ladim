@@ -55,6 +55,7 @@ class Test_convert_1_to_2:
             'output': {
                 'file': 'out.nc',
                 'frequency': [60, 's'],
+                'numrec': 0,
                 'variables': {
                     'X': {
                         'long_name': 'particle X-coordinate', 'ncformat': 'f4'},

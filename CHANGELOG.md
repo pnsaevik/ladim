@@ -13,9 +13,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
-## [2.1.8] - 2025-09-22
+
+## [2.2.1] - 2025-09-22
 ### Changed
 - Use sphinx autoapi to generate documentation
+
+
+## [2.2.0] - 2025-10-01
+### Added
+- Output can now be split between several files
+
 
 ## [2.1.7] - 2025-09-22
 ### Changed

@@ -80,7 +80,7 @@ def run():
     logger.info(f"python version:  {sys.version.split()[0]}\n")
 
     logger.info(f"  Configuration file: {args.config_file}")
-    logger.info(f"  loglevel = {logging.getLevelName(args.loglevel)}")
+    logger.info(f"  loglevel = {args.loglevel}")
 
     # =============
     # Sanity check
