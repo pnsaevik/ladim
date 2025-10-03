@@ -295,7 +295,15 @@ class Writer:
             data values
         """
         raise NotImplementedError()
-    
+
+    def prepare_warm_start(self, warm_start_file:str):
+        """
+        Prepare warm stat
+
+        :param warm_start_file: Warm start file
+        """
+        raise NotImplementedError()
+
     @property
     def sizes(self) -> dict[str, int]:
         """
@@ -386,6 +394,9 @@ class _NCWriter(Writer):
 
     def close(self):
         # Have already closed files after each write
+        pass
+
+    def prepare_warm_start(self, warm_start_file:str):
         pass
 
 
@@ -494,6 +505,18 @@ class _MFNCWriter(Writer):
     def close(self):
         # Have already closed files after each write
         pass
+
+    def prepare_warm_start(self, warm_start_file:str):
+        try:
+            parts = str(warm_start_file).split('.')
+            ext = parts[-1]
+            parts = parts[0].split("_")
+            n  = int(parts[-1])
+        except:
+            raise ValueError(f'Invalid warm start file name: {warm_start_file}')
+
+        assert self.file == f'{parts[0]}.{ext}'
+        self._paths = [None] * n
 
 
 @contextlib.contextmanager

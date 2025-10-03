@@ -352,3 +352,13 @@ class Test_Writer:
         assert w.paths[1].variables['xd_offset'][...] == 5
 
         w.close()
+
+    def test_prepare_warm_start(self):
+        w = output.Writer.mf_netcdf(
+            file="output.nc",
+            formats={},
+            numrec=2
+        )
+        w.prepare_warm_start('output_0002.nc')
+
+        assert len(w.paths) == 2
