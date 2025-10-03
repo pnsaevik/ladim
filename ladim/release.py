@@ -109,6 +109,15 @@ class Releaser:
 
         return warm_start_time
 
+    def from_warm_start_file(self, model: "Model"):
+        old_particles = {}
+        with _open_nc_or_relay(self.warm_start_file) as dset:
+            for var_name, var in dset.variables.items():
+                if var.dimensions == ("particle_instance",):
+                    old_particles[var_name] = var[:]
+
+        state = model.state
+        state.append(old_particles)
 
 def release_data_subset(dataframe, start_time, stop_time, interval: typing.Any = 0):
     events = resolve_schedule(

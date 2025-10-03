@@ -157,17 +157,44 @@ class Test_TextFileReleaser_update:
 
         # Create mock warm start file
         data_dict = dict(time=np.array([1441587720, 1441587780]))
-        dset = nc.Dataset(filename='inmemory.nc', mode='w', format='NETCDF4', diskless=True)
+        dset = nc.Dataset(filename='warm_start_time.nc', mode='w', format='NETCDF4', diskless=True)
         dset.createDimension('time', len(data_dict['time']))
         time_var = dset.createVariable('time', 'i8', ('time',))
         time_var[:] = data_dict['time']
         time_var.units = 'seconds since 1970-01-01 00:00:00'
 
-        # Run releaser update
         releaser = release.Releaser.create(file=buf, warm_start_file=dset)
 
         assert releaser.warm_start_time() == 1441587780
 
+    def test_from_warm_start_file(self, mock_model):
+        # Create mock release file
+        buf = io.StringIO(
+            'release_time X Y\n'
+            '2000-01-01 60 4\n'
+            '2000-01-01 61 5\n'
+        )
+
+        # Create mock warm start file
+        data_dict = dict(time=np.array([1441587720, 1441587780]),
+                         pid=np.array([0, 1, 2, 3]),
+                         X=np.array([10, 20, 30, 40]))
+        dset = nc.Dataset(filename='from_warm_start_file.nc', mode='w', format='NETCDF4', diskless=True)
+        dset.createDimension('time', len(data_dict['time']))
+        dset.createDimension('particle_instance', len(data_dict['pid']))
+        time_var = dset.createVariable('time', 'i8', ('time',))
+        time_var[:] = data_dict['time']
+        time_var.units = 'seconds since 1970-01-01 00:00:00'
+        pid_var = dset.createVariable('pid', 'i4', ('particle_instance',))
+        pid_var[:] = data_dict['pid']
+        x_var = dset.createVariable('X', 'f4', ('particle_instance',))
+        x_var[:] = data_dict['X']
+
+        releaser = release.Releaser.create(file=buf, warm_start_file=dset)
+        releaser.from_warm_start_file(mock_model)
+
+        assert mock_model.state['pid'].tolist() == data_dict['pid'].tolist()
+        assert mock_model.state['X'].tolist() ==  data_dict['X'].tolist()
 
 class Test_resolve_schedule:
     def test_correct_when_all_events_are_specified(self):
