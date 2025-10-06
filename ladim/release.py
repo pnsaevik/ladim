@@ -110,14 +110,27 @@ class Releaser:
         return warm_start_time
 
     def from_warm_start_file(self, model: "Model"):
-        old_particles = {}
+        particles = {}
+
         with _open_nc_or_relay(self.warm_start_file) as dset:
+            if not all(var in dset.variables for var in ('pid', 'particle_count')):
+                raise ValueError("Warm start file must contain 'pid' and 'particle_count' variables")
+
+            particle_count = dset.variables['particle_count'][-1]
+            rows = dset.variables['pid'][:]
+            pid = rows[-particle_count:]
             for var_name, var in dset.variables.items():
-                if var.dimensions == ("particle_instance",):
-                    old_particles[var_name] = var[:]
+                if (var.dimensions == ("particle_instance",)) and (var_name != "pid"):
+                    rows = var[:]
+                    particles[var_name] = rows[-particle_count:]
+                elif var.dimensions == ("particle",):
+                    rows = var[:]
+                    particles[var_name] = rows[pid]
+
+            particles['pid'] = pid
 
         state = model.state
-        state.append(old_particles)
+        state.append(particles)
 
 def release_data_subset(dataframe, start_time, stop_time, interval: typing.Any = 0):
     events = resolve_schedule(

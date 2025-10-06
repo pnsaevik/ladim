@@ -176,15 +176,23 @@ class Test_TextFileReleaser_update:
         )
 
         # Create mock warm start file
-        data_dict = dict(time=np.array([1441587720, 1441587780]),
-                         pid=np.array([0, 1, 2, 3]),
-                         X=np.array([10, 20, 30, 40]))
+        data_dict = dict(time=np.array([1441587720, 1441587780, 1441587840]),
+                         particle_count=np.array([1, 2, 3]),
+                         release_time=np.array([1441587720, 1441587780, 1441587840, 1441587840]),
+                         pid=np.array([0, 0, 1, 0, 1, 2]),
+                         X=np.array([10, 20, 30, 40, 50, 60]))
         dset = nc.Dataset(filename='from_warm_start_file.nc', mode='w', format='NETCDF4', diskless=True)
         dset.createDimension('time', len(data_dict['time']))
+        dset.createDimension('particle', len(data_dict['release_time']))
         dset.createDimension('particle_instance', len(data_dict['pid']))
         time_var = dset.createVariable('time', 'i8', ('time',))
         time_var[:] = data_dict['time']
         time_var.units = 'seconds since 1970-01-01 00:00:00'
+        particle_count_var = dset.createVariable('particle_count', 'i4', ('time',))
+        particle_count_var[:] = data_dict['particle_count']
+        release_time_var = dset.createVariable('release_time', 'i8', ('particle',))
+        release_time_var[:] = data_dict['release_time']
+        release_time_var.units = 'seconds since 1970-01-01 00:00:00'
         pid_var = dset.createVariable('pid', 'i4', ('particle_instance',))
         pid_var[:] = data_dict['pid']
         x_var = dset.createVariable('X', 'f4', ('particle_instance',))
@@ -193,8 +201,8 @@ class Test_TextFileReleaser_update:
         releaser = release.Releaser.create(file=buf, warm_start_file=dset)
         releaser.from_warm_start_file(mock_model)
 
-        assert mock_model.state['pid'].tolist() == data_dict['pid'].tolist()
-        assert mock_model.state['X'].tolist() ==  data_dict['X'].tolist()
+        assert mock_model.state['pid'].tolist() == [0, 1, 2]
+        assert mock_model.state['X'].tolist() ==  [40, 50, 60]
 
 class Test_resolve_schedule:
     def test_correct_when_all_events_are_specified(self):
