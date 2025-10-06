@@ -179,7 +179,7 @@ class Test_TextFileReleaser_update:
         data_dict = dict(time=np.array([1441587720, 1441587780, 1441587840]),
                          particle_count=np.array([1, 2, 3]),
                          release_time=np.array([1441587720, 1441587780, 1441587840, 1441587840]),
-                         pid=np.array([0, 0, 1, 0, 1, 2]),
+                         pid=np.array([0, 0, 1, 0, 2, 3]),
                          X=np.array([10, 20, 30, 40, 50, 60]))
         dset = nc.Dataset(filename='from_warm_start_file.nc', mode='w', format='NETCDF4', diskless=True)
         dset.createDimension('time', len(data_dict['time']))
@@ -201,8 +201,12 @@ class Test_TextFileReleaser_update:
         releaser = release.Releaser.create(file=buf, warm_start_file=dset)
         releaser.from_warm_start_file(mock_model)
 
-        assert mock_model.state['pid'].tolist() == [0, 1, 2]
+        assert mock_model.state['pid'].tolist() == [0, 2, 3]
         assert mock_model.state['X'].tolist() ==  [40, 50, 60]
+        assert mock_model.state['release_time'].tolist() ==  [1441587720, 1441587840, 1441587840]
+        assert mock_model.state['active'].tolist() == [True, True, True]
+        assert mock_model.state['alive'].tolist() == [True, True, True]
+        assert mock_model.state.released == 4
 
 class Test_resolve_schedule:
     def test_correct_when_all_events_are_specified(self):

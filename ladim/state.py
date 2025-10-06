@@ -30,6 +30,10 @@ class State:
         """
         return self._num_released
 
+    @released.setter
+    def released(self, num_released):
+        self._num_released = num_released
+
     def append(self, particles: dict):
         """
         Add new particles
@@ -93,7 +97,7 @@ class State:
     def __setattr__(self, item, value):
         excepted_values = [
             '_data', '_model', '_num_released', '_varnames', 'dt', 'timestep',
-            'timestamp'
+            'timestamp', 'released'
         ]
         if item in list(self.__dict__.keys()) + excepted_values:
             super().__setattr__(item, value)

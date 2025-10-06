@@ -110,27 +110,35 @@ class Releaser:
         return warm_start_time
 
     def from_warm_start_file(self, model: "Model"):
-        particles = {}
+        bool_vars_to_be_copied = ('alive', 'active')
+        state = model.state
 
         with _open_nc_or_relay(self.warm_start_file) as dset:
             if not all(var in dset.variables for var in ('pid', 'particle_count')):
                 raise ValueError("Warm start file must contain 'pid' and 'particle_count' variables")
+            if 'particle' not in dset.dimensions:
+                raise ValueError("Warm start file must contain 'particle' dimension")
 
             particle_count = dset.variables['particle_count'][-1]
             rows = dset.variables['pid'][:]
             pid = rows[-particle_count:]
+            slice_dict = {
+                'particle_instance': slice(-particle_count, None),
+                'particle': pid
+            }
+
+            state['pid'] = pid
+            state.released = len(dset.dimensions['particle'])
             for var_name, var in dset.variables.items():
-                if (var.dimensions == ("particle_instance",)) and (var_name != "pid"):
+                dim_name, = var.dimensions
+                if (dim_name in slice_dict) and (var_name != "pid"):
                     rows = var[:]
-                    particles[var_name] = rows[-particle_count:]
-                elif var.dimensions == ("particle",):
-                    rows = var[:]
-                    particles[var_name] = rows[pid]
+                    state[var_name] = rows[slice_dict[dim_name]]
 
-            particles['pid'] = pid
+        for x in bool_vars_to_be_copied:
+            if x not in state:
+                state[x] = np.ones(len(pid), dtype=bool)
 
-        state = model.state
-        state.append(particles)
 
 def release_data_subset(dataframe, start_time, stop_time, interval: typing.Any = 0):
     events = resolve_schedule(
