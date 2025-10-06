@@ -354,11 +354,13 @@ class Test_Writer:
         w.close()
 
     def test_prepare_warm_start(self):
+        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='xd'))
         w = output.Writer.mf_netcdf(
-            file="output.nc",
-            formats={},
+            file="",
+            formats=variables,
             numrec=2
         )
         w.prepare_warm_start('output_0002.nc')
 
-        assert len(w.paths) == 2
+        assert w.paths == ['output_0000.nc', 'output_0001.nc', 'output_0002.nc']
+        assert w.sizes['xd'] == 0
