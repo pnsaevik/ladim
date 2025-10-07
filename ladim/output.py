@@ -504,17 +504,32 @@ class _MFNCWriter(Writer):
         # Have already closed files after each write
         pass
 
-    def prepare_warm_start(self, warm_start_file:str):
+    def prepare_warm_start(self, warm_start_file:str | typing.Tuple[str, nc.Dataset]):
+        if isinstance(warm_start_file, str):
+            warm_start_data = (warm_start_file, warm_start_file)
+        else:
+            warm_start_data = warm_start_file
+
         try:
-            parts = str(warm_start_file).split('.')
+            parts = str(warm_start_data[0]).split('.')
             ext = parts[-1]
             parts = parts[0].split("_")
             n  = int(parts[-1])
         except:
             raise ValueError(f'Invalid warm start file name: {warm_start_file}')
 
-        self._paths = [f"{parts[0]}_{x:0{self._padding}d}.{ext}" for x in range(n+1)]
         self._step_counter = self.numrec * n
+        self._offsets['time'] = self._step_counter
+        if isinstance(warm_start_file, str):
+            self._paths = [f"{parts[0]}_{x:0{self._padding}d}.{ext}" for x in range(n)]
+        else:
+            self._paths = [None] * n
+        self._paths.append(warm_start_data[1])
+
+        with _open_or_relay(self._paths[-1]) as dset:
+            for k, v in self._offset_variables.items():
+                self._offsets[k] = int(dset.variables[v][...])
+            self._sizes = {k: v.size + self._offsets[k] for k, v in dset.dimensions.items()}
 
 
 @contextlib.contextmanager

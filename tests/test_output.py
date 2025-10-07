@@ -2,6 +2,7 @@ import pytest
 import numpy as np
 import typing
 from ladim import output
+import netCDF4 as nc
 
 
 class Test_Output_update:
@@ -354,13 +355,38 @@ class Test_Writer:
         w.close()
 
     def test_prepare_warm_start(self):
-        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='xd'))
+        # Create mock warm start file
+        data_dict = dict(time=np.array([1441587720, 1441587780]),
+                         release_time=np.array([1441587720, 1441587780, 1441587840]),
+                         pid=np.array([0, 1, 2, 0, 1, 2]),
+                         instance_offset=3)
+        dset = nc.Dataset(filename='prepare_warm_start.nc', mode='w', format='NETCDF4', diskless=True)
+        dset.createDimension('time', len(data_dict['time']))
+        dset.createDimension('particle', len(data_dict['release_time']))
+        dset.createDimension('particle_instance', len(data_dict['pid']))
+        instance_offset = dset.createVariable('instance_offset', 'i8', ())
+        instance_offset[...] = data_dict['instance_offset']
+        time_var = dset.createVariable('time', 'i8', ('time',))
+        time_var[:] = data_dict['time']
+        time_var.units = 'seconds since 1970-01-01 00:00:00'
+        release_time_var = dset.createVariable('release_time', 'i8', ('particle',))
+        release_time_var[:] = data_dict['release_time']
+        release_time_var.units = 'seconds since 1970-01-01 00:00:00'
+        pid_var = dset.createVariable('pid', 'i4', ('particle_instance',))
+        pid_var[:] = data_dict['pid']
+
+        variables = dict(time=output.OutputFormat(ncformat='i8', dimensions='time'),
+                         release_time=output.OutputFormat(ncformat='i8', dimensions='particle'),
+                         pid=output.OutputFormat(ncformat='i4', dimensions='particle_instance'))
+
         w = output.Writer.mf_netcdf(
             file="",
             formats=variables,
-            numrec=2
+            numrec=2,
+            offset_variables={'particle_instance': 'instance_offset'}
         )
-        w.prepare_warm_start('output_0002.nc')
+        w.prepare_warm_start(('output_0001.nc', dset))
 
-        assert w.paths == ['output_0000.nc', 'output_0001.nc', 'output_0002.nc']
-        assert w.sizes['xd'] == 0
+        assert len(w.paths) == 2
+        assert w.sizes == {'time': 4, 'particle': 3, 'particle_instance': 9}
+        assert w.offsets == {'time': 2, 'particle': 0, 'particle_instance': 3}
