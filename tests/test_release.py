@@ -208,6 +208,7 @@ class Test_TextFileReleaser_update:
         assert mock_model.state['alive'].tolist() == [True, True, True]
         assert mock_model.state.released == 4
 
+
 class Test_resolve_schedule:
     def test_correct_when_all_events_are_specified(self):
         e = list(release.resolve_schedule(

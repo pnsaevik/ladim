@@ -107,7 +107,7 @@ class Releaser:
         with _open_nc_or_relay(self.warm_start_file) as dset:
             warm_start_time = dset.variables['time'][-1]
 
-        return warm_start_time
+        return int(warm_start_time)
 
     def from_warm_start_file(self, model: "Model"):
         bool_vars_to_be_copied = ('alive', 'active')
@@ -130,6 +130,8 @@ class Releaser:
             state['pid'] = pid
             state.released = len(dset.dimensions['particle'])
             for var_name, var in dset.variables.items():
+                if len(var.dimensions) == 0:
+                    continue
                 dim_name, = var.dimensions
                 if (dim_name in slice_dict) and (var_name != "pid"):
                     rows = var[:]
