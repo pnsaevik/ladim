@@ -86,6 +86,13 @@ class RomsForcing(Forcing):
             if v in model.state:
                 model.state[v] = self.field(x, y, z, v)
 
+    def prepare_warm_start(self, model: "Model"):
+        elapsed = model.solver.time - model.solver.start
+        t = elapsed // model.solver.step
+
+        self.forcing._grid.modules = model
+        self.forcing.update(t)
+
     def velocity(self, X, Y, Z, tstep=0.0):
         return self.forcing.velocity(X, Y, Z, tstep=tstep)
 

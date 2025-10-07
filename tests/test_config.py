@@ -80,7 +80,8 @@ class Test_convert_1_to_2:
                 'defaults': {},
                 'file': 'particles.rls',
                 'formats': {'time': 'release_time'},
-                'frequency': [1, 'm']},
+                'frequency': [1, 'm'],
+                'warm_start_file': None},
             'solver': {
                 'seed': 0,
                 'start': datetime.datetime(2015, 9, 7, 1, 0),

@@ -20,7 +20,7 @@ class Test_ladim_script:
         assert output.stderr.decode('latin1') == ""
         assert output.stdout.decode('latin1').startswith("usage: ladim")
 
-    @pytest.mark.parametrize("example_num", range(1, 4))
+    @pytest.mark.parametrize("example_num", range(1, 5))
     def test_run_examples(self, example_num):
         curdir = Path.cwd()
         name = f"ex{example_num}"
