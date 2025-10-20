@@ -31,7 +31,7 @@ output_variables:
     outper: [60, s]
 
     # Records per file
-    numrec: 2
+    numrec: 4
 
     # Variables included in output
     particle: [release_time]
