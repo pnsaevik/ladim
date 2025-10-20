@@ -11,6 +11,7 @@ import json
 import io
 import numpy as np
 import pytest
+import yaml
 
 
 class Test_ladim_script:
@@ -26,6 +27,7 @@ class Test_ladim_script:
         name = f"ex{example_num}"
         testpath = Path(__file__).parent / 'sample_data' / name
         outfiles = sorted(list(testpath.glob('output*.nc_txt')))
+        infiles = sorted(list(testpath.glob('input*.nc_txt')))
 
         with open(testpath / 'ladim.yaml') as f:
             conf_str = f.read()
@@ -40,6 +42,9 @@ class Test_ladim_script:
 
         result = {}
         try:
+            for infile in infiles:
+                unpack_nc_txt_file(infile)
+
             os.chdir(testpath)
             ladim.main(io.StringIO(conf_str))
             result = _load_ladim_outputs_as_json(expected.keys())
@@ -47,6 +52,10 @@ class Test_ladim_script:
         finally:
             for ladim_outfile in expected.keys():
                 Path(ladim_outfile).unlink(missing_ok=True)
+            for infile in infiles:
+                nc_file_name = str(infile)[:-4]
+                Path(nc_file_name).unlink(missing_ok=True)
+
             os.chdir(curdir)
 
         if result != expected:
@@ -80,3 +89,16 @@ def _load_ladim_outputs_as_json(ladim_outfiles):
         out[Path(fname).name] = dset_dict
 
     return out
+
+
+def unpack_nc_txt_file(file):
+    if not str(file).endswith('.nc_txt'):
+        raise ValueError('Expected file ending .nc_txt')
+
+    with open(file, mode='r', encoding='utf-8') as fp:
+        contents = yaml.safe_load(fp)
+    
+    dset = xr.Dataset.from_dict(contents)
+
+    outfile = str(file)[:-4]
+    dset.to_netcdf(outfile)
