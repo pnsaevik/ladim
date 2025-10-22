@@ -30,10 +30,6 @@ class State:
         """
         return self._num_released
 
-    @released.setter
-    def released(self, num_released):
-        self._num_released = num_released
-
     def append(self, particles: dict):
         """
         Add new particles
