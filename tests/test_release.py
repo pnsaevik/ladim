@@ -334,66 +334,62 @@ class Test_TextFileReleaser_update:
         # Confirm effect on state module
         assert list(mock_model.state['X']) == [61]
 
-    def test_warm_start_time(self, mock_model):
-        # Create mock release file
-        buf = io.StringIO(
-            'release_time X Y\n'
-            '2000-01-01 60 4\n'
-            '2000-01-01 61 5\n'
-        )
 
-        # Create mock warm start file
-        data_dict = dict(time=np.array([1441587720, 1441587780]))
-        dset = nc.Dataset(filename='warm_start_time.nc', mode='w', format='NETCDF4', diskless=True)
-        dset.createDimension('time', len(data_dict['time']))
-        time_var = dset.createVariable('time', 'i8', ('time',))
-        time_var[:] = data_dict['time']
-        time_var.units = 'seconds since 1970-01-01 00:00:00'
+class Test_load_last_timestep:
+    @pytest.fixture
+    def testdata(self, dataset):
+        dataset.createDimension('time')
+        dataset.createDimension('particle')
+        dataset.createDimension('particle_instance')
 
-        releaser = release.Releaser.create(file=buf, warm_start_file=dset)
+        dataset.createVariable('particle_count', 'i4', 'time')
+        dataset.createVariable('pid', 'i4', 'particle_instance')
 
-        assert releaser.warm_start_time() == 1441587780
+        dataset['particle_count'][:] = [1, 2, 3]
+        dataset['pid'][:] = [1, 1, 2, 1, 2, 4]
 
-    def test_from_warm_start_file(self, mock_model):
-        # Create mock release file
-        buf = io.StringIO(
-            'release_time X Y\n'
-            '2000-01-01 60 4\n'
-            '2000-01-01 61 5\n'
-        )
+        yield dataset
 
-        # Create mock warm start file
-        data_dict = dict(time=np.array([1441587720, 1441587780, 1441587840]),
-                         particle_count=np.array([1, 2, 3]),
-                         release_time=np.array([1441587720, 1441587780, 1441587840, 1441587840]),
-                         pid=np.array([0, 0, 1, 0, 2, 3]),
-                         X=np.array([10, 20, 30, 40, 50, 60]))
-        dset = nc.Dataset(filename='from_warm_start_file.nc', mode='w', format='NETCDF4', diskless=True)
-        dset.createDimension('time', len(data_dict['time']))
-        dset.createDimension('particle', len(data_dict['release_time']))
-        dset.createDimension('particle_instance', len(data_dict['pid']))
-        time_var = dset.createVariable('time', 'i8', ('time',))
-        time_var[:] = data_dict['time']
-        time_var.units = 'seconds since 1970-01-01 00:00:00'
-        particle_count_var = dset.createVariable('particle_count', 'i4', ('time',))
-        particle_count_var[:] = data_dict['particle_count']
-        release_time_var = dset.createVariable('release_time', 'i8', ('particle',))
-        release_time_var[:] = data_dict['release_time']
-        release_time_var.units = 'seconds since 1970-01-01 00:00:00'
-        pid_var = dset.createVariable('pid', 'i4', ('particle_instance',))
-        pid_var[:] = data_dict['pid']
-        x_var = dset.createVariable('X', 'f4', ('particle_instance',))
-        x_var[:] = data_dict['X']
+    def test_can_load_instance_variables(self, testdata):
+        testdata.createVariable('myinstvar', 'i4', 'particle_instance')
+        testdata['myinstvar'][:] = [11, 12, 22, 13, 23, 43]
+        df = release.load_last_timestep(testdata)
 
-        releaser = release.Releaser.create(file=buf, warm_start_file=dset)
-        releaser.from_warm_start_file(mock_model)
+        assert df['myinstvar'].values.tolist() == [13, 23, 43]
 
-        assert mock_model.state['pid'].tolist() == [0, 2, 3]
-        assert mock_model.state['X'].tolist() ==  [40, 50, 60]
-        assert mock_model.state['release_time'].tolist() ==  [1441587720, 1441587840, 1441587840]
-        assert mock_model.state['active'].tolist() == [True, True, True]
-        assert mock_model.state['alive'].tolist() == [True, True, True]
-        assert mock_model.state.released == 4
+    def test_can_load_time_variables(self, testdata):
+        testdata.createVariable('mytimevar', 'i4', 'time')
+        testdata['mytimevar'][:] = [10, 20, 30]
+        df = release.load_last_timestep(testdata)
+
+        assert df['mytimevar'].values.tolist() == [30, 30, 30]
+
+    def test_can_load_particle_variables(self, testdata):
+        testdata.createVariable('mypartvar', 'i4', 'particle')
+        testdata['mypartvar'][:] = [0, 10, 20, 30, 40]
+        df = release.load_last_timestep(testdata)
+
+        assert df['mypartvar'].values.tolist() == [10, 20, 40]
+
+    def test_converts_time_to_posix_timestamp(self, testdata):
+        testdata.createVariable('time', 'i4', 'time')
+        testdata.variables['time'].units = 'seconds since 1970-01-01'
+        testdata['time'][:] = [0, 3600, 7200]
+        df = release.load_last_timestep(testdata)
+
+        time = df['time'].to_numpy()
+        assert np.issubdtype(time.dtype, np.datetime64)
+        assert time.astype('datetime64[h]').astype(str).tolist() == [
+            '1970-01-01T02', '1970-01-01T02', '1970-01-01T02'
+        ]
+
+
+
+@pytest.fixture
+def dataset():
+    import uuid
+    with nc.Dataset(uuid.uuid4().hex, mode='a', diskless=True) as dset:
+        yield dset
 
 
 class MockObj:

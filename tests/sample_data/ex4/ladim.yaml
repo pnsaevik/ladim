@@ -9,7 +9,7 @@ time_control:
 files:
     particle_release_file : particles.rls
     output_file           : out.nc
-    warm_start_file       : input_0001.nc
+    warm_start_file       : input.nc
 
 
 gridforce:
@@ -30,9 +30,6 @@ particle_release:
 output_variables:
     # Frequency of output
     outper: [60, s]
-
-    # Records per file
-    numrec: 2
 
     # Variables included in output
     particle: [release_time]

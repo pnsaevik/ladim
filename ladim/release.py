@@ -50,7 +50,7 @@ class Releaser:
     def create(
             file = None, colnames: list = None, formats: dict = None,
             frequency=(0, 's'), defaults=None, lonlat_converter=None,
-            warm_start_file: typing.Union[str, nc.Dataset, None] = None
+            warm_start_file: str | nc.Dataset | None = None
     ):
         """
         Create release module from whitespace-separated csv file
@@ -95,10 +95,9 @@ class Releaser:
         df = load_table(file, names=colnames, formats=formats)
         df = add_default_variables_in_release_table(df, defaults)
         df = add_start_stop_step_to_release_table(df)
+        df = apply_warm_start_file(df, file=warm_start_file)
         df = replace_lonlat_in_release_table(df, lonlat_converter)
         releaser = Releaser(df)
-
-        releaser.warm_start_file = warm_start_file
 
         return releaser
 
@@ -114,6 +113,10 @@ class Releaser:
         df = expand_schedule_range(df)
         df = expand_schedule_multiplicity(df)
         return df
+
+    def first_release_time(self) -> int:
+        """First scheduled release time"""
+        return int(self._schedule['release_start'].min())
 
     def update(self, model: "Model"):
         self._add_new(model)
@@ -152,44 +155,6 @@ class Releaser:
         new_particles = df.to_dict(orient='list')
         state = model.state
         state.append(new_particles)
-
-    def warm_start_time(self):
-        with _open_nc_or_relay(self.warm_start_file) as dset:
-            warm_start_time = dset.variables['time'][-1]
-
-        return int(warm_start_time)
-
-    def from_warm_start_file(self, model: "Model"):
-        bool_vars_to_be_copied = ('alive', 'active')
-        state = model.state
-
-        with _open_nc_or_relay(self.warm_start_file) as dset:
-            if not all(var in dset.variables for var in ('pid', 'particle_count')):
-                raise ValueError("Warm start file must contain 'pid' and 'particle_count' variables")
-            if 'particle' not in dset.dimensions:
-                raise ValueError("Warm start file must contain 'particle' dimension")
-
-            particle_count = dset.variables['particle_count'][-1]
-            rows = dset.variables['pid'][:]
-            pid = rows[-particle_count:]
-            slice_dict = {
-                'particle_instance': slice(-particle_count, None),
-                'particle': pid
-            }
-
-            state['pid'] = pid
-            state.released = len(dset.dimensions['particle'])
-            for var_name, var in dset.variables.items():
-                if len(var.dimensions) == 0:
-                    continue
-                dim_name, = var.dimensions
-                if (dim_name in slice_dict) and (var_name != "pid"):
-                    rows = var[:]
-                    state[var_name] = rows[slice_dict[dim_name]]
-
-        for x in bool_vars_to_be_copied:
-            if x not in state:
-                state[x] = np.ones(len(pid), dtype=bool)
 
 
 def load_release_file(stream, names: list, formats: dict) -> pd.DataFrame:
@@ -247,6 +212,16 @@ def replace_lonlat_in_release_table(df, lonlat_converter):
 
     X, Y = lonlat_converter(df["lon"].values, df["lat"].values)
     df_new = df.drop(columns=['X', 'Y', 'lat', 'lon'], errors='ignore')
+
+    # If there were X/Y columns in the original dataset, only replace with
+    # lat/lon conversion where the X/Y data were missing
+    if 'X' in df.columns and 'Y' in df.columns:
+        x_old = df['X'].to_numpy()
+        y_old = df['Y'].to_numpy()
+        is_invalid = np.isnan(x_old) | np.isnan(y_old)
+        X[~is_invalid] = x_old
+        Y[~is_invalid] = y_old
+
     df_new["X"] = X
     df_new["Y"] = Y
     return df_new
@@ -286,7 +261,11 @@ def add_start_stop_step_to_release_table(df: pd.DataFrame) -> pd.DataFrame:
     return df.assign(release_start=start, release_stop=stop, release_step=step)
 
 
-def truncate_schedule_period(df: pd.DataFrame, t1, t2) -> pd.DataFrame:
+def truncate_schedule_period(
+        df: pd.DataFrame,
+        t1: int | None = None,
+        t2: int | None = None,
+        ) -> pd.DataFrame:
     """
     Returns a schedule truncated by start and stop time
 
@@ -295,13 +274,21 @@ def truncate_schedule_period(df: pd.DataFrame, t1, t2) -> pd.DataFrame:
     with irrelevant rows removed, and with start- and stop times truncated to
     the given interval.
     """
+
+    if t1 is not None:
+        df = _truncate_start(df, t1)
+    if t2 is not None:
+        df = _truncate_stop(df, t2)
+
+    return df
+
+
+def _truncate_start(df, t1):
     # Remove irrelevant rows
-    idx = df['release_start'].values < t2
-    idx &= df['release_stop'].values > t1
+    idx = df['release_stop'].values > t1
     df_subset = df.loc[idx].copy(deep=True)
 
     start = df_subset['release_start'].values
-    stop = df_subset['release_stop'].values
     step = df_subset['release_step'].values
 
     # Truncate start times if necessary
@@ -309,7 +296,16 @@ def truncate_schedule_period(df: pd.DataFrame, t1, t2) -> pd.DataFrame:
     new_start = reset_range_start(start[idx], step[idx], t1)
     df_subset.loc[idx, 'release_start'] = new_start
 
+    return df_subset
+
+
+def _truncate_stop(df, t2):
+    # Remove irrelevant rows
+    idx = df['release_start'].values < t2
+    df_subset = df.loc[idx].copy(deep=True)
+
     # Truncate stop times if necessary
+    stop = df_subset['release_stop'].values
     idx = stop > t2
     df_subset.loc[idx, 'release_stop'] = t2
 
@@ -393,10 +389,118 @@ def expand_schedule_multiplicity(df):
     df = df.reset_index(drop=True).drop(columns='mult')
     return df
 
-@contextlib.contextmanager
-def _open_nc_or_relay(path_or_object: str | nc.Dataset, mode='r') -> typing.Generator[nc.Dataset, typing.Any, typing.Any]:
-    if isinstance(path_or_object, str):
-        with nc.Dataset(path_or_object, mode=mode) as dset:
-            yield dset
-    else:
-        yield path_or_object
+
+def apply_warm_start_file(
+        df: pd.DataFrame,
+        file: str | nc.Dataset | None
+        ) -> pd.DataFrame:
+    """
+    Apply warm start file to release schedule
+
+    A warm start file is a ladim output file which can be used to re-start a
+    simulation. The function applies the following changes to the
+    input schedule:
+
+    - The particles contained in the last time step of the warm start file are
+      added to the release schedule
+
+    - All previously scheduled releases are removed
+    
+    :param df: Input release schedule
+    :param file: Input warm start file, or None if no-op
+    :returns: New release schedule after warm start file has been applied
+    """
+
+    if file is None:
+        return df  # No-op
+    
+    elif not isinstance(file, nc.Dataset):
+        with nc.Dataset(file) as dset:
+            return apply_warm_start_file(df, dset)
+    
+    warm_start_particles = load_last_timestep(file)
+
+    if len(warm_start_particles) == 0:
+        return df
+
+    new_start_time = np.asarray(warm_start_particles['time'][0], dtype='datetime64[s]')
+
+    df_truncated = truncate_schedule_period(df, new_start_time.astype(int) + 1, None)
+
+    # Add warm start particles, using first row of the input schedule as a
+    # template for default values.
+    num_new = len(warm_start_particles)
+    warm_df = df.loc[df.index[:1].repeat(num_new)].reset_index(drop=True)
+    warm_df[['X', 'Y']] = np.nan
+    for colname in set(df.columns).intersection(warm_start_particles.columns):
+        warm_start_values = warm_start_particles[colname].to_numpy()
+        if np.issubdtype(warm_start_values.dtype, np.datetime64):
+            warm_start_values = warm_start_values.astype('datetime64[s]')
+        warm_df.loc[:, colname] = warm_start_values.astype(warm_df[colname].dtype)
+    warm_df['release_start'] = new_start_time.astype(np.int64)
+    warm_df['release_stop'] = np.iinfo(df['release_stop'].dtype).max  # type: ignore
+    warm_df['release_step'] = 60*60*24*366*1_000_000
+
+    return pd.concat([warm_df, df_truncated], ignore_index=True)
+
+def load_last_timestep(dset: nc.Dataset) -> pd.DataFrame:
+    """Load particles from last time step of ladim output file"""
+
+    if 'particle_count' not in dset.variables:
+        raise ValueError('Missing variable "particle_count"')
+    elif 'pid' not in dset.variables:
+        raise ValueError('Missing variable "pid"')
+    
+    df = pd.DataFrame()
+
+    # Group variable names by dimension
+    varnames_by_dimension = {}
+    for v in dset.variables:
+        dims = dset.variables[v].dimensions
+        if len(dims) != 1:
+            continue
+        dimname = str(dims[0]) if len(dims) > 0 else ''
+        variable_list = varnames_by_dimension.get(dimname, [])
+        variable_list.append(v)
+        varnames_by_dimension[dimname] = variable_list
+
+    # Load instance variables
+    num_particles_last_step = dset['particle_count'][-1]
+    for v in varnames_by_dimension.get('particle_instance', []):
+        dset.variables[v].set_auto_mask(False)
+        values = dset.variables[v][-num_particles_last_step:]
+        df[v] = apply_cf_encoding(values, dset.variables[v])
+
+    # Load time variables
+    for v in varnames_by_dimension.get('time', []):
+        dset.variables[v].set_auto_mask(False)
+        values = dset.variables[v][-1]
+        df[v] = apply_cf_encoding(values, dset.variables[v])
+
+    # Load particle variables
+    pid = df['pid'].values
+    for v in varnames_by_dimension.get('particle', []):
+        dset.variables[v].set_auto_mask(False)
+        values = dset.variables[v][:][pid]
+        df[v] = apply_cf_encoding(values, dset.variables[v])
+
+    return df
+
+
+def get_nc_attrs(variable: nc.Variable) -> dict:
+    return {k: variable.getncattr(k) for k in variable.ncattrs()}
+
+
+def apply_cf_encoding(values, variable: nc.Variable):
+        attrs = get_nc_attrs(variable)
+
+        if 'since' in attrs.get('units', ''):
+            values = np.asarray(nc.num2date(
+                times=values,
+                units=attrs['units'],
+                calendar=attrs.get('calendar', 'standard'),
+                only_use_cftime_datetimes=False,
+                only_use_python_datetimes=True,
+            )).astype('datetime64')
+        
+        return values

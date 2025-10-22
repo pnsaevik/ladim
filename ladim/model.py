@@ -17,9 +17,9 @@ class Model:
     """
 
     def __init__(
-            self, grid: "Grid", forcing: "Forcing", release: "Releaser",
-            state: "State", output: "Output", ibm: "IBM", tracker: "Tracker",
-            solver: "Solver",
+            self, grid: Grid, forcing: Forcing, release: Releaser,
+            state: State, output: Output, ibm: IBM, tracker: Tracker,
+            solver: Solver,
     ):
         self.grid = grid
         self.forcing = forcing
