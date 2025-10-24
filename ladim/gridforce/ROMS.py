@@ -293,7 +293,6 @@ class Forcing:
         # --------------
         # prestep = last forcing step < 0
         #
-        self.has_been_initialized = False
         self._cached_steps = (np.iinfo(np.int64).min, -1)
         self.steps = steps
         self._files = files
@@ -303,52 +302,6 @@ class Forcing:
         self.dV = np.empty((0, 0, 0), dtype=np.float64)
         self.Unew = np.empty((0, 0, 0), dtype=np.float64)
         self.Vnew = np.empty((0, 0, 0), dtype=np.float64)
-
-    def _remaining_initialization(self):
-        steps = self.steps
-        V = [step for step in steps if step < 0]
-        if V:  # Forcing available before start time
-            prestep = max(V)
-            stepdiff = self.stepdiff[steps.index(prestep)]
-            nextstep = prestep + stepdiff
-            self.U, self.V = self._read_velocity(prestep)
-            self.Unew, self.Vnew = self._read_velocity(nextstep)
-            self.dU = (self.Unew - self.U) / stepdiff
-            self.dV = (self.Vnew - self.V) / stepdiff
-            # Interpolate to time step = -1
-            self.U = self.U - (prestep + 1) * self.dU
-            self.V = self.V - (prestep + 1) * self.dV
-            # Other forcing
-            for name in self.ibm_forcing:
-                self[name] = self._read_field(name, prestep)
-                self[name + "new"] = self._read_field(name, nextstep)
-                self["d" + name] = (self[name + "new"] - self[name]) / prestep
-                self[name] = self[name] - (prestep + 1) * self["d" + name]
-
-        elif steps[0] == 0:
-            # Simulation start at first forcing time
-            # Runge-Kutta needs dU and dV in this case as well
-            self.U, self.V = self._read_velocity(0)
-            self.Unew, self.Vnew = self._read_velocity(steps[1])
-            self.dU = (self.Unew - self.U) / steps[1]
-            self.dV = (self.Vnew - self.V) / steps[1]
-            # Synchronize with start time
-            self.Unew = self.U
-            self.Vnew = self.V
-            # Extrapolate to time step = -1
-            self.U = self.U - self.dU
-            self.V = self.V - self.dV
-            # Other forcing:
-            for name in self.ibm_forcing:
-                self[name] = self._read_field(name, 0)
-                self[name + "new"] = self._read_field(name, steps[1])
-                self["d" + name] = (self[name + "new"] - self[name]) / steps[1]
-                self[name] = self[name] - self["d" + name]
-
-        else:
-            # No forcing at start, should already be excluded
-            raise SystemExit(3)
-        self.has_been_initialized = True
 
     # ===================================================
     @staticmethod
