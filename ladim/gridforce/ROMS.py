@@ -294,8 +294,15 @@ class Forcing:
         # prestep = last forcing step < 0
         #
         self.has_been_initialized = False
+        self._cached_steps = (np.iinfo(np.int64).min, -1)
         self.steps = steps
         self._files = files
+        self.U = np.empty((0, 0, 0), dtype=np.float64)
+        self.V = np.empty((0, 0, 0), dtype=np.float64)
+        self.dU = np.empty((0, 0, 0), dtype=np.float64)
+        self.dV = np.empty((0, 0, 0), dtype=np.float64)
+        self.Unew = np.empty((0, 0, 0), dtype=np.float64)
+        self.Vnew = np.empty((0, 0, 0), dtype=np.float64)
 
     def _remaining_initialization(self):
         steps = self.steps
@@ -434,45 +441,88 @@ class Forcing:
 
     # ==============================================
 
-    # Turned off time interpolation of scalar fields
-    # TODO: Implement a switch for turning it on again if wanted
-    def update(self, t):
-        """Update the fields to time step t"""
+    def _update_cached_fields(self, t):
+        """Ensure the requested time is within cached interval"""
+        cached_tstep_1, cached_newpos = self._cached_steps
+        cached_tstep_2 = self.steps[cached_newpos]
 
-        if not self.has_been_initialized:
-            self._remaining_initialization()
-
-        # Read from config?
-        interpolate_velocity_in_time = True
-        interpolate_ibm_forcing_in_time = False
+        if 0 <= cached_tstep_1 <= t <= cached_tstep_2:
+            return
 
         logger.debug("Updating forcing, time step = {}".format(t))
-        if t in self.steps:  # No time interpolation
+
+        # Find new caching interval
+        desired_newpos = np.clip(np.searchsorted(self.steps, t, side='right'), 1, len(self.steps) - 1)
+        desired_tstep_1 = self.steps[desired_newpos - 1]
+        desired_tstep_2 = self.steps[desired_newpos]
+
+        # Update cached fields for tstep 1
+        if desired_newpos - 1 == cached_newpos:
             self.U = self.Unew
             self.V = self.Vnew
             for name in self.ibm_forcing:
                 self[name] = self[name + "new"]
         else:
-            if t - 1 in self.steps:  # Need new fields
-                stepdiff = self.stepdiff[self.steps.index(t - 1)]
-                nextstep = t - 1 + stepdiff
-                self.Unew, self.Vnew = self._read_velocity(nextstep)
-                for name in self.ibm_forcing:
-                    self[name + "new"] = self._read_field(name, nextstep)
-                if interpolate_velocity_in_time:
-                    self.dU = (self.Unew - self.U) / stepdiff
-                    self.dV = (self.Vnew - self.V) / stepdiff
-                if interpolate_ibm_forcing_in_time:
-                    for name in self.ibm_forcing:
-                        self["d" + name] = (self[name + "new"] - self[name]) / stepdiff
+            self.U, self.V = self._read_velocity(desired_tstep_1)
+            for name in self.ibm_forcing:
+                self[name] = self._read_field(name, desired_tstep_1)
 
-            # "Ordinary" time step (including self.steps+1)
-            if interpolate_velocity_in_time:
-                self.U += self.dU
-                self.V += self.dV
-            if interpolate_ibm_forcing_in_time:
-                for name in self.ibm_forcing:
-                    self[name] += self["d" + name]
+        # Update cached fields for tstep 2
+        if desired_newpos != cached_newpos:
+            self.Unew, self.Vnew = self._read_velocity(desired_tstep_2)
+            for name in self.ibm_forcing:
+                self[name + "new"] = self._read_field(name, desired_tstep_2)
+            stepdiff = desired_tstep_2 - desired_tstep_1
+            self.dU = (self.Unew - self.U) / stepdiff
+            self.dV = (self.Vnew - self.V) / stepdiff
+
+        self._cached_steps = (desired_tstep_1, desired_newpos)
+
+
+    # Turned off time interpolation of scalar fields
+    # TODO: Implement a switch for turning it on again if wanted
+    def update(self, t):
+        """Update the fields to time step t"""
+
+        self._update_cached_fields(t)
+
+        # The module has cached fields for two time steps
+        cached_tstep_1, cached_newpos = self._cached_steps
+        cached_tstep_2 = self.steps[cached_newpos]
+        assert cached_tstep_1 <= t <= cached_tstep_2
+
+        # cached_tstep_1:  Time step value for cached field 1
+        # cached_newpos:   Index of cached field 2
+
+        # If the first cached time step matches the requested time, we are done
+        if cached_tstep_1 == t:
+            pass
+
+        # The cached field 2 may match the requested time step.
+        # In that case we copy from cached field 2 and exit
+        elif cached_tstep_2 == t:
+            # Make a copy; second cached field is copied to first cached field
+            self._cached_steps = (t, cached_newpos)
+            self.U = self.Unew
+            self.V = self.Vnew
+            for name in self.ibm_forcing:
+                self[name] = self[name + "new"]
+        
+        # If the first cached time step is one step behind the requested
+        elif cached_tstep_1 + 1 == t:
+            # Do simplified interpolation; just add the increment
+            # Don't interpolate scalar fields, just the velocity
+            self._cached_steps = (t, cached_newpos)
+            self.U += self.dU
+            self.V += self.dV
+
+        # General case, do general interpolation
+        else:
+            # Don't interpolate scalar fields, just the velocity
+            self._cached_steps = (t, cached_newpos)
+            self.U += self.dU * (t - cached_tstep_1)
+            self.V += self.dV * (t - cached_tstep_1)
+
 
     # --------------
 
@@ -517,6 +567,7 @@ class Forcing:
         frame = self.frame_idx[n]
 
         # Read the velocity
+        assert isinstance(self._nc, Dataset)
         U = self._nc.variables["u"][frame, :, self._grid.Ju, self._grid.Iu]
         V = self._nc.variables["v"][frame, :, self._grid.Jv, self._grid.Iv]
 
@@ -537,6 +588,7 @@ class Forcing:
     def _read_field(self, name, n):
         """Read a 3D field"""
         frame = self.frame_idx[n]
+        assert isinstance(self._nc, Dataset)
         F = self._nc.variables[name][frame, :, self._grid.J, self._grid.I]
         if self.scaled[name]:
             F = self.add_offset[name] + self.scale_factor[name] * F
@@ -552,8 +604,8 @@ class Forcing:
     # ------------------
 
     def close(self):
-
-        self._nc.close()
+        if isinstance(self._nc, Dataset):
+            self._nc.close()
 
     def velocity(self, X, Y, Z, tstep=0, method="bilinear"):
 
