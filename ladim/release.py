@@ -1,4 +1,3 @@
-import contextlib
 import numpy as np
 import pandas as pd
 from .utilities import read_timedelta
