@@ -72,13 +72,13 @@ class RomsForcing(Forcing):
         # self.U = self.forcing.U
         # self.V = self.forcing.V
 
-    def update(self, model: "Model"):
+    def update(self, model: "Model", force_update_cache=False):
         elapsed = model.solver.time - model.solver.start
         t = elapsed // model.solver.step
 
         # noinspection PyProtectedMember
         self.forcing._grid.modules = model
-        self.forcing.update(t)
+        self.forcing.update(t, force_update_cache)
 
         # Update state variables by sampling the field
         x, y, z = model.state['X'], model.state['Y'], model.state['Z']
