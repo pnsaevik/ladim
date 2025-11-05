@@ -29,3 +29,11 @@ class Solver:
             model.ibm.update(model)
 
             self.time += self.step
+
+    def skip_forward(self, model: "Model", start_time, stop_time):
+        self.time = start_time
+        self.time = start_time
+        self.stop = stop_time
+        model.state.remove_all_particles()
+        model.forcing.update(model, force_update_cache=True)
+        self.run(model)
