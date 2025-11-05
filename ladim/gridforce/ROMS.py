@@ -436,7 +436,7 @@ class Forcing:
 
     # Turned off time interpolation of scalar fields
     # TODO: Implement a switch for turning it on again if wanted
-    def update(self, t):
+    def update(self, t, force_update_cache=False):
         """Update the fields to time step t"""
 
         if not self.has_been_initialized:
@@ -447,6 +447,26 @@ class Forcing:
         interpolate_ibm_forcing_in_time = False
 
         logger.debug("Updating forcing, time step = {}".format(t))
+        if force_update_cache:
+            prev_step = -1
+            next_step = 1
+            for i, step in enumerate(self.steps):
+                if step <= t:
+                    prev_step = i
+                    next_step = i + 1
+            self.U, self.V = self._read_velocity(prev_step)
+            self.Unew, self.Vnew = self._read_velocity(next_step)
+            stepdiff = self.stepdiff[self.steps.index(prev_step)]
+            self.dU = (self.Unew - self.U) / stepdiff
+            self.dV = (self.Vnew - self.V) / stepdiff
+            for name in self.ibm_forcing:
+                self[name] = self._read_field(name, prev_step)
+                self[name + "new"] = self._read_field(name, next_step)
+            if interpolate_ibm_forcing_in_time:
+                for name in self.ibm_forcing:
+                    self["d" + name] = (self[name + "new"] - self[name]) / stepdiff
+            return
+
         if t in self.steps:  # No time interpolation
             self.U = self.Unew
             self.V = self.Vnew
