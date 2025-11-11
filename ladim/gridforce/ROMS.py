@@ -298,12 +298,18 @@ class Forcing:
         self._files = files
 
     def _remaining_initialization(self):
+        self.prev_step = 0
+        self.next_step = self.steps[1]
         steps = self.steps
         V = [step for step in steps if step < 0]
         if V:  # Forcing available before start time
             prestep = max(V)
             stepdiff = self.stepdiff[steps.index(prestep)]
             nextstep = prestep + stepdiff
+
+            self.prev_step = prestep
+            self.next_step = nextstep
+
             self.U, self.V = self._read_velocity(prestep)
             self.Unew, self.Vnew = self._read_velocity(nextstep)
             self.dU = (self.Unew - self.U) / stepdiff
@@ -436,27 +442,32 @@ class Forcing:
 
     # Turned off time interpolation of scalar fields
     # TODO: Implement a switch for turning it on again if wanted
-    def update(self, t, force_update_cache=False):
+    def update(self, t):
         """Update the fields to time step t"""
 
         if not self.has_been_initialized:
             self._remaining_initialization()
 
+        shall_we_update_the_cache = not (self.prev_step <= t <= self.next_step)
         # Read from config?
         interpolate_velocity_in_time = True
         interpolate_ibm_forcing_in_time = False
 
         logger.debug("Updating forcing, time step = {}".format(t))
-        if force_update_cache:
-            prev_step = -1
-            next_step = 1
+        if shall_we_update_the_cache:
+            prev_step_index = -1
+            next_step_index = 1
             for i, step in enumerate(self.steps):
-                if step <= t:
-                    prev_step = i
-                    next_step = i + 1
+                if step < t:
+                    prev_step_index = i
+                    next_step_index = i + 1
+            prev_step = self.steps[prev_step_index]
+            next_step = self.steps[next_step_index]
+            self.prev_step = prev_step
+            self.next_step = next_step
             self.U, self.V = self._read_velocity(prev_step)
             self.Unew, self.Vnew = self._read_velocity(next_step)
-            stepdiff = self.stepdiff[self.steps.index(prev_step)]
+            stepdiff = self.stepdiff[prev_step_index]
             self.dU = (self.Unew - self.U) / stepdiff
             self.dV = (self.Vnew - self.V) / stepdiff
             for name in self.ibm_forcing:

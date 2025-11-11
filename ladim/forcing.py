@@ -74,22 +74,13 @@ class RomsForcing(Forcing):
         # self.U = self.forcing.U
         # self.V = self.forcing.V
 
-    def update(self, model: "Model", force_update_cache=False):
+    def update(self, model: "Model"):
         elapsed = model.solver.time - model.solver.start
         t = elapsed // model.solver.step
 
         # noinspection PyProtectedMember
         self.forcing._grid.modules = model
-        update_args = [t,force_update_cache]
-        expected_number_of_args_in_update_function= len(inspect.signature(self.forcing.update).parameters)
-        if force_update_cache and expected_number_of_args_in_update_function == 1:
-            # The update function does not support forced cache update.
-            logging.ERROR("The Forcing module update function does not support forced cache update.")
-            logging.ERROR("Exiting.")
-            exit(1)
-        # ignores the force_update_cache parameter if the update function does not support forced update
-        # and the parameter value is False.
-        self.forcing.update(*update_args[:expected_number_of_args_in_update_function])
+        self.forcing.update(t)
 
         # Update state variables by sampling the field
         x, y, z = model.state['X'], model.state['Y'], model.state['Z']
