@@ -295,7 +295,7 @@ class Writer:
             data values
         """
         raise NotImplementedError()
-    
+
     @property
     def sizes(self) -> dict[str, int]:
         """
@@ -426,8 +426,6 @@ class _MFNCWriter(Writer):
         self._tables_to_be_copied = copy_dims
         self._offset_variables = offset_variables
 
-        self._initialize_next_file()
-
     def _initialize_next_file(self):
         if not self.file:
             from uuid import uuid4
@@ -441,7 +439,7 @@ class _MFNCWriter(Writer):
         dset = create_netcdf_file(fname=file_name, formats=self.formats, diskless=diskless)
 
         if len(self._paths) > 0:
-            with _open_or_relay(self._paths[0]) as source_dataset:
+            with _open_or_relay(self._paths[-1]) as source_dataset:
                 _copy_nc_tables(source_dataset, dset, self._tables_to_be_copied)
             self._offsets = self._sizes.copy()
             for k in self._tables_to_be_copied:
@@ -468,7 +466,7 @@ class _MFNCWriter(Writer):
         return self._paths
 
     def write(self, data: dict[str, np.ndarray]):
-        if (self._step_counter > 0) and not(self._step_counter % self.numrec):
+        if not(self._step_counter % self.numrec):
             self._initialize_next_file()
 
         with _open_or_relay(self._paths[-1], mode='a') as dset:

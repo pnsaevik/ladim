@@ -13,8 +13,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.3.0] - unreleased
+### Added
+- Warm start capabilities
 
-## [2.2.1] - 2025-09-22
 ### Changed
 - Use sphinx autoapi to generate documentation
 
