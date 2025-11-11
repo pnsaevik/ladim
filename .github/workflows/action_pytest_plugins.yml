@@ -25,4 +25,4 @@ jobs:
         run: pip install pytest
 
       - name: Run pytest
-        run: pytest --pyargs ladim_plugins -m "not opendap"
+        run: pytest --pyargs ladim_plugins
