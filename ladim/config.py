@@ -126,6 +126,7 @@ def convert_1_to_2(c):
     # Read release config
     out['release'] = {}
     out['release']['file'] = dict_get(c, 'files.particle_release_file')
+    out['release']['warm_start_file'] = dict_get(c, 'files.warm_start_file', None)
     out['release']['colnames'] = dict_get(c, 'particle_release.variables', [])
     if dict_get(c, 'particle_release.release_type', '') == 'continuous':
         out['release']['frequency'] = dict_get(c, 'particle_release.release_frequency', [0, 's'])

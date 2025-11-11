@@ -9,11 +9,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"  # Change to your preferred version
+
       - name: Install ladim
         run: pip install .
+
       - name: Install plugins
         run: pip install ladim_plugins
+
       - name: Install pytest
         run: pip install pytest
+
       - name: Run pytest
-        run: pytest --pyargs ladim_plugins -m "not opendap"
+        run: pytest --pyargs ladim_plugins
