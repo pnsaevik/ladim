@@ -1,4 +1,3 @@
-import logging
 import typing
 if typing.TYPE_CHECKING:
     from ladim.model import Model
@@ -6,7 +5,6 @@ import numexpr
 import string
 import numpy as np
 from numba import njit
-import inspect
 
 
 class Forcing:
