@@ -17,7 +17,7 @@ class Solver:
             np.random.seed(seed)
 
     @staticmethod
-    def create(start, stop, step, skip_forwards_to_next_release_on_empty_state, seed=None):
+    def create(start, stop, step, skip_forwards_to_next_release_on_empty_state=False, seed=None):
         return Solver(start, stop, step, skip_forwards_to_next_release_on_empty_state, seed)
 
     def run(self, model: "Model"):
