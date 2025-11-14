@@ -86,7 +86,8 @@ class Test_convert_1_to_2:
                 'seed': 0,
                 'start': datetime.datetime(2015, 9, 7, 1, 0),
                 'step': 60,
-                'stop': datetime.datetime(2015, 9, 7, 1, 5)},
+                'stop': datetime.datetime(2015, 9, 7, 1, 5),
+                'skip_forwards_to_next_release_on_empty_state': False},
             'tracker': {
                 'diffusion': 0.1,
                 'method': 'RK4',
