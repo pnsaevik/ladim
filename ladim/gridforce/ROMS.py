@@ -14,8 +14,9 @@ Grid and Forcing for LADiM for the Regional Ocean Model System (ROMS)
 import glob
 import logging
 import numpy as np
-from netCDF4 import Dataset, num2date
+from netCDF4 import Dataset, num2date, date2num
 from ladim.sample import sample2D, bilin_inv
+import contextlib
 
 
 logger = logging.getLogger(__name__)
@@ -297,57 +298,88 @@ class Forcing:
         self.steps = steps
         self._files = files
 
+        self.U = np.empty((0, 0, 0), dtype=np.float64)
+        self.V = np.empty((0, 0, 0), dtype=np.float64)
+        self.W = np.empty((0, 0, 0), dtype=np.float64)
+        self.dU = np.empty((0, 0, 0), dtype=np.float64)
+        self.dV = np.empty((0, 0, 0), dtype=np.float64)
+        self.dW = np.empty((0, 0, 0), dtype=np.float64)
+        self.Unew = np.empty((0, 0, 0), dtype=np.float64)
+        self.Vnew = np.empty((0, 0, 0), dtype=np.float64)
+        self.Wnew = np.empty((0, 0, 0), dtype=np.float64)
+        
+        self._cache_t = np.iinfo(np.int64).min
+        self._cache_tnew = np.iinfo(np.int64).min
+        self._cache_dt = 0
+
     def _remaining_initialization(self):
-        self.prev_step = 0
-        self.next_step = self.steps[1]
-        steps = self.steps
-        V = [step for step in steps if step < 0]
-        if V:  # Forcing available before start time
-            prestep = max(V)
-            stepdiff = self.stepdiff[steps.index(prestep)]
-            nextstep = prestep + stepdiff
+        self._load_cache(t=-1)
+        self.has_been_initialized = True
 
-            self.prev_step = prestep
-            self.next_step = nextstep
+    def _load_cache(self, t):
+        if t == self._cache_t:
+            return
+        
+        if t == self._cache_tnew:
+            t0 = t
+            t0_idx = self.steps.index(t0)
+            t1_idx = min(t0_idx + 1, len(self.steps) - 1)
+            t1 = self.steps[t1_idx]
 
-            self.U, self.V = self._read_velocity(prestep)
-            self.Unew, self.Vnew = self._read_velocity(nextstep)
-            self.dU = (self.Unew - self.U) / stepdiff
-            self.dV = (self.Vnew - self.V) / stepdiff
-            # Interpolate to time step = -1
-            self.U = self.U - (prestep + 1) * self.dU
-            self.V = self.V - (prestep + 1) * self.dV
-            # Other forcing
+            self.U = self.Unew
+            self.V = self.Vnew
+            self.Unew, self.Vnew = self._read_velocity(t1)
             for name in self.ibm_forcing:
-                self[name] = self._read_field(name, prestep)
-                self[name + "new"] = self._read_field(name, nextstep)
-                self["d" + name] = (self[name + "new"] - self[name]) / prestep
-                self[name] = self[name] - (prestep + 1) * self["d" + name]
+                self[name] = self[name + "new"]
+                self[name + "new"] = self._read_field(name, t1)
+            
+            self._cache_t = t
+            self._cache_tnew = t1
+            self._cache_dt = 1
+            return
 
-        elif steps[0] == 0:
+        if t == self._cache_t + 1:
+            self.U += self.dU
+            self.V += self.dV
+            self._cache_t = t
+            return
+
+        # Find correct steps
+        t0_noclip_idx = np.searchsorted(self.steps, t, side='right') - 1
+        t0_idx = np.clip(t0_noclip_idx, 0, len(self.steps) - 2)
+        t0 = self.steps[t0_idx]
+        t1_idx = t0_idx + 1
+        t1 = self.steps[t1_idx]
+
+        U, V = self._read_velocity(t0)
+        self.Unew, self.Vnew = self._read_velocity(t1)
+        self.dU = (self.Unew - U) / (t1 - t0)
+        self.dV = (self.Vnew - V) / (t1 - t0)
+
+        if t0 == 0:
             # Simulation start at first forcing time
             # Runge-Kutta needs dU and dV in this case as well
-            self.U, self.V = self._read_velocity(0)
-            self.Unew, self.Vnew = self._read_velocity(steps[1])
-            self.dU = (self.Unew - self.U) / steps[1]
-            self.dV = (self.Vnew - self.V) / steps[1]
             # Synchronize with start time
-            self.Unew = self.U
-            self.Vnew = self.V
-            # Extrapolate to time step = -1
-            self.U = self.U - self.dU
-            self.V = self.V - self.dV
-            # Other forcing:
-            for name in self.ibm_forcing:
-                self[name] = self._read_field(name, 0)
-                self[name + "new"] = self._read_field(name, steps[1])
-                self["d" + name] = (self[name + "new"] - self[name]) / steps[1]
-                self[name] = self[name] - self["d" + name]
-
+            self.Unew = U
+            self.Vnew = V
+            self._cache_tnew = t0
         else:
-            # No forcing at start, should already be excluded
-            raise SystemExit(3)
-        self.has_been_initialized = True
+            self._cache_tnew = t1
+
+        # Interpolate time step
+        self.U = U + (t - t0) * self.dU
+        self.V = V + (t - t0) * self.dV
+
+        # Other forcing:
+        for name in self.ibm_forcing:
+            self[name] = self._read_field(name, t0)
+            self[name + "new"] = self._read_field(name, t1)
+            self["d" + name] = (self[name + "new"] - self[name]) / (t1 - t0)
+            self[name] = self[name] - (t0 + 1) * self["d" + name]
+        
+        self._cache_t = t
+        self._cache_dt = 1
+
 
     # ===================================================
     @staticmethod
@@ -445,65 +477,12 @@ class Forcing:
     def update(self, t):
         """Update the fields to time step t"""
 
+        logger.debug("Updating forcing, time step = {}".format(t))
+
         if not self.has_been_initialized:
             self._remaining_initialization()
 
-        shall_we_update_the_cache = not (self.prev_step <= t <= self.next_step)
-        # Read from config?
-        interpolate_velocity_in_time = True
-        interpolate_ibm_forcing_in_time = False
-
-        logger.debug("Updating forcing, time step = {}".format(t))
-        if shall_we_update_the_cache:
-            prev_step_index = -1
-            next_step_index = 1
-            for i, step in enumerate(self.steps):
-                if step < t:
-                    prev_step_index = i
-                    next_step_index = i + 1
-            prev_step = self.steps[prev_step_index]
-            next_step = self.steps[next_step_index]
-            self.prev_step = prev_step
-            self.next_step = next_step
-            self.U, self.V = self._read_velocity(prev_step)
-            self.Unew, self.Vnew = self._read_velocity(next_step)
-            stepdiff = self.stepdiff[prev_step_index]
-            self.dU = (self.Unew - self.U) / stepdiff
-            self.dV = (self.Vnew - self.V) / stepdiff
-            for name in self.ibm_forcing:
-                self[name] = self._read_field(name, prev_step)
-                self[name + "new"] = self._read_field(name, next_step)
-            if interpolate_ibm_forcing_in_time:
-                for name in self.ibm_forcing:
-                    self["d" + name] = (self[name + "new"] - self[name]) / stepdiff
-            return
-
-        if t in self.steps:  # No time interpolation
-            self.U = self.Unew
-            self.V = self.Vnew
-            for name in self.ibm_forcing:
-                self[name] = self[name + "new"]
-        else:
-            if t - 1 in self.steps:  # Need new fields
-                stepdiff = self.stepdiff[self.steps.index(t - 1)]
-                nextstep = t - 1 + stepdiff
-                self.Unew, self.Vnew = self._read_velocity(nextstep)
-                for name in self.ibm_forcing:
-                    self[name + "new"] = self._read_field(name, nextstep)
-                if interpolate_velocity_in_time:
-                    self.dU = (self.Unew - self.U) / stepdiff
-                    self.dV = (self.Vnew - self.V) / stepdiff
-                if interpolate_ibm_forcing_in_time:
-                    for name in self.ibm_forcing:
-                        self["d" + name] = (self[name + "new"] - self[name]) / stepdiff
-
-            # "Ordinary" time step (including self.steps+1)
-            if interpolate_velocity_in_time:
-                self.U += self.dU
-                self.V += self.dV
-            if interpolate_ibm_forcing_in_time:
-                for name in self.ibm_forcing:
-                    self[name] += self["d" + name]
+        self._load_cache(t)
 
     # --------------
 
@@ -548,6 +527,7 @@ class Forcing:
         frame = self.frame_idx[n]
 
         # Read the velocity
+        assert isinstance(self._nc, Dataset)
         U = self._nc.variables["u"][frame, :, self._grid.Ju, self._grid.Iu]
         V = self._nc.variables["v"][frame, :, self._grid.Jv, self._grid.Iv]
 
@@ -568,6 +548,7 @@ class Forcing:
     def _read_field(self, name, n):
         """Read a 3D field"""
         frame = self.frame_idx[n]
+        assert isinstance(self._nc, Dataset)
         F = self._nc.variables[name][frame, :, self._grid.J, self._grid.I]
         if self.scaled[name]:
             F = self.add_offset[name] + self.scale_factor[name] * F
@@ -583,8 +564,8 @@ class Forcing:
     # ------------------
 
     def close(self):
-
-        self._nc.close()
+        if isinstance(self._nc, Dataset):
+            self._nc.close()
 
     def velocity(self, X, Y, Z, tstep=0, method="bilinear"):
 

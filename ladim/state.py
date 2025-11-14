@@ -101,7 +101,3 @@ class State:
             self._data[item] = value
         else:
             raise AttributeError(f"Attribute not defined: '{item}'")
-
-    def remove_all_particles(self):
-        particles_to_remove = [True] * self.size()
-        self.remove(particles_to_remove)
