@@ -28,8 +28,6 @@ class Solver:
         self.time = self.start + self.step * timesteps_to_skip
 
         while self.time <= self.stop:
-            if self.skip_forwards_to_next_release_on_empty_state:
-                print(model.state.size)
             model.release.update(model)
             if model.state.size == 0 and self.skip_forwards_to_next_release_on_empty_state:
                 self.time = model.release.get_next_release_time(self.time)
