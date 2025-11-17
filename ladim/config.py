@@ -83,7 +83,7 @@ def convert_1_to_2(c):
     out['solver']['step'] = dt_sec
     out['solver']['seed'] = dict_get(c, 'numerics.seed')
     out['solver']['skip_forwards_to_next_release_on_empty_state'] = \
-        dict_get(c,"skip_forwards_to_next_release_on_empty_state", False)
+        dict_get(c, "numerics.skip_forwards_to_next_release_on_empty_state", False)
 
     out['grid'] = {}
     out['grid']['file'] = dict_get(c, [
