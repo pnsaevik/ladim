@@ -32,7 +32,6 @@ class Solver:
                 print(model.state.size)
             model.release.update(model)
             if model.state.size == 0 and self.skip_forwards_to_next_release_on_empty_state:
-                exit()
                 self.time = model.release.get_next_release_time(self.time)
                 if self.time is None:
                     # end of input -> exit while loop
