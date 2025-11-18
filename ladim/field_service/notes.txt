@@ -1,0 +1,7 @@
+This directory holds some tools to harvest data from files to use as fields in IBMs.
+
+Fields may be 2 (Y,X) or (lat, lon), 3 (2d +time) or (2d + depth) or 4 dimensional (time,Y,X,depth) or (time,lon,lat,depth)
+
+We'll start with NK800 v3 netCDF files and expand from there.
+
+The interface should be source type agnostic except for the initialization.
