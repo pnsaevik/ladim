@@ -18,6 +18,7 @@ from netCDF4 import Dataset, num2date, date2num
 from ladim.sample import sample2D, bilin_inv
 import contextlib
 
+from . import netCDFservice
 
 logger = logging.getLogger(__name__)
 
@@ -311,6 +312,12 @@ class Forcing:
         self._cache_t = np.iinfo(np.int64).min
         self._cache_tnew = np.iinfo(np.int64).min
         self._cache_dt = 0
+
+        # TODO: Check to see if config is parsed correctly
+        self.netCDFService = netCDFservice(config)
+
+    def field(self,variable_name, X, Y, Z=None, time=None):
+        return self.netCDFService.read_values(variable_name, X, Y, depth=Z, time=time)
 
     def _remaining_initialization(self):
         self._load_cache(t=-1)

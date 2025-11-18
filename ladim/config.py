@@ -103,6 +103,9 @@ def convert_1_to_2(c):
     out['forcing']['dt'] = dt_sec
     out['forcing']['ibm_forcing'] = dict_get(c, 'gridforce.ibm_forcing', [])
 
+    # TODO: Check to see if dict is parsed correctly
+    out['forcing']['extra_files'] = dict_get(c, 'gridforce.extra_files', [])
+
     out['output'] = {}
     out['output']['file'] = dict_get(c, 'files.output_file')
     out['output']['frequency'] = dict_get(c, 'output_variables.outper')
