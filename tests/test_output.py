@@ -2,6 +2,7 @@ import pytest
 import numpy as np
 import typing
 from ladim import output
+import netCDF4 as nc
 
 
 class Test_Output_update:

@@ -843,3 +843,63 @@ def sample3DUV(U, V, X, Y, K, A, method="bilinear"):
         sample3D(U, X + 0.5, Y, K, A, method=method),
         sample3D(V, X, Y + 0.5, K, A, method=method),
     )
+
+
+def _makeindex_posixtime_to_file_and_timeidx(files):
+    """
+    Create a lookup index from posix time to file and array index
+
+    The function iterates through all ocean_time entries in all files in the
+    input array and records the corresponding posix time for all entries.
+
+    :param files: List of file names to iterate through
+
+    :returns: Arrays of the same size: posixtime, filename, timeidx.
+        Each array entry represents an ocean_time entry in the input files.
+        For each entry, posixtime is the number of seconds since 1970, filename
+        is the file name, timeidx is the within-file array index of the
+        ocean_time entry. The arrays are sorted so that posixtime is strictly
+        increasing.
+    """
+    # Prepare output arrays
+    posixtime_list = []
+    filename_list = []
+    timeidx_list = []
+
+    # Iterate files
+    for file in files:
+        with _open_or_relay(file) as dset:
+            logger.info(f'Load times from file {dset.filepath}')
+
+            # Load time data
+            tvar = dset.variables['ocean_time']
+            tvar.set_auto_mask(False)
+            time_values = np.asarray(tvar[:]).ravel()
+            
+            # Convert to posix seconds
+            time_units = getattr(tvar, 'units', 'seconds since 1970-01-01')
+            calendar = getattr(tvar, 'calendar', 'standard')
+            cf_datetimes = num2date(time_values, time_units, calendar)
+            t = date2num(cf_datetimes, units='seconds since 1970-01-01')
+            
+            # Append to output arrays
+            posixtime_list += np.asarray(t).astype('int64').tolist()
+            filename_list += [dset.filepath] * len(t)
+            timeidx_list += list(range(len(t)))
+    
+    # Sort output arrays
+    idx = np.argsort(posixtime_list)
+    posixtime = np.array(posixtime_list, dtype='int64')[idx]
+    filename = np.array(filename_list, dtype=str)[idx]
+    timeidx = np.array(timeidx_list, dtype='int64')[idx]
+
+    return posixtime, filename, timeidx
+
+
+@contextlib.contextmanager
+def _open_or_relay(file_or_obj):
+    if isinstance(file_or_obj, str):
+        with Dataset(file_or_obj) as dset:
+            yield dset
+    else:
+        yield file_or_obj
