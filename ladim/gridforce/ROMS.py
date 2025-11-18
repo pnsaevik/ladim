@@ -314,7 +314,7 @@ class Forcing:
         self._cache_dt = 0
 
         # TODO: Check to see if config is parsed correctly
-        self.netCDFService = netCDFservice(config)
+        self.netCDFService = netCDFservice.netCDFService(config)
 
     def field(self,variable_name, X, Y, Z=None, time=None):
         return self.netCDFService.read_values(variable_name, X, Y, depth=Z, time=time)
