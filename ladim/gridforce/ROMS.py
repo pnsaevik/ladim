@@ -202,10 +202,10 @@ class Grid:
     def ingrid(self, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
         """Returns True for points inside the subgrid"""
         return (
-            (self.xmin + 0.5 < X)
-            & (X < self.xmax - 0.5)
-            & (self.ymin + 0.5 < Y)
-            & (Y < self.ymax - 0.5)
+                (self.xmin + 0.5 < X)
+                & (X < self.xmax - 0.5)
+                & (self.ymin + 0.5 < Y)
+                & (Y < self.ymax - 0.5)
         )
 
     def onland(self, X, Y):
@@ -308,16 +308,10 @@ class Forcing:
         self.Unew = np.empty((0, 0, 0), dtype=np.float64)
         self.Vnew = np.empty((0, 0, 0), dtype=np.float64)
         self.Wnew = np.empty((0, 0, 0), dtype=np.float64)
-        
+
         self._cache_t = np.iinfo(np.int64).min
         self._cache_tnew = np.iinfo(np.int64).min
         self._cache_dt = 0
-
-        # TODO: Check to see if config is parsed correctly
-        self.netCDFService = netCDFservice.netCDFService(config)
-
-    def field(self,variable_name, X, Y, Z=None, time=None):
-        return self.netCDFService.read_values(variable_name, X, Y, depth=Z, time=time)
 
     def _remaining_initialization(self):
         self._load_cache(t=-1)
@@ -326,7 +320,7 @@ class Forcing:
     def _load_cache(self, t):
         if t == self._cache_t:
             return
-        
+
         if t == self._cache_tnew:
             t0 = t
             t0_idx = self.steps.index(t0)
@@ -339,7 +333,7 @@ class Forcing:
             for name in self.ibm_forcing:
                 self[name] = self[name + "new"]
                 self[name + "new"] = self._read_field(name, t1)
-            
+
             self._cache_t = t
             self._cache_tnew = t1
             self._cache_dt = 1
@@ -383,10 +377,9 @@ class Forcing:
             self[name + "new"] = self._read_field(name, t1)
             self["d" + name] = (self[name + "new"] - self[name]) / (t1 - t0)
             self[name] = self[name] - (t0 + 1) * self["d" + name]
-        
+
         self._cache_t = t
         self._cache_dt = 1
-
 
     # ===================================================
     @staticmethod
@@ -429,7 +422,7 @@ class Forcing:
         all_frames = np.array([np.datetime64(tf) for tf in all_frames])
         I = all_frames[1:] <= all_frames[:-1]
         if np.any(I):
-            i = I.nonzero()[0][0] + 1   # Index of first out-of-order frame
+            i = I.nonzero()[0][0] + 1  # Index of first out-of-order frame
             oooframe = str(all_frames[i]).split('.')[0]  # Remove microseconds
             logger.info(f"Time frame {i} = {oooframe} out of order")
             logger.critical("Forcing time frames not strictly sorted")
@@ -634,7 +627,7 @@ def s_stretch(N, theta_s, theta_b, stagger="rho", Vstretching=1):
         cff1 = 1.0 / np.sinh(theta_s)
         cff2 = 0.5 / np.tanh(0.5 * theta_s)
         return (1.0 - theta_b) * cff1 * np.sinh(theta_s * S) + theta_b * (
-            cff2 * np.tanh(theta_s * (S + 0.5)) - 0.5
+                cff2 * np.tanh(theta_s * (S + 0.5)) - 0.5
         )
 
     elif Vstretching == 2:
@@ -648,7 +641,7 @@ def s_stretch(N, theta_s, theta_b, stagger="rho", Vstretching=1):
         gamma_ = 3.0
         Csur = -np.log(np.cosh(gamma_ * (-S) ** theta_s)) / np.log(np.cosh(gamma_))
         Cbot = (
-            np.log(np.cosh(gamma_ * (S + 1) ** theta_b)) / np.log(np.cosh(gamma_)) - 1
+                np.log(np.cosh(gamma_ * (S + 1) ** theta_b)) / np.log(np.cosh(gamma_)) - 1
         )
         mu = 0.5 * (1 - np.tanh(gamma_ * (S + 0.5)))
         return mu * Csur + (1 - mu) * Cbot
@@ -669,6 +662,7 @@ def s_stretch(N, theta_s, theta_b, stagger="rho", Vstretching=1):
 
     else:
         raise
+
 
 def sdepth(H, Hc, C, stagger="rho", Vtransform=1):
     """Return depth of rho-points in s-levels
@@ -824,14 +818,14 @@ def sample3D(F, X, Y, K, A, method="bilinear"):
         W111 = P * Q * A
 
         return (
-            W000 * F[K, J, I]
-            + W010 * F[K, J + 1, I]
-            + W100 * F[K, J, I + 1]
-            + W110 * F[K, J + 1, I + 1]
-            + W001 * F[K - 1, J, I]
-            + W011 * F[K - 1, J + 1, I]
-            + W101 * F[K - 1, J, I + 1]
-            + W111 * F[K - 1, J + 1, I + 1]
+                W000 * F[K, J, I]
+                + W010 * F[K, J + 1, I]
+                + W100 * F[K, J, I + 1]
+                + W110 * F[K, J + 1, I + 1]
+                + W001 * F[K - 1, J, I]
+                + W011 * F[K - 1, J + 1, I]
+                + W101 * F[K - 1, J, I + 1]
+                + W111 * F[K - 1, J + 1, I + 1]
         )
 
     # else:  method == 'nearest'
@@ -882,18 +876,18 @@ def _makeindex_posixtime_to_file_and_timeidx(files):
             tvar = dset.variables['ocean_time']
             tvar.set_auto_mask(False)
             time_values = np.asarray(tvar[:]).ravel()
-            
+
             # Convert to posix seconds
             time_units = getattr(tvar, 'units', 'seconds since 1970-01-01')
             calendar = getattr(tvar, 'calendar', 'standard')
             cf_datetimes = num2date(time_values, time_units, calendar)
             t = date2num(cf_datetimes, units='seconds since 1970-01-01')
-            
+
             # Append to output arrays
             posixtime_list += np.asarray(t).astype('int64').tolist()
             filename_list += [dset.filepath] * len(t)
             timeidx_list += list(range(len(t)))
-    
+
     # Sort output arrays
     idx = np.argsort(posixtime_list)
     posixtime = np.array(posixtime_list, dtype='int64')[idx]
