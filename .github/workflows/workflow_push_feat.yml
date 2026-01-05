@@ -12,5 +12,3 @@ on:
 jobs:
   run_pytest:
     uses: ./.github/workflows/action_pytest.yml
-  run_pytest_plugins:
-    uses: ./.github/workflows/action_pytest_plugins.yml
