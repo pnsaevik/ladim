@@ -115,15 +115,6 @@ class Releaser:
         """First scheduled release time"""
         return int(self._schedule['release_start'].min())
 
-    def get_next_release_time(self, t) -> int:
-        """Next release time after and including t"""
-        times = self._schedule['release_start'].values
-        times = set([x for x in times if x > t])
-        if len(times) == 0:
-            return None
-        next_release_time = min(times)
-        return next_release_time
-
     def update(self, model: "Model"):
         self._add_new(model)
         self._kill_old(model)
