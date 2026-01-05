@@ -13,9 +13,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
-## [2.2.1] - unreleased
+## [2.2.2] - unreleased
 ### Added
 - Warm start capabilities
+### Changed
+- Skip forward if no particles
 
 
 ## [2.2.0] - 2025-10-01
