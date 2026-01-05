@@ -8,9 +8,7 @@ import netCDF4 as nc
 if typing.TYPE_CHECKING:
     from ladim.model import Model
 
-
 logger = logging.getLogger(__name__)
-
 
 CoordTransform = typing.Callable[[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]]
 ParticleGenerator = typing.Callable[[float, float], pd.DataFrame]
@@ -47,7 +45,7 @@ class Releaser:
 
     @staticmethod
     def create(
-            file = None, colnames: list = None, formats: dict = None,
+            file=None, colnames: list = None, formats: dict = None,
             frequency=(0, 's'), defaults=None, lonlat_converter=None,
             warm_start_file: str | nc.Dataset | None = None
     ):
@@ -82,7 +80,7 @@ class Releaser:
         defaults = defaults or {}
         formats = formats or {}
         lonlat_converter = lonlat_converter or (lambda lon, lat: (lon, lat))
-        
+
         # Add standard defaults
         standard_defaults = {
             'release_interval': np.asarray(read_timedelta(frequency) / np.timedelta64(1, 's'), dtype='int64'),
@@ -243,13 +241,13 @@ def add_start_stop_step_to_release_table(df: pd.DataFrame) -> pd.DataFrame:
     start = df['release_time'].to_numpy(dtype='datetime64[s]').astype('int64')
 
     # Load release intervals (0 = no repeats)
-    max_step = 60*60*24*366*1_000_000
+    max_step = 60 * 60 * 24 * 366 * 1_000_000
     if 'release_interval' in df.columns:
         step = df['release_interval'].to_numpy(dtype='int64')
         step[step == 0] = max_step
     else:
         step = np.full(start.shape, fill_value=max_step, dtype='int64')
-    
+
     # Define stop times for release events
     unq_start, unq_start_inv = np.unique(start, return_inverse=True)
     unq_stop = np.roll(unq_start, -1)
@@ -264,7 +262,7 @@ def truncate_schedule_period(
         df: pd.DataFrame,
         t1: int | None = None,
         t2: int | None = None,
-        ) -> pd.DataFrame:
+) -> pd.DataFrame:
     """
     Returns a schedule truncated by start and stop time
 
@@ -330,7 +328,7 @@ def expand_schedule_range(df: pd.DataFrame) -> pd.DataFrame:
     seq = [i for n in num for i in range(n)]
     idx = np.repeat(np.arange(len(num)), num)
     times = start[idx] + seq * step[idx]
-    
+
     drop_cols = ['release_start', 'release_stop', 'release_step', 'release_time']
     new_df = df.drop(columns=drop_cols, errors='ignore').iloc[idx]
     new_df['release_time'] = times
@@ -365,7 +363,7 @@ def load_table(table, **open_kwargs) -> pd.DataFrame:
     if isinstance(table, (str, os.PathLike)):
         with open(table, mode='r', encoding='utf-8') as fp:
             return load_release_file(fp, **open_kwargs)
-    
+
     elif hasattr(table, 'read'):
         return load_release_file(table, **open_kwargs)
 
@@ -392,7 +390,7 @@ def expand_schedule_multiplicity(df):
 def apply_warm_start_file(
         df: pd.DataFrame,
         file: str | nc.Dataset | None
-        ) -> pd.DataFrame:
+) -> pd.DataFrame:
     """
     Apply warm start file to release schedule
 
@@ -412,11 +410,11 @@ def apply_warm_start_file(
 
     if file is None:
         return df  # No-op
-    
+
     elif not isinstance(file, nc.Dataset):
         with nc.Dataset(file) as dset:
             return apply_warm_start_file(df, dset)
-    
+
     warm_start_particles = load_last_timestep(file)
 
     if len(warm_start_particles) == 0:
@@ -438,9 +436,10 @@ def apply_warm_start_file(
         warm_df.loc[:, colname] = warm_start_values.astype(warm_df[colname].dtype)
     warm_df['release_start'] = new_start_time.astype(np.int64)
     warm_df['release_stop'] = np.iinfo(df['release_stop'].dtype).max  # type: ignore
-    warm_df['release_step'] = 60*60*24*366*1_000_000
+    warm_df['release_step'] = 60 * 60 * 24 * 366 * 1_000_000
 
     return pd.concat([warm_df, df_truncated], ignore_index=True)
+
 
 def load_last_timestep(dset: nc.Dataset) -> pd.DataFrame:
     """Load particles from last time step of ladim output file"""
@@ -449,7 +448,7 @@ def load_last_timestep(dset: nc.Dataset) -> pd.DataFrame:
         raise ValueError('Missing variable "particle_count"')
     elif 'pid' not in dset.variables:
         raise ValueError('Missing variable "pid"')
-    
+
     df = pd.DataFrame()
 
     # Group variable names by dimension
@@ -491,15 +490,15 @@ def get_nc_attrs(variable: nc.Variable) -> dict:
 
 
 def apply_cf_encoding(values, variable: nc.Variable):
-        attrs = get_nc_attrs(variable)
+    attrs = get_nc_attrs(variable)
 
-        if 'since' in attrs.get('units', ''):
-            values = np.asarray(nc.num2date(
-                times=values,
-                units=attrs['units'],
-                calendar=attrs.get('calendar', 'standard'),
-                only_use_cftime_datetimes=False,
-                only_use_python_datetimes=True,
-            )).astype('datetime64')
-        
-        return values
+    if 'since' in attrs.get('units', ''):
+        values = np.asarray(nc.num2date(
+            times=values,
+            units=attrs['units'],
+            calendar=attrs.get('calendar', 'standard'),
+            only_use_cftime_datetimes=False,
+            only_use_python_datetimes=True,
+        )).astype('datetime64')
+
+    return values

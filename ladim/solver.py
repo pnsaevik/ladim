@@ -28,7 +28,8 @@ class Solver:
 
         while self.time <= self.stop:
             model.release.update(model)
-            model.forcing.update(model)
+            if model.state.size > 0:
+                model.forcing.update(model)
             model.output.update(model)
             model.tracker.update(model)
             model.ibm.update(model)

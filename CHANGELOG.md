@@ -16,6 +16,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ## [2.3.0] - unreleased
 ### Added
 - Warm start capabilities
+### Changed
+- Skip forward if no particles
 
 ### Changed
 - Use sphinx autoapi to generate documentation
