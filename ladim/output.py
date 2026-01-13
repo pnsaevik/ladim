@@ -5,6 +5,47 @@ if typing.TYPE_CHECKING:
     from .model import Model
 import os
 import contextlib
+import queue
+import threading
+
+
+class AsyncWriter:
+    def __init__(self, writer):
+        """
+        Asynchronous writer
+        
+        Converts a synchronous writer to an asynchronous writer
+
+        :param writer: Input synchronous writer function
+        """
+        self._writer = writer
+        self._queue = queue.Queue()
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(
+            target=self._worker,
+            daemon=True,
+        )
+        self._thread.start()
+    
+    def write(self, data: dict[str, np.ndarray]):
+        self._queue.put(data)
+    
+    def close(self):
+        self._queue.put(None)
+        self._thread.join()
+    
+    def stop(self):
+        self._stop_event.set()
+        self.close()
+
+    def _worker(self):
+        while not self._stop_event.is_set():
+            data = self._queue.get()
+            if data is None:
+                self._queue.task_done()
+                break
+            self._writer(data)
+            self._queue.task_done()
 
 
 class Output:

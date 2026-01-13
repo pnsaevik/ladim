@@ -5,6 +5,22 @@ from ladim import output
 import netCDF4 as nc
 
 
+class Test_AsyncWriter():
+    def test_can_write_in_sequence(self):
+        alldata = []
+
+        def writer(data):
+            alldata.append(data)
+
+        w = output.AsyncWriter(writer)
+        w.write(dict(a=np.array([1, 2, 3])))
+        w.write(dict(a=np.array([4, 5])))
+        w.close()
+
+        assert len(alldata) == 2
+        assert alldata[1]['a'].tolist() == [4, 5]
+
+
 class Test_Output_update:
     @pytest.fixture()
     def mock_model(self):
