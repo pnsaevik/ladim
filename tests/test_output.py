@@ -21,6 +21,20 @@ class Test_AsyncWriter():
         assert alldata[1] == [4, 5]
 
 
+class Test_filename_generator:
+    def test_correct_when_no_pattern(self):
+        g = output.filename_generator('filename.nc')
+        assert next(g) == 'filename.nc'
+        assert next(g) == 'filename_1.nc'
+        assert next(g) == 'filename_2.nc'
+
+    def test_correct_when_pattern_of_zeros(self):
+        g = output.filename_generator('filename_00000.nc')
+        assert next(g) == 'filename_00000.nc'
+        assert next(g) == 'filename_00001.nc'
+        assert next(g) == 'filename_00002.nc'
+
+
 class Test_Output_update:
     @pytest.fixture()
     def mock_model(self):
