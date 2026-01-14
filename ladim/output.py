@@ -1,3 +1,7 @@
+"""
+Output data write routines
+"""
+
 import netCDF4 as nc
 import numpy as np
 import typing
@@ -14,9 +18,19 @@ class AsyncWriter:
         """
         Asynchronous writer
         
-        Converts a synchronous writer to an asynchronous writer
+        Convert a synchronous writer to an asynchronous writer. The class has
+        an internal queue, and incoming data is sent to the writer thread in
+        sequence. The close() method should be called in the end to ensure
+        all data in the queue is written before shutdown.
 
-        :param writer: Input synchronous writer function
+        Usage::
+
+            w = AsyncWriter(lambda data: myfile.write(data))
+            w.write(b'asdf')
+            w.write(b'qwerty')
+            w.close()
+
+        :param writer: Synchronous writer function with a single input argument
         """
         self._writer = writer
         self._queue = queue.Queue()
@@ -27,18 +41,30 @@ class AsyncWriter:
         )
         self._thread.start()
     
-    def write(self, data: dict[str, np.ndarray]):
+    def write(self, data):
+        """
+        Schedule a chunk of data for asynchronous writing.
+        
+        :param data: Data to be sent to the writer function
+        """
         self._queue.put(data)
     
     def close(self):
+        """
+        Wait until all data is written and close down thread
+        """
         self._queue.put(None)
         self._thread.join()
     
     def stop(self):
+        """
+        Close down thread even though there is more data in the pipeline
+        """
         self._stop_event.set()
         self.close()
 
     def _worker(self):
+        """Main loop: process data in sequence and wait for more if the queue is empty"""
         while not self._stop_event.is_set():
             data = self._queue.get()
             if data is None:

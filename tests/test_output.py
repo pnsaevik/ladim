@@ -13,12 +13,12 @@ class Test_AsyncWriter():
             alldata.append(data)
 
         w = output.AsyncWriter(writer)
-        w.write(dict(a=np.array([1, 2, 3])))
-        w.write(dict(a=np.array([4, 5])))
+        w.write([1, 2, 3])
+        w.write([4, 5])
         w.close()
 
         assert len(alldata) == 2
-        assert alldata[1]['a'].tolist() == [4, 5]
+        assert alldata[1] == [4, 5]
 
 
 class Test_Output_update:
