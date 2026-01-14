@@ -13,6 +13,53 @@ import contextlib
 import queue
 import threading
 from pathlib import Path
+import xarray as xr
+
+
+def append_netcdf(data: xr.Dataset, fp: nc.Dataset):
+    """
+    Append data to netcdf file
+    
+    :param data: Dataset to write
+    :param fp: Handle to output dataset
+    """
+    fp.set_auto_mask(False)
+
+    # Create root-level attributes
+    if not fp.ncattrs():
+        fp.setncatts(data.attrs)
+
+    # Create dimensions
+    for dimname in data.dims:
+        if dimname not in fp.dimensions:
+            fp.createDimension(dimname=dimname, size=None)
+
+    # Create variables
+    for varname, item in data.variables.items():
+        if str(varname) not in fp.variables:
+            fp.createVariable(
+                varname=str(varname),
+                datatype=item.dtype,
+                dimensions=tuple(str(d) for d in item.dims),
+            )
+
+            fp.variables[varname].set_auto_mask(False)
+            fp.variables[varname].setncatts(item.attrs)
+
+    # Store old dimension sizes
+    old_dims = {k: v.size for k, v in fp.dimensions.items()}
+
+    # Append data
+    for varname, item in data.variables.items():
+        idx = tuple(
+            slice(old_dims[k], old_dims[k] + sz)
+            for k, sz in zip(item.dims, item.shape)
+        )
+        fp.variables[varname][idx] = item.to_numpy()
+
+    return fp
+    
+
 
 
 def filename_generator(pattern):
