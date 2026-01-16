@@ -60,6 +60,16 @@ class State:
 
         self._num_released += num_new_particles
 
+    @property
+    def values(self) -> dict[str, np.ndarray]:
+        """
+        Convert state object to dict of numpy arrays
+        """
+        return {
+            k: self._data[k].to_numpy()
+            for k in self._data.columns
+        }
+
     def remove(self, particles):
         """
         Remove particles
