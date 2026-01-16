@@ -18,35 +18,15 @@
     "attrs": {
         "Conventions": "CF-1.8",
         "institution": "Institute of Marine Research",
-        "source": "Lagrangian Advection and Diffusion Model"
+        "source": "Lagrangian Advection and Diffusion Model",
+        "ladim_plugins_version": "2.9.0"
     },
     "dims": {
-        "time": 3,
         "particle": 5,
-        "particle_instance": 14
+        "particle_instance": 14,
+        "time": 3
     },
     "data_vars": {
-        "instance_offset": {
-            "dims": [],
-            "attrs": {
-                "long_name": "particle instance offset for file"
-            },
-            "data": 0
-        },
-        "particle_count": {
-            "dims": [
-                "time"
-            ],
-            "attrs": {
-                "long_name": "number of particles in a given timestep",
-                "ragged_row_count": "particle count at nth timestep"
-            },
-            "data": [
-                4,
-                5,
-                5
-            ]
-        },
         "release_time": {
             "dims": [
                 "particle"
@@ -160,6 +140,27 @@
                 1.0,
                 1.0
             ]
+        },
+        "particle_count": {
+            "dims": [
+                "time"
+            ],
+            "attrs": {
+                "long_name": "number of particles in a given timestep",
+                "ragged_row_count": "particle count at nth timestep"
+            },
+            "data": [
+                4,
+                5,
+                5
+            ]
+        },
+        "instance_offset": {
+            "dims": [],
+            "attrs": {
+                "long_name": "particle instance offset for file"
+            },
+            "data": 0
         }
     }
 }

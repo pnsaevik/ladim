@@ -241,7 +241,7 @@ def _initialize_netcdf(fp: nc.Dataset):
         })
         try:
             from ladim_plugins import __version__ as ladim_plugins_version  # type: ignore
-            # fp.setncattr('ladim_plugins_version', ladim_plugins_version)
+            fp.setncattr('ladim_plugins_version', ladim_plugins_version)
         except ImportError:
             pass
 
