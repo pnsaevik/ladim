@@ -530,7 +530,7 @@ class Output:
         )
 
     def close(self):
-        if _CACHE['async_writer'] is not None:
+        if _CACHE.get('async_writer', None) is not None:
             _CACHE['async_writer'].close()
 
 
