@@ -1,0 +1,132 @@
+{
+    "coords": {
+        "time": {
+            "dims": [
+                "time"
+            ],
+            "attrs": {
+                "long_name": "time",
+                "standard_name": "time"
+            },
+            "data": [
+                "2015-09-07 01:02:00",
+                "2015-09-07 01:02:30"
+            ]
+        }
+    },
+    "attrs": {
+        "Conventions": "CF-1.8",
+        "institution": "Institute of Marine Research",
+        "source": "Lagrangian Advection and Diffusion Model",
+        "ladim_plugins_version": "2.9.0"
+    },
+    "dims": {
+        "particle_instance": 10,
+        "time": 2
+    },
+    "data_vars": {
+        "pid": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle identifier"
+            },
+            "data": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                0,
+                1,
+                2,
+                3,
+                4
+            ]
+        },
+        "X": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle X-coordinate"
+            },
+            "data": [
+                5.063,
+                5.031,
+                5.002,
+                5.003,
+                5.0,
+                5.022,
+                5.041,
+                5.014,
+                4.991,
+                5.033
+            ]
+        },
+        "Y": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle Y-coordinate"
+            },
+            "data": [
+                3.958,
+                3.904,
+                3.974,
+                3.96,
+                4.0,
+                3.908,
+                3.878,
+                3.944,
+                3.957,
+                3.996
+            ]
+        },
+        "Z": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle depth",
+                "standard_name": "depth_below_surface",
+                "units": "m",
+                "positive": "down"
+            },
+            "data": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+            ]
+        },
+        "particle_count": {
+            "dims": [
+                "time"
+            ],
+            "attrs": {
+                "long_name": "number of particles in a given timestep",
+                "ragged_row_count": "particle count at nth timestep"
+            },
+            "data": [
+                5,
+                5
+            ]
+        },
+        "instance_offset": {
+            "dims": [],
+            "attrs": {
+                "long_name": "particle instance offset for file"
+            },
+            "data": 0
+        }
+    }
+}

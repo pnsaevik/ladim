@@ -1,0 +1,29 @@
+{
+    "coords": {},
+    "attrs": {
+        "Conventions": "CF-1.8",
+        "institution": "Institute of Marine Research",
+        "source": "Lagrangian Advection and Diffusion Model",
+        "ladim_plugins_version": "2.9.0"
+    },
+    "dims": {
+        "particle": 5
+    },
+    "data_vars": {
+        "release_time": {
+            "dims": [
+                "particle"
+            ],
+            "attrs": {
+                "long_name": "particle release time"
+            },
+            "data": [
+                "2015-09-07 01:00:00",
+                "2015-09-07 01:00:30",
+                "2015-09-07 01:01:00",
+                "2015-09-07 01:01:30",
+                "2015-09-07 01:02:00"
+            ]
+        }
+    }
+}

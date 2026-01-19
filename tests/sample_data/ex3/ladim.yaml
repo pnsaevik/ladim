@@ -3,12 +3,12 @@
 time_control:
     # Start and stop of simulation
     start_time     : 2015-09-07 01:00:00
-    stop_time      : 2015-09-07 01:05:00
+    stop_time      : 2015-09-07 01:02:30
 
 
 files:
     particle_release_file : particles.rls
-    output_file           : out.nc
+    output_file           : out%M.nc
 
 
 gridforce:
@@ -18,7 +18,7 @@ gridforce:
 
 particle_release:
     release_type: 'continuous'
-    release_frequency: [1, m]
+    release_frequency: [30, s]
     variables: [release_time, X, Y, Z, group_id]
     release_time: time   # np.datetime64[s]
 
@@ -28,7 +28,7 @@ particle_release:
 
 output_variables:
     # Frequency of output
-    outper: [60, s]
+    outper: [30, s]
 
     # Records per file
     numrec: 4
@@ -85,7 +85,7 @@ output_variables:
 
 numerics:
     # Model time step
-    dt: [60, s]     # Format = [value, unit]
+    dt: [30, s]     # Format = [value, unit]
     # Advection method, EF, RK2, or RK4
     advection: RK4
     diffusion: 0.1    # [m/s**2]
