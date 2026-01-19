@@ -357,49 +357,6 @@ def append_netcdf(data: xr.Dataset, fp: nc.Dataset):
         fp.variables[varname][idx] = item.to_numpy()
 
     return fp
-    
-
-
-
-def filename_generator(pattern):
-    """
-    Create a series of file names from a pattern
-
-    Example patterns:
-
-    - "filename_0000.nc" gives ("filename_0000.nc", "filename_0001.nc", ...)
-    - "filename.nc" gives ("filename.nc", "filename_1.nc", "filename_2.nc", ...)
-    
-    :param pattern: File name pattern
-    """
-    parent = Path(pattern).parent
-    stem = Path(pattern).stem
-    suffix = Path(pattern).suffix
-
-    pat = re.compile(r'(.*)_(0*)')
-    m = pat.match(stem)
-    
-    if m is None:
-        first_stem = stem
-        enumerate_pattern = ''
-    else:
-        first_stem = m.group(1)
-        enumerate_pattern = m.group(2)
-    
-    if enumerate_pattern and all(c == '0' for c in enumerate_pattern):
-        i = 0
-        num_digits = len(enumerate_pattern)
-        while True:
-            fname = f"{first_stem}_{i:0{num_digits}d}{suffix}"
-            yield str(parent / fname)
-            i += 1
-    
-    else:
-        yield pattern
-        i = 1
-        while True:
-            yield str(parent / f'{first_stem}_{i}{suffix}')
-            i += 1
         
 
 def _to_seconds(spec):

@@ -40,18 +40,3 @@ class Test_append_netcdf:
 
             output.append_netcdf(data, fp)
             assert fp.variables['x'][:].tolist() == [1, 2, 3, 4, 5, 6]
-
-
-class Test_filename_generator:
-    def test_correct_when_no_pattern(self):
-        g = output.filename_generator('filename.nc')
-        assert next(g) == 'filename.nc'
-        assert next(g) == 'filename_1.nc'
-        assert next(g) == 'filename_2.nc'
-
-    def test_correct_when_pattern_of_zeros(self):
-        g = output.filename_generator('filename_00000.nc')
-        assert next(g) == 'filename_00000.nc'
-        assert next(g) == 'filename_00001.nc'
-        assert next(g) == 'filename_00002.nc'
-
