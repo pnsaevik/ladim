@@ -1,0 +1,102 @@
+# Configuration file for sedimentation model
+
+time_control:
+    # Start and stop of simulation
+    start_time     : 2015-09-07 01:00:00
+    stop_time      : 2015-09-07 01:05:00
+
+
+files:
+    particle_release_file : particles.rls
+    output_file           : out.nc
+
+
+gridforce:
+    # Module name is mandatory.
+    # The other items are module dependent
+    module: ladim_plugins.chemicals
+    input_file: forcing.nc  # Use wildcards (*) to select a range of files
+    ibm_forcing:
+    - AKs
+
+
+ibm:
+    module: ladim_plugins.chemicals
+    vertical_mixing: AKs  # Scalar [m2/s] or variable name
+    vertdiff_dt: 60  # [s] Fractional time step size for vertical diffusion (default = inf, which indicates that the regular time step size should be used)
+    vertdiff_dz: 2  # [m] Spacing of vertical diffusion sampling point (default = 0, which indicates that the diffusion is sampled at the particle position)
+    vertdiff_max: 0.01  # [m2/s] Maximal vertical diffusion value (default = inf)
+    horzdiff_type: smagorinsky
+    horzdiff_max: 1
+    horzdiff_min: 0
+    land_collision: reposition  # Alternatives: 'reposition' (default), 'freeze', 'costal_diffusion'
+
+particle_release:
+    variables: [release_time, X, Y, Z, group_id]
+    release_time: time   # np.datetime64[s]
+
+    # Mark variables as time independent
+    particle_variables: [release_time, group_id]
+
+
+output_variables:
+    # Frequency of output
+    outper: [60, s]
+
+    # Variables included in output
+    particle: [release_time]
+    instance: [pid, X, Y, Z]
+
+
+    # --- Output format for standard variables ---
+
+    # Output format for the particle release time
+    release_time:
+        ncformat: f8
+        long_name: particle release time
+        units: seconds since reference_time
+
+    # Output format for the particle identifier
+    pid:
+        ncformat: i4
+        long_name: particle identifier
+
+    # Output format for the X coordinate
+    X:
+        ncformat: f4
+        long_name: particle X-coordinate
+
+    # Output format for the Y coordinate
+    Y:
+        ncformat: f4
+        long_name: particle Y-coordinate
+
+    # Output format for the particle depth
+    Z:
+        ncformat: f4
+        long_name: particle depth
+        standard_name: depth_below_surface
+        units: m
+        positive: down
+
+    # Output format for the latitude
+    lat:
+        ncformat: f4
+        long_name: particle latitude
+        units: degrees_north
+        standard_name: latitude
+
+    # Output format for the longitude
+    lon:
+        ncformat: f4
+        long_name: particle longitude
+        units: degrees_east
+        standard_name: longitude
+
+
+numerics:
+    # Model time step
+    dt: [60, s]     # Format = [value, unit]
+    # Advection method, EF, RK2, or RK4
+    advection: RK4
+    diffusion: 0    # [m/s**2]

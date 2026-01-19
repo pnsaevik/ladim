@@ -1,0 +1,145 @@
+attrs:
+  Conventions: CF-1.8
+  date: '2025-05-20'
+  history: Created by ladim 2.1.5
+  institution: Institute of Marine Research
+  source: Lagrangian Advection and Diffusion Model
+coords:
+  time:
+    attrs:
+      long_name: time
+      standard_name: time
+      units: seconds since 1970-01-01
+    data:
+    - 1441587600
+    - 1441587660
+    - 1441587720
+    - 1441587780
+    - 1441587840
+    - 1441587900
+    dims:
+    - time
+data_vars:
+  X:
+    attrs:
+      long_name: particle X-coordinate
+    data:
+    - 3.0
+    - 3.030808210372925
+    - 2.0
+    - 7.0
+    - 3.0311591625213623
+    - 2.0569393634796143
+    - 7.041181564331055
+    - 3.1002111434936523
+    - 2.419058084487915
+    - 6.597515106201172
+    - 3.456528663635254
+    - 2.0418317317962646
+    - 6.956457138061523
+    - 3.1912429332733154
+    - 1.6445001363754272
+    - 7.129193305969238
+    dims:
+    - particle_instance
+  Y:
+    attrs:
+      long_name: particle Y-coordinate
+    data:
+    - 3.0
+    - 2.9947237968444824
+    - 2.0
+    - 5.500100135803223
+    - 2.9662156105041504
+    - 2.0585105419158936
+    - 5.502910614013672
+    - 2.5460848808288574
+    - 1.543968915939331
+    - 6.298955917358398
+    - 2.78379225730896
+    - 2.2502243518829346
+    - 5.950219631195068
+    - 3.1403472423553467
+    - 1.6519376039505005
+    - 5.6433820724487305
+    dims:
+    - particle_instance
+  Z:
+    attrs:
+      long_name: particle depth
+      positive: down
+      standard_name: depth_below_surface
+      units: m
+    data:
+    - 31.792999267578125
+    - 31.76234245300293
+    - 0.0
+    - 5.0
+    - 31.791749954223633
+    - 0.14056262373924255
+    - 4.992455005645752
+    - 31.72907829284668
+    - 0.8210374712944031
+    - 5.062049865722656
+    - 31.791292190551758
+    - 0.07033130526542664
+    - 5.047951698303223
+    - 31.685808181762695
+    - 0.18107876181602478
+    - 5.0231218338012695
+    dims:
+    - particle_instance
+  instance_offset:
+    attrs:
+      long_name: particle instance offset for file
+    data: 0
+    dims: []
+  particle_count:
+    attrs:
+      long_name: number of particles in a given timestep
+      ragged_row_count: particle count at nth timestep
+    data:
+    - 1
+    - 3
+    - 3
+    - 3
+    - 3
+    - 3
+    dims:
+    - time
+  pid:
+    attrs:
+      long_name: particle identifier
+    data:
+    - 0
+    - 0
+    - 1
+    - 2
+    - 0
+    - 1
+    - 2
+    - 0
+    - 1
+    - 2
+    - 0
+    - 1
+    - 2
+    - 0
+    - 1
+    - 2
+    dims:
+    - particle_instance
+  release_time:
+    attrs:
+      long_name: particle release time
+      units: seconds since 1970-01-01
+    data:
+    - 1441587600.0
+    - 1441587660.0
+    - 1441587660.0
+    dims:
+    - particle
+dims:
+  particle: 3
+  particle_instance: 16
+  time: 6
