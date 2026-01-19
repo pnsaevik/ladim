@@ -1,0 +1,85 @@
+time_control:
+    # Start and stop of simulation
+    start_time     : 2015-09-01 01:00:00
+    stop_time      : 2015-09-01 01:05:00
+
+
+files:
+    particle_release_file : particles.rls
+    output_file           : out.nc
+
+
+gridforce:
+    module: ladim.gridforce.ROMS
+    input_file: forcing.nc  # Use wildcards (*) to select a range of files
+    ibm_forcing: [temp, salt]
+
+
+ibm:
+    ibm_module: ladim_plugins.lunar_eel
+    vertical_mixing: 0.00005  # [m*2/s]
+    lunar_latlon: [60, 0]     # [deg] lat, lon position for computing lunar phase and altitude
+    vertical_limits: [0, 20]  # [m] Keep larvae within these vertical bounds
+    speed: 0.12               # [m/s] Larva swim speed when oriented
+
+
+particle_release:
+    release_type: discrete
+    variables: 
+    - release_time   # Time of release, formatted as yyyy-mm-ddThh:mm:ss
+    - X              # X coordinate of release location
+    - Y              # Y coordinate of release location
+    - Z              # Depth of release location
+
+    # Converters (if not float)
+    release_time: time
+
+    # Time-independent variables
+    particle_variables: [release_time]
+
+
+output_variables:
+    # Output period, format [value, unit], unit = s, m, h, or d
+    outper: [60, s]
+
+    # Variable names
+    particle: [release_time]
+    instance: [pid, lat, lon, Z]
+
+    # --- Output format for standard variables ---
+
+    # Output format for the particle release time
+    release_time:
+        ncformat: f8
+        long_name: particle release time
+        units: seconds since reference_time
+
+    # Output format for the particle identifier
+    pid:
+        ncformat: i4
+        long_name: particle identifier
+
+    # Output format for the latitude
+    lat:
+        ncformat: f4
+        long_name: particle latitude
+
+    # Output format for the longitude
+    lon:
+        ncformat: f4
+        long_name: particle longitude
+
+    # Output format for the particle depth
+    Z:
+        ncformat: f4
+        long_name: particle depth
+        standard_name: depth_below_surface
+        units: m
+        positive: down
+
+
+numerics:
+    # Model time step, [value, unit]
+    dt: [60, s]     # usually 120 on 160m NorFjords, 600 NorKyst, 1800 SVIM
+    advection: RK4  # either EF, RK2 or RK4 (recommended)
+    diffusion: 0    # [m*2/s]

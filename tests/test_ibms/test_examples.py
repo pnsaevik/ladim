@@ -14,8 +14,10 @@ import importlib.resources
 
 
 module_names = [
-    d.name for d in pathlib.Path(ladim.ibms.__file__).parent.glob('*/')
-    if d.joinpath('ladim.yaml').is_file()
+    'chemicals',
+    'egg',
+    'larvae',
+    'lunar_eel',
 ]
 
 
