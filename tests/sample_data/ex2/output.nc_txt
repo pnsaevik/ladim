@@ -24,35 +24,11 @@
         "source": "Lagrangian Advection and Diffusion Model"
     },
     "dims": {
-        "time": 6,
         "particle": 5,
-        "particle_instance": 20
+        "particle_instance": 20,
+        "time": 6
     },
     "data_vars": {
-        "instance_offset": {
-            "dims": [],
-            "attrs": {
-                "long_name": "particle instance offset for file"
-            },
-            "data": 0
-        },
-        "particle_count": {
-            "dims": [
-                "time"
-            ],
-            "attrs": {
-                "long_name": "number of particles in a given timestep",
-                "ragged_row_count": "particle count at nth timestep"
-            },
-            "data": [
-                1,
-                2,
-                3,
-                4,
-                5,
-                5
-            ]
-        },
         "release_time": {
             "dims": [
                 "particle"
@@ -190,6 +166,30 @@
                 1.0,
                 1.0
             ]
+        },
+        "particle_count": {
+            "dims": [
+                "time"
+            ],
+            "attrs": {
+                "long_name": "number of particles in a given timestep",
+                "ragged_row_count": "particle count at nth timestep"
+            },
+            "data": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                5
+            ]
+        },
+        "instance_offset": {
+            "dims": [],
+            "attrs": {
+                "long_name": "particle instance offset for file"
+            },
+            "data": 0
         }
     }
 }

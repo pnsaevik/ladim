@@ -60,6 +60,16 @@ class State:
 
         self._num_released += num_new_particles
 
+    @property
+    def values(self) -> dict[str, np.ndarray]:
+        """
+        Convert state object to dict of numpy arrays
+        """
+        return {
+            k: self._data[k].to_numpy()
+            for k in self._data.columns
+        }
+
     def remove(self, particles):
         """
         Remove particles
@@ -93,7 +103,7 @@ class State:
     def __setattr__(self, item, value):
         excepted_values = [
             '_data', '_model', '_num_released', '_varnames', 'dt', 'timestep',
-            'timestamp'
+            'timestamp', 'released'
         ]
         if item in list(self.__dict__.keys()) + excepted_values:
             super().__setattr__(item, value)

@@ -16,6 +16,10 @@ class IBM:
 
         self.user_ibm = UserIbmClass(conf or {})
 
+    @staticmethod
+    def create(legacy_module=None, conf: dict = None):
+        return IBM(legacy_module, conf)
+
     def update(self, model: "Model"):
         grid = model.grid
         state = model.state

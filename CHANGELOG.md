@@ -5,13 +5,23 @@ All notable changes to the project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Issues]
-### Change
-- Velocity in forcing module should return "grid speed" velocity. Rescaling
-  should happen within the forcing module, not tracking module.
-- New grid and forcing module should have a clearer separation. Grid should
-  take care of coordinate system changes, while forcing should return static
-  fields.
+## [2.2.3] - unreleased
+### Added
+- Warm start capabilities
+- Version of ladim_plugins recorded in output file
+### Changed
+- Skip forward if no particles
+- Output to several files must now follow a semantic pattern
+
+
+## [2.2.0] - 2025-10-01
+### Added
+- Output can now be split between several files
+
+
+## [2.1.7] - 2025-09-22
+### Changed
+- Use arctan2 instead of atan2 to improve numpy compatibility
 
 
 ## [2.1.6] - 2025-06-10

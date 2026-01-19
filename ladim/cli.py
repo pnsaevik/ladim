@@ -29,7 +29,7 @@ def main(config_stream, loglevel=logging.INFO):
     # Read configuration
     config = configure(config_stream)
 
-    model = Model.from_config(config)
+    model = Model.create(config)
     model.run()
     model.close()
 
@@ -79,7 +79,7 @@ def run():
     logger.info(f"python version:  {sys.version.split()[0]}\n")
 
     logger.info(f"  Configuration file: {args.config_file}")
-    logger.info(f"  loglevel = {logging.getLevelName(args.loglevel)}")
+    logger.info(f"  loglevel = {args.loglevel}")
 
     # =============
     # Sanity check

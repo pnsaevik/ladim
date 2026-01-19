@@ -1,3 +1,3 @@
-__version__ = '2.1.6'
+__version__ = '2.2.3'
 
-from .main import main, run
+from .cli import main, run
