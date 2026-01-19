@@ -83,9 +83,9 @@ def _load_ladim_outputs_as_json(ladim_outfiles):
             d = dset_dict['data_vars'][v]['data']
             dset_dict['data_vars'][v]['data'] = np.round(d, 3).tolist()
 
-        del dset_dict['attrs']['date']
-        del dset_dict['attrs']['history']
-        del dset_dict['attrs']['ladim_plugins_version']
+        dset_dict['attrs'].pop('date', None)
+        dset_dict['attrs'].pop('history', None)
+        dset_dict['attrs'].pop('ladim_plugins_version', None)
 
         out[Path(fname).name] = dset_dict
 
