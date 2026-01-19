@@ -14,14 +14,14 @@ files:
 gridforce:
     # Module name is mandatory.
     # The other items are module dependent
-    module: ladim_plugins.chemicals
+    module: ladim.ibms.chemicals
     input_file: forcing.nc  # Use wildcards (*) to select a range of files
     ibm_forcing:
     - AKs
 
 
 ibm:
-    module: ladim_plugins.chemicals
+    module: ladim.ibms.chemicals
     vertical_mixing: AKs  # Scalar [m2/s] or variable name
     vertdiff_dt: 60  # [s] Fractional time step size for vertical diffusion (default = inf, which indicates that the regular time step size should be used)
     vertdiff_dz: 2  # [m] Spacing of vertical diffusion sampling point (default = 0, which indicates that the diffusion is sampled at the particle position)

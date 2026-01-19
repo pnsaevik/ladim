@@ -1,0 +1,71 @@
+# Configuration file for sedimentation model
+
+&deftime time_control:
+    # Start and stop of simulation
+    start_time     : 2025-01-31 00:15:00
+    stop_time      : 2025-01-31 00:30:00
+
+
+files:
+    particle_release_file : particles.rls
+    output_file           : out.nc
+
+
+gridforce:
+    # Module name is mandatory.
+    # The other items are module dependent
+    module: ladim_plugins.nk2d
+
+    # Replace with string pattern for the thredds server
+    input_file: "dap2://thredds.met.no/thredds/dodsC/fou-hi/norkystv3_800m_m00_be"
+    depth: 5
+
+
+particle_release:
+    variables: [mult, release_time, X, Y, Z, group_id]
+    release_time: time   # np.datetime64[s]
+
+    # Mark variables as time independent
+    particle_variables: [release_time]
+
+
+output_variables:
+    # Frequency of output
+    outper: [15, m]
+
+    # Variables included in output
+    particle: [release_time]
+    instance: [pid, X, Y]
+
+
+    # --- Output format for standard variables ---
+
+    # Output format for the particle release time
+    release_time:
+        ncformat: f8
+        long_name: particle release time
+        units: seconds since reference_time
+
+    # Output format for the particle identifier
+    pid:
+        ncformat: i4
+        long_name: particle identifier
+
+    # Output format for the X coordinate
+    X:
+        ncformat: f4
+        standard_name: longitude
+        units: degrees_east
+
+    # Output format for the Y coordinate
+    Y:
+        ncformat: f4
+        standard_name: latitude
+        units: degrees_north
+
+numerics:
+    # Model time step
+    dt: [5, m]     # Format = [value, unit]
+    # Advection method, EF, RK2, or RK4
+    advection: RK4
+    diffusion: 0    # [m/s**2]

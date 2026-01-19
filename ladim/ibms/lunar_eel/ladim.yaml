@@ -16,7 +16,7 @@ gridforce:
 
 
 ibm:
-    ibm_module: ladim_plugins.lunar_eel
+    ibm_module: ladim.ibms.lunar_eel
     vertical_mixing: 0.00005  # [m*2/s]
     lunar_latlon: [60, 0]     # [deg] lat, lon position for computing lunar phase and altitude
     vertical_limits: [0, 20]  # [m] Keep larvae within these vertical bounds

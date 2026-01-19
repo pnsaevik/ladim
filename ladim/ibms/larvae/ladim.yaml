@@ -16,7 +16,7 @@ gridforce:
 
 
 ibm:
-    ibm_module: ladim_plugins.larvae
+    ibm_module: ladim.ibms.larvae
 
     # Simulation parameters
     vertical_mixing: 0           # Diffusivity in the vertical direction (default = 0) [m^2/s]

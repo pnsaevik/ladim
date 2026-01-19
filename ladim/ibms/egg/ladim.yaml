@@ -16,7 +16,7 @@ gridforce:
 
 
 ibm:
-    ibm_module: ladim_plugins.egg
+    ibm_module: ladim.ibms.egg
     vertical_mixing: 0.00005  # [m*2/s]
     egg_diam: 0.0011  # [m]  cod=0.0014, saithe=0.0011
 

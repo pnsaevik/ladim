@@ -1,0 +1,149 @@
+attrs:
+  Conventions: CF-1.8
+  date: '2025-05-20'
+  history: Created by ladim 2.1.5
+  institution: Institute of Marine Research
+  source: Lagrangian Advection and Diffusion Model
+coords:
+  time:
+    attrs:
+      long_name: time
+      standard_name: time
+      units: seconds since 1970-01-01
+    data:
+    - 1441587600
+    - 1441587660
+    - 1441587720
+    - 1441587780
+    - 1441587840
+    - 1441587900
+    - 1441587960
+    - 1441588020
+    - 1441588080
+    - 1441588140
+    - 1441588200
+    dims:
+    - time
+data_vars:
+  X:
+    attrs:
+      long_name: particle X-coordinate
+    data:
+    - 3.0
+    - 3.0541927814483643
+    - 4.0
+    - 4.041346549987793
+    - 5.0
+    - 4.975327014923096
+    - 3.0
+    - 3.0143284797668457
+    - 3.036571502685547
+    - 3.094083786010742
+    dims:
+    - particle_instance
+  Y:
+    attrs:
+      long_name: particle Y-coordinate
+    data:
+    - 3.0
+    - 2.945977210998535
+    - 4.0
+    - 3.9691367149353027
+    - 5.0
+    - 4.964430332183838
+    - 3.0
+    - 2.9667141437530518
+    - 2.9708003997802734
+    - 2.9253413677215576
+    dims:
+    - particle_instance
+  Z:
+    attrs:
+      long_name: particle depth
+      positive: down
+      standard_name: depth_below_surface
+      units: m
+    data:
+    - 0.0
+    - 18.107215881347656
+    - 1.0
+    - 18.988693237304688
+    - 2.0
+    - 20.048622131347656
+    - 31.850000381469727
+    - 31.630334854125977
+    - 31.609033584594727
+    - 31.67404556274414
+    dims:
+    - particle_instance
+  active:
+    attrs:
+      flag_meanings: inactive active
+      long_name: particle active mask
+    data:
+    - 1
+    - 1
+    - 1
+    - 1
+    - 1
+    - 1
+    - 1
+    - 1
+    - 1
+    - 1
+    dims:
+    - particle_instance
+  instance_offset:
+    attrs:
+      long_name: particle instance offset for file
+    data: 0
+    dims: []
+  particle_count:
+    attrs:
+      long_name: number of particles in a given timestep
+      ragged_row_count: particle count at nth timestep
+    data:
+    - 1
+    - 2
+    - 2
+    - 1
+    - 0
+    - 1
+    - 1
+    - 1
+    - 1
+    - 0
+    - 0
+    dims:
+    - time
+  pid:
+    attrs:
+      long_name: particle identifier
+    data:
+    - 0
+    - 0
+    - 1
+    - 1
+    - 2
+    - 2
+    - 3
+    - 3
+    - 3
+    - 3
+    dims:
+    - particle_instance
+  release_time:
+    attrs:
+      long_name: particle release time
+      units: seconds since 1970-01-01
+    data:
+    - 1441587600.0
+    - 1441587660.0
+    - 1441587720.0
+    - 1441587900.0
+    dims:
+    - particle
+dims:
+  particle: 4
+  particle_instance: 10
+  time: 11

@@ -18,6 +18,8 @@ module_names = [
     'egg',
     'larvae',
     'lunar_eel',
+    'mine',
+    'nk2d',
 ]
 
 
