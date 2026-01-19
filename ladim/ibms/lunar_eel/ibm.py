@@ -1,4 +1,8 @@
 import numpy as np
+import typing
+if typing.TYPE_CHECKING:
+    from ladim.state import State
+    from ladim.grid import Grid
 
 
 class IBM:
@@ -18,8 +22,8 @@ class IBM:
         self.dt = config['dt']
         self.xs_dx = None
         self.ys_dy = None
-        self.state = None
-        self.grid = None
+        self.state = None  # type: State
+        self.grid = None  # type: Grid
 
         self.moonfunc = get_moon_function(lat=moon_lat, lon=moon_lon)
 

@@ -20,6 +20,7 @@ module_names = [
     'lunar_eel',
     'mine',
     'nk2d',
+    'sedimentation',
 ]
 
 

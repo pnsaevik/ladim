@@ -1,0 +1,29 @@
+# Seed for random number generator (optional)
+seed: 0
+
+# Column order (optional, default is date, longitude, latitude, depth, *attrs)
+columns: [active, date, longitude, latitude, depth, sink_vel, region]
+
+groups:
+# First group of particles. Note the leading hyphen ("-")
+-   num: 5                                      # Number of particles
+    date: [2000-01-01 01:00, 2000-02-01 01:00]  # Start and stop dates
+    location: [5, 60]                           # Release location
+    depth: [0, 10]                              # Release depth range
+    attrs:
+        active: 1
+        sink_vel: ladim_plugins.sedimentation.sinkvel
+        region: 0
+
+# Second group of particles. Note the leading hyphen ("-")
+-   num: 5                                      # Number of particles
+    seed: 0                                     # Seed for random number generator (optional)
+    date: [2000-01-01 01:00, 2000-02-01 01:00]  # Start and stop dates
+    location:                                   # Release area
+        center: [5, 60]                         # latitude, longitude of release center
+        offset: [[-50, 50, 50, -50], [-50, -50, 50, 50]]  # metric offset (polygon) relative to release center
+    depth: [0, 10]                              # Release depth range
+    attrs:
+        active: 1
+        sink_vel: ladim_plugins.sedimentation.sinkvel
+        region: 1

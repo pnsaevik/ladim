@@ -1,0 +1,135 @@
+# Configuration file for sedimentation model
+
+time_control:
+    # Start and stop of simulation
+    start_time     : 2015-09-07 01:00:00
+    stop_time      : 2015-09-07 01:10:00
+
+
+files:
+    particle_release_file : particles.rls
+    output_file           : out.nc
+
+
+gridforce:
+    # Module name is mandatory.
+    # The other items are module dependent
+    module: ladim_plugins.sedimentation
+    input_file: forcing.nc  # Use wildcards (*) to select a range of files
+
+
+ibm:
+    module: ladim_plugins.sedimentation
+    variables:
+    - sink_vel  # Sinking velocity [m/s]
+    - active    # 1 if mobile, 0 if immobile
+    - age       # Particle age in seconds
+
+    # Critical shear stress for resuspension
+    #    0 ==> All material is resuspended
+    #    Large number (e.g., 1000) ==> No material is resuspended
+    #    sand = 0.12 kg / m s2)
+    taucrit:
+        method: constant
+        value: 0
+
+    # Alternative `taucrit` format: Read from file
+    #
+    # Two methods are available, both of which computes taucrit from the grain size:
+    # - `grain_size_bin` uses Carvajalino-Fernández et al (2019) directly
+    # - `grain_size_poly` is similar, but uses a polygonal fit instead of a binned approach
+    #
+    # Source file needs to be a netCDF file with a raster map of the grain size,
+    # with `latitude` and `longitude` as 1-dimensional, regularly-spaced
+    # coordinates. Grain size typically range from 1 to 500. A value of 0 is
+    # regarded as a "missing value" and is treated like a grain size of 100.
+    #
+    # Example below:
+    #
+    # taucrit:
+    #   method: grain_size_bin
+    #   source: grainsize.nc
+    #   varname: grain_size
+
+
+    lifespan: 200  # Time (seconds) before a particle is taken out of the simulation
+
+    # Vertical diffusion [m*2/s] on the sea floor under resuspension conditions
+    vertical_mixing:
+        method: constant
+        value: 0.0001
+
+    # Alternative `vertical_mixing` format: Linearly increasing from bottom,
+    # until a maximal limit. Diffusion increases from bottom according to
+    # the 'law of the wall' and the current velocity at the bottom.
+    #
+    # Example below:
+    #
+    # vertical_mixing:
+    #   method: bounded_linear
+    #   max_diff: 0.01
+
+
+particle_release:
+    variables: [active, release_time, X, Y, Z, sink_vel]
+    release_time: time   # np.datetime64[s]
+    active: int
+
+    # Mark variables as time independent
+    particle_variables: [release_time]
+
+
+output_variables:
+    # Frequency of output
+    outper: [60, s]
+
+    # Variables included in output
+    particle: [release_time]
+    instance: [pid, X, Y, Z, active]
+
+
+    # --- Output format for standard variables ---
+
+    # Output format for the particle release time
+    release_time:
+        ncformat: f8
+        long_name: particle release time
+        units: seconds since reference_time
+
+    # Output format for the particle identifier
+    pid:
+        ncformat: i4
+        long_name: particle identifier
+
+    # Output format for the X coordinate
+    X:
+        ncformat: f4
+        long_name: particle X-coordinate
+
+    # Output format for the Y coordinate
+    Y:
+        ncformat: f4
+        long_name: particle Y-coordinate
+
+    # Output format for the particle depth
+    Z:
+        ncformat: f4
+        long_name: particle depth
+        standard_name: depth_below_surface
+        units: m
+        positive: down
+
+    # Output format for the particle active indicator
+    active:
+        ncformat: i4
+        long_name: particle active mask
+        # flag_values: [0, 1],
+        flag_meanings: inactive active
+
+
+numerics:
+    # Model time step
+    dt: [60, s]     # Format = [value, unit]
+    # Advection method, EF, RK2, or RK4
+    advection: EF
+    diffusion: 1    # [m/s**2]
