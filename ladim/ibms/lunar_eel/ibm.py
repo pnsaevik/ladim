@@ -78,7 +78,7 @@ def reflexive(r, rmin=-np.inf, rmax=np.inf):
 
 def _load_ephemeris():
     from skyfield.api import load_file
-    pkname = 'ladim_plugins.lunar_eel'
+    pkname = 'ladim.ibms.lunar_eel'
 
     try:
         from importlib.resources import files, as_file

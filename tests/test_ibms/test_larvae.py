@@ -48,7 +48,7 @@ class Test_weight_to_length:
 
 
 # def test_snapshot():
-#     import ladim_plugins.tests.test_examples
+#     import ladim.ibms.tests.test_examples
 #     import os
-#     os.chdir(os.path.dirname(ladim_plugins.tests.test_examples.__file__))
-#     ladim_plugins.tests.test_examples.test_output_matches_snapshot('larvae')
+#     os.chdir(os.path.dirname(ladim.ibms.tests.test_examples.__file__))
+#     ladim.ibms.tests.test_examples.test_output_matches_snapshot('larvae')

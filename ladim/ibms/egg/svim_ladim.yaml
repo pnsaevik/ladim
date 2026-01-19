@@ -31,7 +31,7 @@ gridforce:
 # Samle IBM-variablene her
 ibm:
     # IBM-module, omit or '' for no IBM
-    ibm_module: ladim_plugins.egg
+    ibm_module: ladim.ibms.egg
 
 state:
     # pid, X, Y, Z are mandatory and should not be given

@@ -14,7 +14,7 @@ files:
 gridforce:
     # Module name is mandatory.
     # The other items are module dependent
-    module: ladim_plugins.nk2d
+    module: ladim.ibms.nk2d
 
     # Replace with string pattern for the thredds server
     input_file: "dap2://thredds.met.no/thredds/dodsC/fou-hi/norkystv3_800m_m00_be"

@@ -1,13 +1,5 @@
 import numpy as np
-from ladim_plugins.chemicals import gridforce, IBM
-
-
-def is_legacy():
-    try:
-        import ladim.timestepper
-    except ModuleNotFoundError:
-        return True
-    return False
+from ladim.ibms.chemicals import gridforce, IBM
 
 
 class Test_nearest_unmasked:

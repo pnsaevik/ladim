@@ -29,9 +29,3 @@ jobs:
 
       - name: Run pytest
         run: pytest
-
-      - name: Install plugins
-        run: pip install ladim_plugins
-
-      - name: Test plugins
-        run: pytest --pyargs ladim_plugins
