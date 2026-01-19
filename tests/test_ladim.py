@@ -85,6 +85,7 @@ def _load_ladim_outputs_as_json(ladim_outfiles):
 
         del dset_dict['attrs']['date']
         del dset_dict['attrs']['history']
+        del dset_dict['attrs']['ladim_plugins_version']
 
         out[Path(fname).name] = dset_dict
 

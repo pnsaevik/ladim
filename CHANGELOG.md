@@ -8,6 +8,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ## [2.2.3] - unreleased
 ### Added
 - Warm start capabilities
+- Version of ladim_plugins recorded in output file
 ### Changed
 - Skip forward if no particles
 - Output to several files must now follow a semantic pattern

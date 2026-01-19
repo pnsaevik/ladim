@@ -3,8 +3,7 @@
     "attrs": {
         "Conventions": "CF-1.8",
         "institution": "Institute of Marine Research",
-        "source": "Lagrangian Advection and Diffusion Model",
-        "ladim_plugins_version": "2.9.0"
+        "source": "Lagrangian Advection and Diffusion Model"
     },
     "dims": {
         "particle": 5
