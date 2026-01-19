@@ -1,0 +1,111 @@
+time_control:
+    # Start and stop of simulation
+    start_time     : 2015-09-07 01:00:00
+    stop_time      : 2015-09-07 01:05:00
+
+
+files:
+    particle_release_file : particles.rls
+    output_file           : out.nc
+
+
+gridforce:
+    module: ladim.gridforce.ROMS
+    input_file: forcing.nc  # Use wildcards (*) to select a range of files
+    ibm_forcing: [temp, salt]
+
+
+ibm:
+    ibm_module: ladim_plugins.egg
+    vertical_mixing: 0.00005  # [m*2/s]
+    egg_diam: 0.0011  # [m]  cod=0.0014, saithe=0.0011
+
+state:
+    # pid, X, Y, Z are mandatory and should not be given
+    ibm_variables:
+    - super       # Number of actual particles per simulation particle
+    - age         # Age of particle [degree-days]
+    - egg_buoy    # Boyancy of particle [salinity equivalent]
+
+
+particle_release:
+    release_type: discrete
+    variables: 
+    - mult           # Number of particles released
+    - release_time   # Time of release, formatted as yyyy-mm-ddThh:mm:ss
+    - X              # X coordinate of release location
+    - Y              # Y coordinate of release location
+    - Z              # Depth of release location
+    - group_id       # Custom id used to group particles in post processing
+    - super          # Number of actual eggs per simulation particle
+    - egg_buoy       # Egg buoyancy, in salinity equivalents
+    
+    # Converters (if not float)
+    mult: int
+    release_time: time
+    group_id: int
+    particle_variables: [release_time, group_id]
+
+
+output_variables:
+    # Output period, format [value, unit], unit = s, m, h, or d
+    outper: [60, s]
+
+    # Variable names
+    particle: [release_time, group_id]
+    instance: [pid, X, Y, Z, age, super, egg_buoy ]
+
+    # --- Output format for standard variables ---
+
+    # Output format for the particle release time
+    release_time:
+        ncformat: f8
+        long_name: particle release time
+        units: seconds since reference_time
+
+    # Output format for the particle identifier
+    pid:
+        ncformat: i4
+        long_name: particle identifier
+
+    # Output format for the X coordinate
+    X:
+        ncformat: f4
+        long_name: particle X-coordinate
+
+    # Output format for the Y coordinate
+    Y:
+        ncformat: f4
+        long_name: particle Y-coordinate
+
+    # Output format for the particle depth
+    Z:
+        ncformat: f4
+        long_name: particle depth
+        standard_name: depth_below_surface
+        units: m
+        positive: down
+
+    # --- Output format for IBM-specific variables ---
+
+    # Output format for the temperature
+    temp:
+        ncformat: f4
+        long_name: temperature
+
+    # Output format for the egg buouy
+    egg_buoy: {ncformat: f4, long_name: egg buoyancy, units: '1'}
+    group_id: {ncformat: i4, long_name: particle group id}
+    age:
+        ncformat: f4
+        long_name: particle age in degree-days
+        units: Celcius days
+        standard_name: integral_of_sea_water_temperature_wrt_time
+    super: {ncformat: f4, long_name: number of individuals in instance}
+
+
+numerics:
+    # Model time step, [value, unit]
+    dt: [60, s]     # usually 120 on 160m NorFjords, 600 NorKyst, 1800 SVIM
+    advection: RK4  # either EF, RK2 or RK4 (recommended)
+    diffusion: 0    # [m*2/s]
