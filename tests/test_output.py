@@ -42,22 +42,6 @@ class Test_append_netcdf:
             assert fp.variables['x'][:].tolist() == [1, 2, 3, 4, 5, 6]
 
 
-class Test_AsyncWriter():
-    def test_can_write_in_sequence(self):
-        alldata = []
-
-        def writer(data):
-            alldata.append(data)
-
-        w = output.AsyncWriter(writer)
-        w.write([1, 2, 3])
-        w.write([4, 5])
-        w.close()
-
-        assert len(alldata) == 2
-        assert alldata[1] == [4, 5]
-
-
 class Test_filename_generator:
     def test_correct_when_no_pattern(self):
         g = output.filename_generator('filename.nc')

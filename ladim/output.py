@@ -16,9 +16,6 @@ from pathlib import Path
 import xarray as xr
 
 
-_CACHE = {}
-
-
 def store(
         state: dict[str, np.ndarray],
         time: int,
@@ -75,16 +72,6 @@ def store(
         is 'netcdf4'.
     """
 
-    # Wrap the write operation in an asynchronous writer (thread is started only once)
-    if 'async_writer' not in _CACHE:
-        _CACHE['async_writer'] = AsyncWriter(lambda data: _sync_store(*data))
-    
-    writer = _CACHE['async_writer']
-    #writer.write((state, time, dt, freq, encoding, target, engine))
-    _sync_store(state, time, dt, freq, encoding, target, engine)
-
-
-def _sync_store(state, time, dt, freq, encoding, target, engine):
     # Delegate function call to correct engine
 
     store_functions = {
@@ -415,67 +402,6 @@ def filename_generator(pattern):
             i += 1
         
 
-class AsyncWriter:
-    def __init__(self, writer):
-        """
-        Asynchronous writer
-        
-        Convert a synchronous writer to an asynchronous writer. The class has
-        an internal queue, and incoming data is sent to the writer thread in
-        sequence. The close() method should be called in the end to ensure
-        all data in the queue is written before shutdown.
-
-        Usage::
-
-            w = AsyncWriter(lambda data: myfile.write(data))
-            w.write(b'asdf')
-            w.write(b'qwerty')
-
-        :param writer: Synchronous writer function with a single input argument
-        """
-        self._writer = writer
-        self._queue = queue.Queue()
-        self._stop_event = threading.Event()
-        self._thread = threading.Thread(
-            target=self._worker,
-            daemon=True,
-        )
-        self._thread.start()
-    
-    def write(self, data):
-        """
-        Schedule a chunk of data for asynchronous writing.
-        
-        :param data: Data to be sent to the writer function
-        """
-        self._queue.put(data)
-    
-    def close(self):
-        """
-        Wait until all data is written and close down thread
-        """
-        self._queue.put(None)
-        self._thread.join()
-    
-    def stop(self):
-        """
-        Close down thread even though there is more data in the pipeline
-        """
-        self._stop_event.set()
-        self._queue.put(None)
-        self._thread.join()
-
-    def _worker(self):
-        """Main loop: process data in sequence and wait for more if the queue is empty"""
-        while not self._stop_event.is_set():
-            data = self._queue.get()
-            if data is None:
-                self._queue.task_done()
-                break
-            self._writer(data)
-            self._queue.task_done()
-
-
 def _to_seconds(spec):
     try:
         num, unit = spec
@@ -530,8 +456,7 @@ class Output:
         )
 
     def close(self):
-        if _CACHE.get('async_writer', None) is not None:
-            _CACHE['async_writer'].close()
+        pass
 
 
 class OutputFormat:
