@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 
 
@@ -14,14 +13,17 @@ class State:
     def __init__(self):
         self._num_released = 0
         self._varnames = set()
-        self._data = pd.DataFrame()
+        self._data = dict()  # type: dict[str, np.ndarray]
 
     @property
     def size(self):
         """
         Current number of particles
         """
-        return len(self._data)
+        keys = list(self._data.keys())
+        if len(keys) == 0:
+            return 0
+        return len(self._data[keys[0]])
 
     @property
     def released(self):
@@ -42,23 +44,35 @@ class State:
         if not particles:
             return
 
-        num_new_particles = next(len(v) for v in particles.values())
-        particles['pid'] = np.arange(num_new_particles) + self._num_released
-        particles['alive'] = np.ones(num_new_particles, dtype=bool)
-        if 'active' in particles:
-            particles['active'] = np.array(particles['active'], dtype=bool)
+        # Check that input has correct format
+        num_new = next(len(v) for v in particles.values())
+        fields = {}  # type: dict[str, np.ndarray]
+        for k, v in particles.items():
+            fields[k] = np.asarray(v)
+            if not np.shape(fields[k]) == (num_new, ):
+                raise ValueError('Unequal number of array elements in input')
+
+        # Add standard variables
+        fields['pid'] = np.arange(num_new) + self._num_released
+        fields['alive'] = np.ones(num_new, dtype=bool)
+        if 'active' in fields:
+            fields['active'] = np.array(fields['active'], dtype=bool)
         else:
-            particles['active'] = np.ones(num_new_particles, dtype=bool)
+            fields['active'] = np.ones(num_new, dtype=bool)
 
-        new_particles = pd.DataFrame(data=particles)
-        self._data = pd.concat(
-            objs=[self._data, new_particles],
-            axis='index',
-            ignore_index=True,
-            join='outer',
-        )
+        # Concatenate old and new particles
+        newdata = {}  # type: dict[str, np.ndarray]
+        num_old = self.size
+        for k, v_new in fields.items():
+            if k in self._data:
+                v_old = self._data[k]
+            else:
+                v_old = np.zeros(num_old, dtype=v_new.dtype)
+            
+            newdata[k] = np.concatenate([v_old, v_new], dtype=v_old.dtype)
 
-        self._num_released += num_new_particles
+        self._data = newdata
+        self._num_released += num_new
 
     def remove(self, particles):
         """
@@ -71,13 +85,16 @@ class State:
             return
 
         keep = ~particles
-        self._data = self._data.iloc[keep]
+        for k in self._data.keys():
+            self._data[k] = self._data[k][keep]
 
     def __getitem__(self, item):
-        return self._data[item].values
+        return self._data[item]
 
     def __setitem__(self, item, value):
-        self._data[item] = value
+        v = np.asarray(value)
+        assert v.shape == (self.size, )
+        self._data[item] = v
 
     def __len__(self):
         return self.size

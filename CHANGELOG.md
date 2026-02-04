@@ -14,6 +14,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   fields.
 
 
+## [2.1.7] - 2026-02-04
+### Fixed
+- Compatibility with pandas 3
+
+
 ## [2.1.6] - 2025-06-10
 ### Added
 - Experimental njit functions
