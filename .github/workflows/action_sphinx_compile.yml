@@ -10,9 +10,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install sphinx
-        run: pip install sphinx
+        run: pip install sphinx sphinx-autoapi matplotlib pydantic
       - name: Build documentation
-        run: sphinx-build -v -b html -n doc/source doc/build
+        run: python -m sphinx --verbose --builder html --nitpicky --fail-on-warning doc/source doc/build
+      - name: Check links
+        run: python -m sphinx --verbose --builder linkcheck --nitpicky --fail-on-warning doc/source doc/linkcheck
       - name: Upload documentation
         uses: actions/upload-pages-artifact@v3
         with:
