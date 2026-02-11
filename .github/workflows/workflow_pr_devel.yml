@@ -12,7 +12,9 @@ jobs:
     uses: ./.github/workflows/action_sphinx_compile.yml
   build_pypi:
     uses: ./.github/workflows/action_pypi_compile.yml
-
+  deploy_pages:
+    needs: build_sphinx
+    uses: ./.github/workflows/action_sphinx_deploy.yml
   # The pytest check is already run elsewhere
   # run_pytest:
   #   uses: ./.github/workflows/action_pytest.yml

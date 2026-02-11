@@ -1,11 +1,7 @@
-name: Deploy github pages
+name: Deploy to github pages
 
-on:
-  workflow_dispatch: {}
-  push:
-    branches:
-      - devel
-
+on: workflow_call
+    
 jobs:
   # Deploy job
   deploy_sphinx:
