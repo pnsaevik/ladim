@@ -31,7 +31,8 @@ modules_with_makrel = [
 
 
 @pytest.mark.parametrize("module_name", module_names)
-def test_output_matches_snapshot(module_name):
+def test_output_matches_snapshot(module_name, tmp_path):
+    os.chdir(tmp_path)
     out = run_ladim(module_name)
 
     # Create reference outfile if it does not exist
@@ -85,14 +86,12 @@ def run_makrel(module_name):
 
 
 def run_ladim(module_name):
-    # Change into a temporary folder `test_dir`
-    with chdir_temp() as test_dir:
-        np.random.seed(0)  # To ensure consistent results
-        conf = get_config(module_name)
-        ladim.main(conf)
+    np.random.seed(0)  # To ensure consistent results
+    conf = get_config(module_name)
+    ladim.main(conf)
 
-        # Read and return output data
-        return xr.load_dataset(test_dir.joinpath('out.nc'), decode_cf=False)
+    # Read and return output data
+    return xr.load_dataset('out.nc', decode_cf=False)
 
 
 def get_config(module_name):
