@@ -1,0 +1,18 @@
+# --- Push to main branch ---
+#
+# Assumes the commit has already been approved and tested in a pull request
+# Should deploy to PyPI and GitHub Pages
+
+name: Deploy github pages
+
+
+on:
+  workflow_dispatch: {}
+
+
+jobs:
+  build_sphinx:
+    uses: ./.github/workflows/action_sphinx_compile.yml
+  deploy_sphinx:
+    needs: build_sphinx
+    uses: ./.github/workflows/action_sphinx_deploy.yml
