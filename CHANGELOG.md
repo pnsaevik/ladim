@@ -13,7 +13,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
-## [2.2.2] - unreleased
+## [2.2.3] - unreleased
 ### Added
 - Warm start capabilities
 ### Changed
@@ -25,9 +25,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Output can now be split between several files
 
 
-## [2.1.7] - 2025-09-22
+## [2.1.8] - 2025-09-22
 ### Changed
 - Use arctan2 instead of atan2 to improve numpy compatibility
+
+
+## [2.1.7] - 2026-02-04
+### Fixed
+- Compatibility with pandas 3
 
 
 ## [2.1.6] - 2025-06-10

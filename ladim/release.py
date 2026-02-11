@@ -243,7 +243,7 @@ def add_start_stop_step_to_release_table(df: pd.DataFrame) -> pd.DataFrame:
     # Load release intervals (0 = no repeats)
     max_step = 60 * 60 * 24 * 366 * 1_000_000
     if 'release_interval' in df.columns:
-        step = df['release_interval'].to_numpy(dtype='int64')
+        step = df['release_interval'].to_numpy(dtype='int64', copy=True)
         step[step == 0] = max_step
     else:
         step = np.full(start.shape, fill_value=max_step, dtype='int64')
