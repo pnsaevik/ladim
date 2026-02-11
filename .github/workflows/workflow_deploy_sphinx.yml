@@ -8,6 +8,9 @@ name: Deploy github pages
 
 on:
   workflow_dispatch: {}
+  push:
+    branches:
+      - devel
 
 
 jobs:
