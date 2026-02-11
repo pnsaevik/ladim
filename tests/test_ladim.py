@@ -23,7 +23,6 @@ class Test_ladim_script:
 
     @pytest.mark.parametrize("example_num", range(1, 5))
     def test_run_examples(self, example_num):
-        curdir = Path.cwd()
         name = f"ex{example_num}"
         testpath = Path(__file__).parent / 'sample_data' / name
         outfiles = sorted(list(testpath.glob('output*.nc_txt')))
@@ -55,8 +54,6 @@ class Test_ladim_script:
             for infile in infiles:
                 nc_file_name = str(infile)[:-4]
                 Path(nc_file_name).unlink(missing_ok=True)
-
-            os.chdir(curdir)
 
         if result != expected:
             _dump_ladim_outputs_as_json(result, testpath)

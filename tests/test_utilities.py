@@ -5,10 +5,8 @@ import os
 
 @pytest.fixture()
 def tmp_path_with_chdir(tmp_path):
-    original_dir = os.getcwd()
     os.chdir(tmp_path)
     yield tmp_path
-    os.chdir(original_dir)
 
 
 class Test_load_class:
