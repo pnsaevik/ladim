@@ -253,8 +253,8 @@ class Test_Writer:
             x=output.OutputFormat(ncformat='f4', dimensions='mydim')
         )
         w = output.Writer.netcdf(file="", formats=variables)
-        w.write(dict(x=np.array([1.0, 2.0, 3.0])))
-        w.write(dict(x=np.array([4.0, 5.0])))
+        w.write_instance(dict(x=np.array([1.0, 2.0, 3.0])))
+        w.write_instance(dict(x=np.array([4.0, 5.0])))
 
         assert w.paths[0].variables['x'][:].tolist() == [1.0, 2.0, 3.0, 4.0, 5.0]
         assert w.sizes == {'mydim': 5}
@@ -266,10 +266,10 @@ class Test_Writer:
         
         # Write four times with numrec = 2
         w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
-        w.write(dict(x=np.array([1, 2, 3])))
-        w.write(dict(x=np.array([4, 5])))
-        w.write(dict(x=np.array([6, 7, 8])))
-        w.write(dict(x=np.array([9])))
+        w.write_instance(dict(x=np.array([1, 2, 3])))
+        w.write_instance(dict(x=np.array([4, 5])))
+        w.write_instance(dict(x=np.array([6, 7, 8])))
+        w.write_instance(dict(x=np.array([9])))
 
         # Read x values
         x_values = []
@@ -285,15 +285,28 @@ class Test_Writer:
         
         # Write two times with numrec = 2; single file
         w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
-        w.write(dict(x=np.array([1, 2, 3])))
-        w.write(dict(x=np.array([4, 5])))
+        w.write_instance(dict(x=np.array([1, 2, 3])))
+        w.write_instance(dict(x=np.array([4, 5])))
         assert len(w.paths) == 1
         assert w.paths[0].variables['x'][:].tolist() == [1, 2, 3, 4, 5]
 
         # Write once more; two files
-        w.write(dict(x=np.array([6, 7, 8])))
+        w.write_instance(dict(x=np.array([6, 7, 8])))
         assert len(w.paths) == 2
         assert w.paths[1].variables['x'][:].tolist() == [6, 7, 8]
+
+        w.close()
+
+    def test_mf_netcdf_writer_does_not_split_on_init_writes(self):
+        variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='xd'))
+        
+        # Write three times with numrec = 2; still a single file
+        w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
+        w.write_init(dict(x=np.array([1, 2, 3])))
+        w.write_init(dict(x=np.array([4, 5])))
+        w.write_init(dict(x=np.array([6, 7, 8])))
+        assert len(w.paths) == 1
+        assert w.paths[0].variables['x'][:].tolist() == [1, 2, 3, 4, 5, 6, 7, 8]
 
         w.close()
 
@@ -302,16 +315,15 @@ class Test_Writer:
         
         # Write three times with numrec = 2; two files
         w = output.Writer.mf_netcdf(file="", formats=variables, numrec=2)
-        w.write(dict(x=np.array([1, 2, 3])))
-        w.write(dict(x=np.array([4, 5])))
-        w.write(dict(x=np.array([6, 7, 8])))
+        w.write_instance(dict(x=np.array([1, 2, 3])))
+        w.write_instance(dict(x=np.array([4, 5])))
+        w.write_instance(dict(x=np.array([6, 7, 8])))
 
         assert w.sizes['xd'] == 8
 
         w.close()
 
     def test_mf_netcdf_writer_copies_particle_table(self):
-        # 'particle' is a special keyword: These variables should be copied
         variables = dict(x=output.OutputFormat(ncformat='f4', dimensions='xd'))
         
         # Write three times with numrec = 2
@@ -321,9 +333,9 @@ class Test_Writer:
             numrec=2,
             copy_dims=('xd', ),
             )
-        w.write(dict(x=np.array([1, 2, 3])))
-        w.write(dict(x=np.array([4, 5])))
-        w.write(dict(x=np.array([6, 7, 8])))
+        w.write_instance(dict(x=np.array([1, 2, 3])))
+        w.write_instance(dict(x=np.array([4, 5])))
+        w.write_instance(dict(x=np.array([6, 7, 8])))
 
         assert w.paths[0].variables['x'][:].tolist() == [1, 2, 3, 4, 5]
         assert w.paths[1].variables['x'][:].tolist() == [1, 2, 3, 4, 5, 6, 7, 8]
@@ -332,7 +344,6 @@ class Test_Writer:
         w.close()
 
     def test_mf_netcdf_writer_updates_offset_variable(self):
-        # 'particle_instance' is a special keyword: This dimension has an offset variable
         variables = dict(
             x=output.OutputFormat(ncformat='f4', dimensions='xd'),
             xd_offset=output.OutputFormat(ncformat='i4', dimensions='')
@@ -345,9 +356,9 @@ class Test_Writer:
             numrec=2,
             offset_variables={'xd': 'xd_offset'}
         )
-        w.write(dict(x=np.array([1, 2, 3])))
-        w.write(dict(x=np.array([4, 5])))
-        w.write(dict(x=np.array([6, 7, 8])))
+        w.write_instance(dict(x=np.array([1, 2, 3])))
+        w.write_instance(dict(x=np.array([4, 5])))
+        w.write_instance(dict(x=np.array([6, 7, 8])))
 
         assert w.paths[0].variables['xd_offset'][...] == 0
         assert w.paths[1].variables['xd_offset'][...] == 5

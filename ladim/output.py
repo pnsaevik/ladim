@@ -5,6 +5,7 @@ if typing.TYPE_CHECKING:
     from .model import Model
 import os
 import contextlib
+import abc
 
 
 class Output:
@@ -63,14 +64,27 @@ class Output:
         return Output(variables, file, frequency, numrec)
 
     def update(self, model: "Model"):
-        data_dict_init = self._update_init_vars(model)
+        # Check if this is a write step for instance (dynamic) variables
         data_dict_inst = self._update_instance_vars(model)
+        self.writer.write_instance(data_dict_inst)
 
-        self.writer.write(data_dict_init | data_dict_inst)
+        # Check if there are any new particles to write
+        # Do this after write_instance in case there is a file name rotation
+        data_dict_init = self._update_init_vars(model)
+        self.writer.write_init(data_dict_init)
 
     def _update_init_vars(self, model) -> dict[str, np.ndarray]:
         """
-        Update the initial state of new particles
+        Build output arrays for newly released particles only.
+
+        This method inspects how many particle-table rows have already been
+        written to the output and compares that with the cumulative number of
+        released particles in the model state. Any particles that have been
+        released but not yet written are treated as "new" and their initial
+        variables are returned as contiguous arrays ordered by pid offset.
+
+        Returns an empty dict when there are no new particles on this solver
+        step.
         """
 
         # Check if there are any new particles
@@ -97,7 +111,13 @@ class Output:
 
     def _update_instance_vars(self, model) -> dict[str, np.ndarray]:
         """
-        Update the current state of dynamic variables
+        Build one time-record payload for dynamic (instance) variables.
+
+        Instance variables are written at the configured output frequency,
+        not on every solver step. If the current solver time is not a write
+        time, this returns an empty dict. Otherwise it returns the per-particle
+        instance arrays plus the scalar time metadata fields (`time` and
+        `particle_count`) that define the ragged record.
         """
 
         # Check if this is a write time step
@@ -241,11 +261,10 @@ class Writer:
     """
     Abstract base class for output writers
 
-    An output writer should be able to write tabular data in a thread-safe
-    way to the output storage backend. The output may be in the form of one or
-    more tables, distributed over one or more files. Each write operation should
-    be atomic, i.e. all data is written sequentially to the file at once. The
-    total number of rows in each table is not known at creation time.
+    An output writer stores tabular particle data in one or more files.
+    Callers write initial (static) and instance (dynamic) data through
+    separate methods. Only ``write_instance`` advances the time-record
+    counter used for multi-file splitting (``numrec``).
 
     Each table may have a number of columns, each with a unique name, data type
     and potentially some metadata attributes. The number of columns and their
@@ -287,9 +306,26 @@ class Writer:
 
         return _MFNCWriter(file, formats, numrec, offset_variables, copy_dims)
 
-    def write(self, data: dict[str, np.ndarray]):
+    @abc.abstractmethod
+    def write_init(self, data: dict[str, np.ndarray]):
         """
-        Write data to file(s)
+        Append initial (static/particle-table) variables.
+
+        Does not count toward ``numrec`` file splitting. Empty ``data`` is a
+        no-op.
+
+        :param data: Dictionary with variable names as keys and numpy arrays as
+            data values
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_instance(self, data: dict[str, np.ndarray]):
+        """
+        Append one time record of instance (dynamic) variables.
+
+        Each non-empty call counts as one record for ``numrec`` file splitting.
+        Empty ``data`` is a no-op.
 
         :param data: Dictionary with variable names as keys and numpy arrays as
             data values
@@ -369,7 +405,16 @@ class _NCWriter(Writer):
     def paths(self) -> list[typing.Any]:
         return self._paths
 
-    def write(self, data: dict[str, np.ndarray]):
+    def write_init(self, data: dict[str, np.ndarray]):
+        if not data:
+            return
+        with _open_or_relay(self._paths[0], mode='a') as dset:
+            self._write(dset, data)
+            self._sizes = {k: v.size for k, v in dset.dimensions.items()}
+
+    def write_instance(self, data: dict[str, np.ndarray]):
+        if not data:
+            return
         with _open_or_relay(self._paths[0], mode='a') as dset:
             self._write(dset, data)
             self._sizes = {k: v.size for k, v in dset.dimensions.items()}
@@ -465,8 +510,22 @@ class _MFNCWriter(Writer):
     def paths(self) -> list[typing.Any]:
         return self._paths
 
-    def write(self, data: dict[str, np.ndarray]):
-        if not(self._step_counter % self.numrec):
+    def write_init(self, data: dict[str, np.ndarray]):
+        if not data:
+            return
+        if not self._paths:
+            self._initialize_next_file()
+
+        with _open_or_relay(self._paths[-1], mode='a') as dset:
+            self._write(dset, data)
+
+    def write_instance(self, data: dict[str, np.ndarray]):
+        if not data:
+            return
+
+        if not self._paths:
+            self._initialize_next_file()
+        elif self._step_counter > 0 and self._step_counter % self.numrec == 0:
             self._initialize_next_file()
 
         with _open_or_relay(self._paths[-1], mode='a') as dset:
@@ -481,11 +540,11 @@ class _MFNCWriter(Writer):
             sz = old_sizes[dimname]
             dset.variables[k][sz:sz + len(v)] = v
 
-        for k, v in self._offset_variables.items():
-            if v in dset.variables:
-                dset.variables[v][...] = self._offsets[k]
+        for dimname, varname in self._offset_variables.items():
+            if varname in dset.variables and dimname in self._offsets:
+                dset.variables[varname][...] = self._offsets[dimname]
 
-        self._sizes = {k: v.size + self._offsets[k] for k, v in dset.dimensions.items()}
+        self._sizes = {k: v.size + self._offsets.get(k, 0) for k, v in dset.dimensions.items()}
 
         dset.sync()
 
