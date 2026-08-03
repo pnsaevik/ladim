@@ -1,3 +1,8 @@
+# --- Push to main branch ---
+#
+# Assumes the commit has already been approved and tested in a pull request
+# Should deploy to PyPI and GitHub Pages
+
 name: Deploy main branch
 
 

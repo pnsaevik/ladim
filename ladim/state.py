@@ -110,7 +110,7 @@ class State:
     def __setattr__(self, item, value):
         excepted_values = [
             '_data', '_model', '_num_released', '_varnames', 'dt', 'timestep',
-            'timestamp'
+            'timestamp', 'released'
         ]
         if item in list(self.__dict__.keys()) + excepted_values:
             super().__setattr__(item, value)

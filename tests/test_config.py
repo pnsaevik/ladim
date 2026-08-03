@@ -55,6 +55,7 @@ class Test_convert_1_to_2:
             'output': {
                 'file': 'out.nc',
                 'frequency': [60, 's'],
+                'numrec': 0,
                 'variables': {
                     'X': {
                         'long_name': 'particle X-coordinate', 'ncformat': 'f4'},
@@ -65,7 +66,8 @@ class Test_convert_1_to_2:
                         'ncformat': 'f4',
                         'positive': 'down',
                         'standard_name': 'depth_below_surface',
-                        'units': 'm'},
+                        'units': 'm',
+                    },
                     'pid': {
                         'long_name': 'particle identifier', 'ncformat': 'i4'},
                     'release_time': {
@@ -73,18 +75,24 @@ class Test_convert_1_to_2:
                         'long_name': 'particle release time',
                         'ncformat': 'i4',
                         'units': 'seconds since '
-                        '1970-01-01'}}},
+                        '1970-01-01',
+                    },
+                },
+            },
             'release': {
                 'colnames': ['release_time', 'X', 'Y', 'Z', 'group_id'],
                 'defaults': {},
                 'file': 'particles.rls',
                 'formats': {'time': 'release_time'},
-                'frequency': [1, 'm']},
+                'frequency': [1, 'm'],
+                'warm_start_file': None,
+            },
             'solver': {
                 'seed': 0,
                 'start': datetime.datetime(2015, 9, 7, 1, 0),
                 'step': 60,
-                'stop': datetime.datetime(2015, 9, 7, 1, 5)},
+                'stop': datetime.datetime(2015, 9, 7, 1, 5),
+            },
             'tracker': {
                 'diffusion': 0.1,
                 'method': 'RK4',

@@ -9,9 +9,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Update apt-get
+        run: sudo apt-get update
+      
+      - name: Install netcdf4
+        run: sudo apt-get install -y libhdf5-dev libnetcdf-dev netcdf-bin python3-netcdf4 python3-h5py
+
       - name: Install package
         run: pip install .
+
       - name: Install pytest
         run: pip install pytest
+
       - name: Run pytest
         run: pytest
+
+      - name: Install plugins
+        run: pip install ladim_plugins
+
+      - name: Test plugins
+        run: pytest --pyargs ladim_plugins

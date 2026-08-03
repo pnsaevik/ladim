@@ -1,0 +1,16 @@
+channels:
+  - conda-forge
+
+dependencies:
+ - netCDF4
+ - numba
+ - numexpr
+ - numpy
+ - pandas
+ - pyarrow
+ - pydantic
+ - pyproj
+ - python
+ - pyyaml
+ - scipy
+ - xarray

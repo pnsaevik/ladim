@@ -14,22 +14,22 @@ Grid and Forcing for LADiM for the Regional Ocean Model System (ROMS)
 import glob
 import logging
 import numpy as np
-from netCDF4 import Dataset, num2date
+from netCDF4 import Dataset, num2date, date2num
 from ladim.sample import sample2D, bilin_inv
+import contextlib
 
 
 logger = logging.getLogger(__name__)
 
 
 class Grid:
-    """Simple ROMS grid object
+    """
+    Simple ROMS grid object.
 
-    Possible grid arguments:
-      subgrid = [i0, i1, j0, j1]
-        Ordinary python style, start points included, not end points
-        Each of the elements can be replaced with None, for no limitation
-      Vinfo: dictionary with N, hc, theta_s and theta_b
-
+    Possible grid arguments are subgrid and Vinfo. subgrid = [i0, i1, j0, j1].
+    Ordinary python style, start points included, not end points. Each of the
+    elements can be replaced with None, for no limitation. Vinfo: dictionary
+    with N, hc, theta_s and theta_b.
     """
 
     # Lagrer en del unødige attributter
@@ -248,7 +248,6 @@ class Grid:
 class Forcing:
     """
     Class for ROMS forcing
-
     """
 
     def __init__(self, config, _):
@@ -297,51 +296,88 @@ class Forcing:
         self.steps = steps
         self._files = files
 
-    def _remaining_initialization(self):
-        steps = self.steps
-        V = [step for step in steps if step < 0]
-        if V:  # Forcing available before start time
-            prestep = max(V)
-            stepdiff = self.stepdiff[steps.index(prestep)]
-            nextstep = prestep + stepdiff
-            self.U, self.V = self._read_velocity(prestep)
-            self.Unew, self.Vnew = self._read_velocity(nextstep)
-            self.dU = (self.Unew - self.U) / stepdiff
-            self.dV = (self.Vnew - self.V) / stepdiff
-            # Interpolate to time step = -1
-            self.U = self.U - (prestep + 1) * self.dU
-            self.V = self.V - (prestep + 1) * self.dV
-            # Other forcing
-            for name in self.ibm_forcing:
-                self[name] = self._read_field(name, prestep)
-                self[name + "new"] = self._read_field(name, nextstep)
-                self["d" + name] = (self[name + "new"] - self[name]) / prestep
-                self[name] = self[name] - (prestep + 1) * self["d" + name]
+        self.U = np.empty((0, 0, 0), dtype=np.float64)
+        self.V = np.empty((0, 0, 0), dtype=np.float64)
+        self.W = np.empty((0, 0, 0), dtype=np.float64)
+        self.dU = np.empty((0, 0, 0), dtype=np.float64)
+        self.dV = np.empty((0, 0, 0), dtype=np.float64)
+        self.dW = np.empty((0, 0, 0), dtype=np.float64)
+        self.Unew = np.empty((0, 0, 0), dtype=np.float64)
+        self.Vnew = np.empty((0, 0, 0), dtype=np.float64)
+        self.Wnew = np.empty((0, 0, 0), dtype=np.float64)
+        
+        self._cache_t = np.iinfo(np.int64).min
+        self._cache_tnew = np.iinfo(np.int64).min
+        self._cache_dt = 0
 
-        elif steps[0] == 0:
+    def _remaining_initialization(self):
+        self._load_cache(t=-1)
+        self.has_been_initialized = True
+
+    def _load_cache(self, t):
+        if t == self._cache_t:
+            return
+        
+        if t == self._cache_tnew:
+            t0 = t
+            t0_idx = self.steps.index(t0)
+            t1_idx = min(t0_idx + 1, len(self.steps) - 1)
+            t1 = self.steps[t1_idx]
+
+            self.U = self.Unew
+            self.V = self.Vnew
+            self.Unew, self.Vnew = self._read_velocity(t1)
+            for name in self.ibm_forcing:
+                self[name] = self[name + "new"]
+                self[name + "new"] = self._read_field(name, t1)
+            
+            self._cache_t = t
+            self._cache_tnew = t1
+            self._cache_dt = 1
+            return
+
+        if t == self._cache_t + 1:
+            self.U += self.dU
+            self.V += self.dV
+            self._cache_t = t
+            return
+
+        # Find correct steps
+        t0_noclip_idx = np.searchsorted(self.steps, t, side='right') - 1
+        t0_idx = np.clip(t0_noclip_idx, 0, len(self.steps) - 2)
+        t0 = self.steps[t0_idx]
+        t1_idx = t0_idx + 1
+        t1 = self.steps[t1_idx]
+
+        U, V = self._read_velocity(t0)
+        self.Unew, self.Vnew = self._read_velocity(t1)
+        self.dU = (self.Unew - U) / (t1 - t0)
+        self.dV = (self.Vnew - V) / (t1 - t0)
+
+        if t0 == 0:
             # Simulation start at first forcing time
             # Runge-Kutta needs dU and dV in this case as well
-            self.U, self.V = self._read_velocity(0)
-            self.Unew, self.Vnew = self._read_velocity(steps[1])
-            self.dU = (self.Unew - self.U) / steps[1]
-            self.dV = (self.Vnew - self.V) / steps[1]
             # Synchronize with start time
-            self.Unew = self.U
-            self.Vnew = self.V
-            # Extrapolate to time step = -1
-            self.U = self.U - self.dU
-            self.V = self.V - self.dV
-            # Other forcing:
-            for name in self.ibm_forcing:
-                self[name] = self._read_field(name, 0)
-                self[name + "new"] = self._read_field(name, steps[1])
-                self["d" + name] = (self[name + "new"] - self[name]) / steps[1]
-                self[name] = self[name] - self["d" + name]
-
+            self.Unew = U
+            self.Vnew = V
+            self._cache_tnew = t0
         else:
-            # No forcing at start, should already be excluded
-            raise SystemExit(3)
-        self.has_been_initialized = True
+            self._cache_tnew = t1
+
+        # Interpolate time step
+        self.U = U + (t - t0) * self.dU
+        self.V = V + (t - t0) * self.dV
+
+        # Other forcing:
+        for name in self.ibm_forcing:
+            self[name] = self._read_field(name, t0)
+            self[name + "new"] = self._read_field(name, t1)
+            self["d" + name] = (self[name + "new"] - self[name]) / (t1 - t0)
+            self[name] = self[name] - (t0 + 1) * self["d" + name]
+        
+        self._cache_t = t
+        self._cache_dt = 1
+
 
     # ===================================================
     @staticmethod
@@ -364,9 +400,9 @@ class Forcing:
     def scan_file_times(files):
         """Check files and scan the times
 
-        Returns:
-          all_frames: List of all time frames
-          num_frames: Mapping: filename -> number of time frames in file
+        :return: (all_frames, num_frames), where all_frames is list of all time
+            frames, num_frames is a mapping from filename to number of time
+            frames in file.
 
         """
         all_frames = []  # All time frames
@@ -439,40 +475,12 @@ class Forcing:
     def update(self, t):
         """Update the fields to time step t"""
 
+        logger.debug("Updating forcing, time step = {}".format(t))
+
         if not self.has_been_initialized:
             self._remaining_initialization()
 
-        # Read from config?
-        interpolate_velocity_in_time = True
-        interpolate_ibm_forcing_in_time = False
-
-        logger.debug("Updating forcing, time step = {}".format(t))
-        if t in self.steps:  # No time interpolation
-            self.U = self.Unew
-            self.V = self.Vnew
-            for name in self.ibm_forcing:
-                self[name] = self[name + "new"]
-        else:
-            if t - 1 in self.steps:  # Need new fields
-                stepdiff = self.stepdiff[self.steps.index(t - 1)]
-                nextstep = t - 1 + stepdiff
-                self.Unew, self.Vnew = self._read_velocity(nextstep)
-                for name in self.ibm_forcing:
-                    self[name + "new"] = self._read_field(name, nextstep)
-                if interpolate_velocity_in_time:
-                    self.dU = (self.Unew - self.U) / stepdiff
-                    self.dV = (self.Vnew - self.V) / stepdiff
-                if interpolate_ibm_forcing_in_time:
-                    for name in self.ibm_forcing:
-                        self["d" + name] = (self[name + "new"] - self[name]) / stepdiff
-
-            # "Ordinary" time step (including self.steps+1)
-            if interpolate_velocity_in_time:
-                self.U += self.dU
-                self.V += self.dV
-            if interpolate_ibm_forcing_in_time:
-                for name in self.ibm_forcing:
-                    self[name] += self["d" + name]
+        self._load_cache(t)
 
     # --------------
 
@@ -517,6 +525,7 @@ class Forcing:
         frame = self.frame_idx[n]
 
         # Read the velocity
+        assert isinstance(self._nc, Dataset)
         U = self._nc.variables["u"][frame, :, self._grid.Ju, self._grid.Iu]
         V = self._nc.variables["v"][frame, :, self._grid.Jv, self._grid.Iv]
 
@@ -537,6 +546,7 @@ class Forcing:
     def _read_field(self, name, n):
         """Read a 3D field"""
         frame = self.frame_idx[n]
+        assert isinstance(self._nc, Dataset)
         F = self._nc.variables[name][frame, :, self._grid.J, self._grid.I]
         if self.scaled[name]:
             F = self.add_offset[name] + self.scale_factor[name] * F
@@ -552,8 +562,8 @@ class Forcing:
     # ------------------
 
     def close(self):
-
-        self._nc.close()
+        if isinstance(self._nc, Dataset):
+            self._nc.close()
 
     def velocity(self, X, Y, Z, tstep=0, method="bilinear"):
 
@@ -585,18 +595,15 @@ class Forcing:
 # ----------------------------------------------
 
 def s_stretch(N, theta_s, theta_b, stagger="rho", Vstretching=1):
-    """Compute a s-level stretching array
+    """
+    Compute an s-level stretching array.
 
-    *N* : Number of vertical levels
-
-    *theta_s* : Surface stretching factor
-
-    *theta_b* : Bottom stretching factor
-
-    *stagger* : "rho"|"w"
-
-    *Vstretching* : 1|2|3|4|5
-
+    :param int N: Number of vertical levels.
+    :param float theta_s: Surface stretching factor.
+    :param float theta_b: Bottom stretching factor.
+    :param str stagger: Grid staggering option ("rho" or "w").
+    :param int Vstretching: Stretching function choice (1, 2, 3, 4, or 5).
+    :return: Computed s-level stretching array.
     """
 
     # if stagger == "rho":
@@ -652,34 +659,28 @@ def s_stretch(N, theta_s, theta_b, stagger="rho", Vstretching=1):
         raise
 
 def sdepth(H, Hc, C, stagger="rho", Vtransform=1):
-    """Return depth of rho-points in s-levels
+    """
+    Return depth of rho-points in s-levels.
 
-    *H* : arraylike
-      Bottom depths [meter, positive]
+    :param arraylike H: Bottom depths [meter, positive].
+    :param float Hc: Critical depth.
+    :param numpy.ndarray cs_r: 1D array of s-level stretching curve.
+    :param str stagger: Grid staggering option ("rho" or "w").
+    :param int Vtransform: Defines the transform used.
+        Defaults to 1 = Song-Haidvogel.
 
-    *Hc* : scalar
-       Critical depth
-
-    *cs_r* : 1D array
-       s-level stretching curve
-
-    *stagger* : [ 'rho' | 'w' ]
-
-    *Vtransform* : [ 1 | 2 ]
-       defines the transform used, defaults 1 = Song-Haidvogel
-
-    Returns an array with ndim = H.ndim + 1 and
-    shape = cs_r.shape + H.shape with the depths of the
-    mid-points in the s-levels.
+    :return: Depths of mid-points in the s-levels with
+        ``ndim = H.ndim + 1`` and
+        ``shape = cs_r.shape + H.shape``.
+    :rtype: numpy.ndarray
 
     Typical usage::
 
-    >>> fid = Dataset(roms_file)
-    >>> H = fid.variables['h'][:, :]
-    >>> C = fid.variables['Cs_r'][:]
-    >>> Hc = fid.variables['hc'].getValue()
-    >>> z_rho = sdepth(H, Hc, C)
-
+        fid = Dataset(roms_file)
+        H = fid.variables['h'][:, :]
+        C = fid.variables['Cs_r'][:]
+        Hc = fid.variables['hc'].getValue()
+        z_rho = sdepth(H, Hc, C)
     """
     H = np.asarray(H)
     Hshape = H.shape  # Save the shape of H
@@ -715,33 +716,39 @@ def sdepth(H, Hc, C, stagger="rho", Vtransform=1):
 
 def z2s(z_rho, X, Y, Z):
     """
-    Find s-level and coefficients for vertical interpolation
+    Find s-level and coefficients for vertical interpolation.
 
-    input:
-        z_rho  3D array with vertical s-coordinate structure at rho-points
-        X, Y   1D arrays, horizontal position in grid coordinates
-        Z      1D array, particle depth, meters, positive
+    :param z_rho: 3D array with vertical s-coordinate structure at rho-points.
+    :param X: 1D array, horizontal position in grid coordinates.
+    :param Y: 1D array, horizontal position in grid coordinates.
+    :param Z: 1D array, particle depth [meters, positive].
 
-    Returns
-        K      1D integer array
-        A      1D float array
+    :return:  (K, A), where K is integer and A is float, both 1D arrays.
 
+    Notes
+    -----
     With:
-        1 <= K < kmax = z_rho.shape[0]
-        z_rho[K-1] < -Z < z_rho[K] for 1 < K < kmax - 1
-        -Z < z_rho[1] for K = 1
-        z_rho[-1] < -Z for K = kmax - 1
-        0.0 <= A <= 1
-        Interior linear interpolation:
-            A * z_rho[K - 1] + (1 - A) * z_rho[K] = -Z
-            for z_rho[0] < -Z < z_rho[-1]
-        Extend constant below lowest:
-            A * z_rho[K - 1] + (1 - A) * z_rho[K] = z_rho[0]
-            for -Z < z_rho[0]  (K=1, A=1)
-        Extend constantly above highest:
-            A * z_rho[K - 1] + (1 - A) * z_rho[K] = z_rho[-1]
-            for -Z > z_rho[-1]  (K=kmax-1, A=0)
 
+    * ``1 <= K < kmax = z_rho.shape[0]``
+    * ``z_rho[K-1] < -Z < z_rho[K]`` for ``1 < K < kmax - 1``
+    * ``-Z < z_rho[1]`` for ``K = 1``
+    * ``z_rho[-1] < -Z`` for ``K = kmax - 1``
+    * ``0.0 <= A <= 1``
+
+    Interior linear interpolation::
+
+        A * z_rho[K - 1] + (1 - A) * z_rho[K] = -Z
+        for z_rho[0] < -Z < z_rho[-1]
+
+    Extend constant below lowest::
+
+        A * z_rho[K - 1] + (1 - A) * z_rho[K] = z_rho[0]
+        for -Z < z_rho[0]  (K=1, A=1)
+
+    Extend constant above highest::
+
+        A * z_rho[K - 1] + (1 - A) * z_rho[K] = z_rho[-1]
+        for -Z > z_rho[-1]  (K=kmax-1, A=0)
     """
 
     kmax = z_rho.shape[0]  # Number of vertical levels
@@ -766,22 +773,30 @@ def z2s(z_rho, X, Y, Z):
 
 def sample3D(F, X, Y, K, A, method="bilinear"):
     """
-    Sample a 3D field on the (sub)grid
+    Sample a 3D field on the (sub)grid.
 
-    F = 3D field
-    S = depth structure matrix
-    X, Y = 1D arrays of horizontal grid coordinates
-    Z = 1D array of depth [m, positive downwards]
+    :param F: 3D field.
+    :param S: Depth structure matrix.
+    :param X: 1D array of horizontal grid coordinates.
+    :param Y: 1D array of horizontal grid coordinates.
+    :param Z: 1D array of depth [m, positive downwards].
+    :param interpolation: Interpolation method.
+        - ``'bilinear'`` for trilinear interpolation.
+        - ``'nearest'`` for value in 3D grid cell.
 
-    Everything in rho-points
+    :return: Sampled values on the (sub)grid.
 
-    F.shape = S.shape = (kmax, jmax, imax)
-    S.shape = (kmax, jmax, imax)
-    X.shape = Y.shape = Z.shape = (pmax,)
+    Notes
+    -----
+    Everything is in rho-points.
 
-    # Interpolation = 'bilinear' for trilinear Interpolation
-    # = 'nearest' for value in 3D grid cell
+    Shapes:
 
+    * ``F.shape = (kmax, jmax, imax)``
+    * ``S.shape = (kmax, jmax, imax)``
+    * ``X.shape = (pmax,)``
+    * ``Y.shape = (pmax,)``
+    * ``Z.shape = (pmax,)``
     """
 
     if method == "bilinear":
@@ -831,3 +846,63 @@ def sample3DUV(U, V, X, Y, K, A, method="bilinear"):
         sample3D(U, X + 0.5, Y, K, A, method=method),
         sample3D(V, X, Y + 0.5, K, A, method=method),
     )
+
+
+def _makeindex_posixtime_to_file_and_timeidx(files):
+    """
+    Create a lookup index from posix time to file and array index
+
+    The function iterates through all ocean_time entries in all files in the
+    input array and records the corresponding posix time for all entries.
+
+    :param files: List of file names to iterate through
+
+    :returns: Arrays of the same size: posixtime, filename, timeidx.
+        Each array entry represents an ocean_time entry in the input files.
+        For each entry, posixtime is the number of seconds since 1970, filename
+        is the file name, timeidx is the within-file array index of the
+        ocean_time entry. The arrays are sorted so that posixtime is strictly
+        increasing.
+    """
+    # Prepare output arrays
+    posixtime_list = []
+    filename_list = []
+    timeidx_list = []
+
+    # Iterate files
+    for file in files:
+        with _open_or_relay(file) as dset:
+            logger.info(f'Load times from file {dset.filepath}')
+
+            # Load time data
+            tvar = dset.variables['ocean_time']
+            tvar.set_auto_mask(False)
+            time_values = np.asarray(tvar[:]).ravel()
+            
+            # Convert to posix seconds
+            time_units = getattr(tvar, 'units', 'seconds since 1970-01-01')
+            calendar = getattr(tvar, 'calendar', 'standard')
+            cf_datetimes = num2date(time_values, time_units, calendar)
+            t = date2num(cf_datetimes, units='seconds since 1970-01-01')
+            
+            # Append to output arrays
+            posixtime_list += np.asarray(t).astype('int64').tolist()
+            filename_list += [dset.filepath] * len(t)
+            timeidx_list += list(range(len(t)))
+    
+    # Sort output arrays
+    idx = np.argsort(posixtime_list)
+    posixtime = np.array(posixtime_list, dtype='int64')[idx]
+    filename = np.array(filename_list, dtype=str)[idx]
+    timeidx = np.array(timeidx_list, dtype='int64')[idx]
+
+    return posixtime, filename, timeidx
+
+
+@contextlib.contextmanager
+def _open_or_relay(file_or_obj):
+    if isinstance(file_or_obj, str):
+        with Dataset(file_or_obj) as dset:
+            yield dset
+    else:
+        yield file_or_obj

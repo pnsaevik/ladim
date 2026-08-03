@@ -1,0 +1,16 @@
+name: Deploy to GitHub Pages
+
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - devel
+
+
+jobs:
+  build_sphinx:
+    uses: ./.github/workflows/action_sphinx_compile.yml
+  deploy_sphinx:
+    needs: build_sphinx
+    uses: ./.github/workflows/action_sphinx_deploy.yml

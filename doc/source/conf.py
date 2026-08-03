@@ -1,10 +1,33 @@
-# -*- coding: utf-8 -*-
-#
+from datetime import datetime
+from sphinx.application import Sphinx
+from sphinx.util.docfields import Field
+import os
+
+
+def setup(app: Sphinx):
+    app.add_object_type(
+        'confval',
+        'confval',
+        objname='configuration value',
+        indextemplate='pair: %s; configuration value',
+        doc_field_types=[
+            Field('type', label='Type', has_arg=False, names=('type',)),
+            Field('default', label='Default', has_arg=False, names=('default',)),
+            Field('units', label='Units', has_arg=False, names=('units',)),
+        ]
+    )
+    app.add_config_value('package_version', release, 'env')
+    app.connect('builder-inited', copy_environment_file_to_static)
+    app.connect('build-finished', remove_environment_file_from_static)
+    app.connect('builder-inited', create_schema_doc)
+    app.connect('build-finished', remove_schema_doc)
+
+
 # Configuration file for the Sphinx documentation builder.
 #
-# This file does only contain a selection of the most common options. For a
-# full list see the documentation:
-# http://www.sphinx-doc.org/en/stable/config
+# This file only contains a selection of the most common options. For a full
+# list see the documentation:
+# https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 # -- Path setup --------------------------------------------------------------
 
@@ -12,156 +35,180 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+# sys.path.insert(0, os.path.abspath('..'))
 
 
 # -- Project information -----------------------------------------------------
 
-project = "LADiM"
-author = "Bjørn Ådlandsvik"
-copyright = "2018, Institute of Marine Research"
+project = 'Ladim'
+# noinspection PyShadowingBuiltins
+copyright = f'{datetime.now().year}, Institute of Marine Research'
+author = 'Bjørn Ådlandsvik'
+source_suffix = '.rst'
 
-# The short X.Y version
-version = "1.1"
+
 # The full version, including alpha/beta/rc tags
-release = "1.1.0"
-today_fmt = "%Y-%m-%d"
+def getversion():
+    version_file = os.path.abspath('../../ladim/__init__.py')
+    version_line = ''
+    with open(version_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.startswith('__version__'):
+                version_line = line
+                break
+    
+    if not version_line:
+        raise RuntimeError("Could not find __version__ in ladim/__init__.py")
+    
+    # Extract version string between quotes
+    import re
+    match = re.search(r"['\"]([^'\"]+)['\"]", line)
+    if match:
+        return match.group(1)
+    else:
+        raise RuntimeError("Could not find __version__ in ladim/__init__.py")
+
+
+def copy_environment_file_to_static(app: Sphinx):
+    """
+    Copy conda environment file to folder of static files, for further reference
+    """
+    import shutil
+    from pathlib import Path
+    env_file = Path(app.srcdir) / '../../environment.yml'
+    dst_file = Path(app.srcdir) / '_static/environment.yml'
+    dst_file.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(env_file, dst_file)
+
+
+def remove_environment_file_from_static(app: Sphinx, exception):
+    """
+    Remove temporary conda environment file
+    """
+    _ = exception
+    from pathlib import Path
+    dst_file = Path(app.srcdir) / '_static/environment.yml'
+    dst_file.unlink(missing_ok=True)
+
+
+def create_schema_doc(app: Sphinx):
+    """
+    Create rst file for schema documentation
+    """
+    from pathlib import Path
+    import importlib.util
+    schema_module_file = Path(app.srcdir) / '../../ladim/schema.py'
+    schema_module_spec = importlib.util.spec_from_file_location('ladim_schema', schema_module_file)
+    assert schema_module_spec is not None
+    schema_module = importlib.util.module_from_spec(schema_module_spec)
+    schema_loader = schema_module_spec.loader
+    assert schema_loader is not None
+    schema_loader.exec_module(schema_module)
+    rst_text = schema_module.rest_doc()
+
+    rst_file = Path(app.srcdir) / 'schemadoc.rst'
+    rst_file.write_text(rst_text)
+
+
+def remove_schema_doc(app: Sphinx, exception):
+    """
+    Remove temporary schema doc file
+    """
+    _ = exception
+    from pathlib import Path
+    rst_file = Path(app.srcdir) / 'schemadoc.rst'
+    rst_file.unlink()
+
+
+release = getversion()
+# Add to the substitutions
+rst_prolog = f"""
+.. |package_version| replace:: {release}
+"""
 
 # -- General configuration ---------------------------------------------------
-
-# If your documentation needs a minimal Sphinx version, state it here.
-#
-# needs_sphinx = '1.0'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ["sphinx.ext.mathjax"]
+extensions = [
+    'sphinx.ext.mathjax',
+    'sphinx.ext.doctest',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.intersphinx',
+    'autoapi.extension',
+    'matplotlib.sphinxext.plot_directive',
+]
+
+nitpicky = True
+html_css_files = [
+    'css/custom.css',
+]
+
+# Ignore known broken or inaccesible links
+linkcheck_ignore = [
+    r'https://doi.org/10.17895/ices.pub.19271159',  # Behind paywall
+    r'https://www.hi.no/forskning/marine-data-forskningsdata/lakseluskart/html/lakseluskart.html',  # Timeout issues
+]
+
+# Matplotlib extension options
+plot_html_show_source_link = False
+plot_formats = ['png']
+plot_html_show_formats = False
+plot_pre_code = ""
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates"]
-
-# The suffix(es) of source filenames.
-# You can specify multiple suffix as a list of string:
-#
-# source_suffix = ['.rst', '.md']
-source_suffix = ".rst"
-
-# The master toctree document.
-master_doc = "index"
-
-# The language for content autogenerated by Sphinx. Refer to documentation
-# for a list of supported languages.
-#
-# This is also used if you do content translation via gettext catalogs.
-# Usually you set "language" from the command line for these cases.
-language = 'en'
+templates_path = ['_templates']
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-# This pattern also affects html_static_path and html_extra_path .
-# exclude_patterns = []
+# This pattern also affects html_static_path and html_extra_path.
+exclude_patterns = []
 
-# The name of the Pygments (syntax highlighting) style to use.
-pygments_style = "sphinx"
-
+locale_dirs = []
+language = 'en'
+gettext_compact = False
 
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinxdoc"
-
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
-#
-# html_theme_options = {}
+html_theme = 'alabaster'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
-
-# Custom sidebar templates, must be a dictionary that maps document names
-# to template names.
-#
-# The default sidebars (for documents that don't match any pattern) are
-# defined by theme itself.  Builtin themes are using these templates by
-# default: ``['localtoc.html', 'relations.html', 'sourcelink.html',
-# 'searchbox.html']``.
-#
-# html_sidebars = {}
-html_logo = "logo.png"
-
-# -- Options for HTMLHelp output ---------------------------------------------
-
-# Output file base name for HTML help builder.
-htmlhelp_basename = "LADiMdoc"
+html_static_path = ['_static']
 
 
-# -- Options for LaTeX output ------------------------------------------------
+# -- Options for Sphinx AutoAPI -----------------------------------------------
 
-latex_elements = {
-    # The paper size ('letterpaper' or 'a4paper').
-    #
-    # 'papersize': 'letterpaper',
-    # The font size ('10pt', '11pt' or '12pt').
-    #
-    # 'pointsize': '10pt',
-    # Additional stuff for the LaTeX preamble.
-    #
-    # 'preamble': '',   # Needed for readthedocs
-    "preamble": "".join(
-        (
-            r"\DeclareUnicodeCharacter{F8}{\o}",  # ø
-            r"\DeclareUnicodeCharacter{C5}{\AA}",  # Å
-        )
-    ),
-    # Latex figure (float) alignment
-    #
-    # 'figure_align': 'htbp',
+autoapi_dirs = ['../../ladim']
+autoapi_ignore = [
+    '*/build/*',
+    '*/gridforce/*',
+]
+autoapi_add_toctree_entry = True
+autoapi_member_order = 'groupwise'
+autoapi_template_dir = '_templates/autoapi'
+autoapi_keep_files = False
+autoapi_generate_api_docs = True
+autoapi_own_page_level = 'module'
+autoapi_options = [
+    'members',
+    'show-module-summary',
+    'imported-members',
+]
+autodoc_typehints = 'description'
+
+
+# -- Options for intersphinx ------------------------
+
+intersphinx_mapping = {
+    'xarray': ('https://docs.xarray.dev/en/stable/', None),
+    'pandas': ('https://pandas.pydata.org/docs/', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    "python": ("https://docs.python.org/3", None),
+    'pydantic': ('https://docs.pydantic.dev/latest', None), 
 }
-
-# Grouping the document tree into LaTeX files. List of tuples
-# (source start file, target name, title,
-#  author, documentclass [howto, manual, or own class]).
-latex_documents = [
-    (
-        "index",
-        "ladim.tex",
-        "LADiM Documentation",
-        r"Bjørn Ådlandsvik <bjorn@imr.no>\\Institute of Marine Research",
-        "manual",
-    )
-]
-
-
-# -- Options for manual page output ------------------------------------------
-
-# One entry per manual page. List of tuples
-# (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "ladim", "LADiM Documentation", [author], 1)]
-
-
-# -- Options for Texinfo output ----------------------------------------------
-
-# Grouping the document tree into Texinfo files. List of tuples
-# (source start file, target name, title, author,
-#  dir menu entry, description, category)
-texinfo_documents = [
-    (
-        master_doc,
-        "LADiM",
-        "LADiM Documentation",
-        author,
-        "LADiM",
-        "One line description of project.",
-        "Miscellaneous",
-    )
-]
-
-# -- Extension configuration -------------------------------------------------

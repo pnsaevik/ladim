@@ -1,35 +1,62 @@
-import contextlib
 import numpy as np
 import pandas as pd
 from .utilities import read_timedelta
 import logging
 import typing
+import netCDF4 as nc
 
 if typing.TYPE_CHECKING:
     from ladim.model import Model
 
-
 logger = logging.getLogger(__name__)
+
+CoordTransform = typing.Callable[[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]]
+ParticleGenerator = typing.Callable[[float, float], pd.DataFrame]
 
 
 class Releaser:
-    def __init__(self, particle_generator: typing.Callable[[float, float], pd.DataFrame]):
-        self.particle_generator = particle_generator
+    def __init__(self, schedule: pd.DataFrame):
+        """
+        Create a releaser from a schedule
+
+        A schedule is a table of release times and release intervals, together
+        with initial properties of released particles. Each row represents a
+        particle source. Some columns have special meanings:
+
+        release_start
+            First release time of this particle type, in seconds since the posix
+            epoch (1970-01-01).
+
+        release_stop
+            Stop time (not inclusive) for this particle source, in seconds
+            since the posix epoch (1970-01-01).
+        
+        release_step
+            Number of seconds between releases. Set this to a large number if
+            the release should not be repeated.
+
+        X, Y, Z
+            Initial particle X, Y, Z position, using internal model coordinates
+
+        :param schedule: A table of release times, release intervals and initial
+            properties of released particles.
+        """
+        self._schedule = schedule
 
     @staticmethod
-    def from_textfile(
-            file, colnames: list = None, formats: dict = None,
+    def create(
+            file=None, colnames: list = None, formats: dict = None,
             frequency=(0, 's'), defaults=None, lonlat_converter=None,
+            warm_start_file: str | nc.Dataset | None = None
     ):
         """
-        Release module which reads from a text file
-
-        The text file must be a whitespace-separated csv file
+        Create release module from whitespace-separated csv file
 
         :param lonlat_converter: Function that converts lon, lat coordinates to
             x, y coordinates
 
-        :param file: Release file
+        :param file: Either a release file (path name or stream), or an
+            in-memory table (object that is convertible to pandas data frame)
 
         :param colnames: Column names, if the release file does not contain any
 
@@ -45,17 +72,48 @@ class Releaser:
         :param defaults: A dict of variables to be added to each particle. The keys
             are the variable names, the values are the initial values at particle
             release.
+        
+        :param warm_start_file: Ladim output file containing start values
+            for the first time step
         """
+        # Handle empty arguments
+        defaults = defaults or {}
+        formats = formats or {}
+        lonlat_converter = lonlat_converter or (lambda lon, lat: (lon, lat))
 
-        release_table = ReleaseTable.from_filename_or_stream(
-            file=file,
-            column_names=colnames,
-            column_formats=formats or dict(),
-            interval=read_timedelta(frequency) / np.timedelta64(1, 's'),
-            defaults=defaults or dict(),
-            lonlat_converter=lonlat_converter,
-        )
-        return Releaser(particle_generator=release_table.subset)
+        # Add standard defaults
+        standard_defaults = {
+            'release_interval': np.asarray(read_timedelta(frequency) / np.timedelta64(1, 's'), dtype='int64'),
+            'release_time': np.array(0, dtype='datetime64[s]'),
+        }
+        defaults = {**standard_defaults, **defaults}
+
+        # Create releaser from release table
+        df = load_table(file, names=colnames, formats=formats)
+        df = add_default_variables_in_release_table(df, defaults)
+        df = add_start_stop_step_to_release_table(df)
+        df = apply_warm_start_file(df, file=warm_start_file)
+        df = replace_lonlat_in_release_table(df, lonlat_converter)
+        releaser = Releaser(df)
+
+        return releaser
+
+    def new_particles(self, start: float, stop: float) -> pd.DataFrame:
+        """
+        Initial properties of particles released within a given period
+
+        :param start: Start time of period
+        :param stop: Stop time of period (not inclusive)
+        :returns: Initial properties of particles released within period
+        """
+        df = truncate_schedule_period(self._schedule, start, stop)
+        df = expand_schedule_range(df)
+        df = expand_schedule_multiplicity(df)
+        return df
+
+    def first_release_time(self) -> int:
+        """First scheduled release time"""
+        return int(self._schedule['release_start'].min())
 
     def update(self, model: "Model"):
         self._add_new(model)
@@ -72,7 +130,7 @@ class Releaser:
     def _add_new(self, model: "Model"):
         # Get the portion of the release dataset that corresponds to
         # current simulation time
-        df = self.particle_generator(
+        df = self.new_particles(
             model.solver.time,
             model.solver.time + model.solver.step,
         )
@@ -94,17 +152,6 @@ class Releaser:
         new_particles = df.to_dict(orient='list')
         state = model.state
         state.append(new_particles)
-
-
-def release_data_subset(dataframe, start_time, stop_time, interval: typing.Any = 0):
-    events = resolve_schedule(
-        times=dataframe['release_time'].values,
-        interval=interval,
-        start_time=start_time,
-        stop_time=stop_time,
-    )
-
-    return dataframe.iloc[events]
 
 
 def load_release_file(stream, names: list, formats: dict) -> pd.DataFrame:
@@ -156,55 +203,172 @@ def get_converters(varnames: list, conf: dict) -> dict:
     return converters
 
 
-class ReleaseTable:
-    def __init__(
-            self,
-            dataframe: pd.DataFrame,
-            interval: float,
-            defaults: dict[str, typing.Any],
-            lonlat_converter: typing.Callable[[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]],
-    ):
-        self.dataframe = dataframe
-        self.interval = interval
-        self.defaults = defaults
-        self.lonlat_converter = lonlat_converter
-
-    def subset(self, start_time, stop_time):
-        events = resolve_schedule(
-            times=self.dataframe['release_time'].values,
-            interval=self.interval,
-            start_time=start_time,
-            stop_time=stop_time,
-        )
-
-        df = self.dataframe.iloc[events].copy(deep=True)
-        df = replace_lonlat_in_release_table(df, self.lonlat_converter)
-        df = add_default_variables_in_release_table(df, self.defaults)
-        df = expand_multiplicity_in_release_table(df)
-
-        return df
-
-    @staticmethod
-    def from_filename_or_stream(file, column_names, column_formats, interval, defaults, lonlat_converter):
-        with open_or_relay(file, 'r', encoding='utf-8') as fp:
-            return ReleaseTable.from_stream(
-                fp, column_names, column_formats, interval, defaults, lonlat_converter)
-
-    @staticmethod
-    def from_stream(fp, column_names, column_formats, interval, defaults, lonlat_converter):
-        df = load_release_file(stream=fp, names=column_names, formats=column_formats)
-        return ReleaseTable(df, interval, defaults, lonlat_converter)
-
-
 def replace_lonlat_in_release_table(df, lonlat_converter):
     if "lon" not in df.columns or "lat" not in df.columns:
         return df
 
     X, Y = lonlat_converter(df["lon"].values, df["lat"].values)
     df_new = df.drop(columns=['X', 'Y', 'lat', 'lon'], errors='ignore')
+
+    # If there were X/Y columns in the original dataset, only replace with
+    # lat/lon conversion where the X/Y data were missing
+    if 'X' in df.columns and 'Y' in df.columns:
+        x_old = df['X'].to_numpy()
+        y_old = df['Y'].to_numpy()
+        is_invalid = np.isnan(x_old) | np.isnan(y_old)
+        X[~is_invalid] = x_old
+        Y[~is_invalid] = y_old
+
     df_new["X"] = X
     df_new["Y"] = Y
     return df_new
+
+
+def add_start_stop_step_to_release_table(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Converts release times to release schedules
+
+    A release table includes a column ``release_time`` which may be in string
+    format or date format or posix seconds. Potentially, the release table also
+    includes a column ``release_interval`` containing the scheduled intervals.
+    This function appends three columns to the incoming table, namely
+    release_start, release_stop and release_step. These are all in units of
+    posix seconds. They define when the scheduled release starts, when it stops,
+    and the interval between releases.
+    """
+
+    # Convert start of release events to posix seconds
+    start = df['release_time'].to_numpy(dtype='datetime64[s]').astype('int64')
+
+    # Load release intervals (0 = no repeats)
+    max_step = 60 * 60 * 24 * 366 * 1_000_000
+    if 'release_interval' in df.columns:
+        step = df['release_interval'].to_numpy(dtype='int64', copy=True)
+        step[step == 0] = max_step
+    else:
+        step = np.full(start.shape, fill_value=max_step, dtype='int64')
+
+    # Define stop times for release events
+    unq_start, unq_start_inv = np.unique(start, return_inverse=True)
+    unq_stop = np.roll(unq_start, -1)
+    if len(unq_stop):
+        unq_stop[-1] = np.iinfo(unq_stop.dtype).max
+    stop = unq_stop[unq_start_inv]
+
+    return df.assign(release_start=start, release_stop=stop, release_step=step)
+
+
+def truncate_schedule_period(
+        df: pd.DataFrame,
+        t1: int | None = None,
+        t2: int | None = None,
+) -> pd.DataFrame:
+    """
+    Returns a schedule truncated by start and stop time
+
+    A schedule is a data frame with columns release_start, release_stop and
+    release_step. The function returns a truncated version of the data frame
+    with irrelevant rows removed, and with start- and stop times truncated to
+    the given interval.
+    """
+
+    if t1 is not None:
+        df = _truncate_start(df, t1)
+    if t2 is not None:
+        df = _truncate_stop(df, t2)
+
+    return df
+
+
+def _truncate_start(df, t1):
+    # Remove irrelevant rows
+    idx = df['release_stop'].values > t1
+    df_subset = df.loc[idx].copy(deep=True)
+
+    start = df_subset['release_start'].values
+    step = df_subset['release_step'].values
+
+    # Truncate start times if necessary
+    idx = start < t1
+    new_start = reset_range_start(start[idx], step[idx], t1)
+    df_subset.loc[idx, 'release_start'] = new_start
+
+    return df_subset
+
+
+def _truncate_stop(df, t2):
+    # Remove irrelevant rows
+    idx = df['release_start'].values < t2
+    df_subset = df.loc[idx].copy(deep=True)
+
+    # Truncate stop times if necessary
+    stop = df_subset['release_stop'].values
+    idx = stop > t2
+    df_subset.loc[idx, 'release_stop'] = t2
+
+    return df_subset
+
+
+def expand_schedule_range(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Expands scheduled releases to actual releases
+
+    A schedule is a data frame with columns release_start, release_stop and
+    release_step. The function returns a data frame where each row is expanded
+    to a number of rows according to the start, stop, step specification.
+    
+    Also, the columns release_start, release_stop and release_step are replaced
+    with a single release_time column.
+    """
+
+    start = df['release_start'].values
+    stop = df['release_stop'].values
+    step = df['release_step'].values
+    num = np.maximum(np.ceil((stop - start) / step).astype('int64'), 0)
+    seq = [i for n in num for i in range(n)]
+    idx = np.repeat(np.arange(len(num)), num)
+    times = start[idx] + seq * step[idx]
+
+    drop_cols = ['release_start', 'release_stop', 'release_step', 'release_time']
+    new_df = df.drop(columns=drop_cols, errors='ignore').iloc[idx]
+    new_df['release_time'] = times
+
+    return new_df
+
+
+def reset_range_start(start, step, limit):
+    """
+    Get new start of range, keeping the new range aligned with the old
+    
+    Old range: [start, start + step, start + 2*step, ...]
+    New range: [start + N*step, start + (N+1)*step, ...]
+
+    The new range should be as large as possible while keeping limit <= start + N*step
+    
+    :returns: First element of new range
+    """
+    N_min = (limit - start) / step
+    N = np.ceil(N_min).astype('int64')
+    return start + N * step
+
+
+def load_table(table, **open_kwargs) -> pd.DataFrame:
+    """
+    Load a table as a pandas data frame
+
+    The input may be a path name or stream, or an in-memory table
+    """
+    import os
+
+    if isinstance(table, (str, os.PathLike)):
+        with open(table, mode='r', encoding='utf-8') as fp:
+            return load_release_file(fp, **open_kwargs)
+
+    elif hasattr(table, 'read'):
+        return load_release_file(table, **open_kwargs)
+
+    else:
+        return pd.DataFrame(table)
 
 
 def add_default_variables_in_release_table(df, defaults):
@@ -215,7 +379,7 @@ def add_default_variables_in_release_table(df, defaults):
     return df_new
 
 
-def expand_multiplicity_in_release_table(df):
+def expand_schedule_multiplicity(df):
     if 'mult' not in df:
         return df
     df = df.loc[np.repeat(df.index, df['mult'].values.astype('i4'))]
@@ -223,154 +387,118 @@ def expand_multiplicity_in_release_table(df):
     return df
 
 
-def resolve_schedule(times, interval, start_time, stop_time):
+def apply_warm_start_file(
+        df: pd.DataFrame,
+        file: str | nc.Dataset | None
+) -> pd.DataFrame:
     """
-    Convert decriptions of repeated events to actual event indices
+    Apply warm start file to release schedule
 
-    The variable `times` specifies start time of scheduled events. Each event occurs
-    repeatedly (specified by `interval`) until there is a new scheduling time.
-    The function returns the index of all events occuring within the time span.
+    A warm start file is a ladim output file which can be used to re-start a
+    simulation. The function applies the following changes to the
+    input schedule:
 
-    Example 1: times = [0, 0], interval = 2. These are 2 events (index [0, 1]),
-    occuring at times [0, 2, 4, 6, ...], starting at time = 0. The time interval
-    start_time = 0, stop_time = 6 will contain the event times 0, 2, 4. The
-    returned event indices are [0, 1, 0, 1, 0, 1].
+    - The particles contained in the last time step of the warm start file are
+      added to the release schedule
 
-    Example 2: times = [0, 0, 3, 3, 3], interval = 2. The schedule starts with
-    2 events (index [0, 1]) occuring at time = 0. At time = 2, there are no new
-    scheduled events, and the previous events are repeated. At time = 3 there
-    are 3 new events scheduled (index [2, 3, 4]), which cancel the previous
-    events. The new events are repeated at times [3, 5, 7, ...]. The time
-    interval start_time = 0, stop_time = 7 contain the event times [0, 2, 3, 5].
-    The returned event indices are [0, 1, 0, 1, 2, 3, 4, 2, 3, 4].
-
-    :param times: Nondecreasing list of event times
-    :param interval: Maximum interval between scheduled times
-    :param start_time: Start time of schedule
-    :param stop_time: Stop time of schedule (not inclusive)
-    :return: Index of events in resolved schedule
+    - All previously scheduled releases are removed
+    
+    :param df: Input release schedule
+    :param file: Input warm start file, or None if no-op
+    :returns: New release schedule after warm start file has been applied
     """
 
-    sched = Schedule(times=np.asarray(times), events=np.arange(len(times)))
-    sched2 = sched.resolve(start_time, stop_time, interval)
-    return sched2.events
+    if file is None:
+        return df  # No-op
+
+    elif not isinstance(file, nc.Dataset):
+        with nc.Dataset(file) as dset:
+            return apply_warm_start_file(df, dset)
+
+    warm_start_particles = load_last_timestep(file)
+
+    if len(warm_start_particles) == 0:
+        return df
+
+    new_start_time = np.asarray(warm_start_particles['time'][0], dtype='datetime64[s]')
+
+    df_truncated = truncate_schedule_period(df, new_start_time.astype(int) + 1, None)
+
+    # Add warm start particles, using first row of the input schedule as a
+    # template for default values.
+    num_new = len(warm_start_particles)
+    warm_df = df.loc[df.index[:1].repeat(num_new)].reset_index(drop=True)
+    warm_df[['X', 'Y']] = np.nan
+    for colname in set(df.columns).intersection(warm_start_particles.columns):
+        warm_start_values = warm_start_particles[colname].to_numpy()
+        if np.issubdtype(warm_start_values.dtype, np.datetime64):
+            warm_start_values = warm_start_values.astype('datetime64[s]')
+        warm_df.loc[:, colname] = warm_start_values.astype(warm_df[colname].dtype)
+    warm_df['release_start'] = new_start_time.astype(np.int64)
+    warm_df['release_stop'] = np.iinfo(df['release_stop'].dtype).max  # type: ignore
+    warm_df['release_step'] = 60 * 60 * 24 * 366 * 1_000_000
+
+    return pd.concat([warm_df, df_truncated], ignore_index=True)
 
 
-class Schedule:
-    def __init__(self, times: np.ndarray, events: np.ndarray):
-        self.times = times.view()
-        self.events = events.view()
-        self.times.flags.writeable = False
-        self.events.flags.writeable = False
+def load_last_timestep(dset: nc.Dataset) -> pd.DataFrame:
+    """Load particles from last time step of ladim output file"""
 
-    def valid(self):
-        return np.all(np.diff(self.times) >= 0)
+    if 'particle_count' not in dset.variables:
+        raise ValueError('Missing variable "particle_count"')
+    elif 'pid' not in dset.variables:
+        raise ValueError('Missing variable "pid"')
 
-    def copy(self):
-        return Schedule(times=self.times.copy(), events=self.events.copy())
+    df = pd.DataFrame()
 
-    def append(self, other: "Schedule"):
-        return Schedule(
-            times=np.concatenate((self.times, other.times)),
-            events=np.concatenate((self.events, other.events)),
-        )
+    # Group variable names by dimension
+    varnames_by_dimension = {}
+    for v in dset.variables:
+        dims = dset.variables[v].dimensions
+        if len(dims) != 1:
+            continue
+        dimname = str(dims[0]) if len(dims) > 0 else ''
+        variable_list = varnames_by_dimension.get(dimname, [])
+        variable_list.append(v)
+        varnames_by_dimension[dimname] = variable_list
 
-    def extend_backwards_using_interval(self, time, interval):
-        min_time = self.times[0]
-        if min_time <= time:
-            return self
+    # Load instance variables
+    num_particles_last_step = dset['particle_count'][-1]
+    for v in varnames_by_dimension.get('particle_instance', []):
+        dset.variables[v].set_auto_mask(False)
+        values = dset.variables[v][-num_particles_last_step:]
+        df[v] = apply_cf_encoding(values, dset.variables[v])
 
-        num_extensions = int(np.ceil((min_time - time) / interval))
-        new_time = min_time - num_extensions * interval
-        return self.extend_backwards(new_time)
+    # Load time variables
+    for v in varnames_by_dimension.get('time', []):
+        dset.variables[v].set_auto_mask(False)
+        values = dset.variables[v][-1]
+        df[v] = apply_cf_encoding(values, dset.variables[v])
 
-    def extend_backwards(self, new_minimum_time):
-        idx_to_be_copied = (self.times == self.times[0])
-        num_to_be_copied = np.count_nonzero(idx_to_be_copied)
-        extension = Schedule(
-            times=np.repeat(new_minimum_time, num_to_be_copied),
-            events=self.events[idx_to_be_copied],
-        )
-        return extension.append(self)
+    # Load particle variables
+    pid = df['pid'].values
+    for v in varnames_by_dimension.get('particle', []):
+        dset.variables[v].set_auto_mask(False)
+        values = dset.variables[v][:][pid]
+        df[v] = apply_cf_encoding(values, dset.variables[v])
 
-    def trim_tail(self, stop_time):
-        num = np.sum(self.times < stop_time)
-        return Schedule(
-            times=self.times[:num],
-            events=self.events[:num],
-        )
-
-    def trim_head(self, start_time):
-        num = np.sum(self.times < start_time)
-        return Schedule(
-            times=self.times[num:],
-            events=self.events[num:],
-        )
-
-    def rightshift_closest_time_value(self, time, interval):
-        # If interval=0 is specified, this means there is nothing to right-shift
-        if interval <= 0:
-            return self
-
-        # Find largest value that is smaller than or equal to time
-        idx_target_time = sum(self.times <= time) - 1
-
-        # If no tabulated time values are smaller than the given time, there
-        # is nothing to right-shift
-        if idx_target_time == -1:
-            return self
-
-        # Compute new value to write
-        target_time = self.times[idx_target_time]
-        num_offsets = np.ceil((time - target_time) / interval)
-        new_target_time = target_time + num_offsets * interval
-
-        # Check if the new value is larger than the next value
-        if idx_target_time + 1 < len(self.times):  # If not, then there is no next value
-            next_time = self.times[idx_target_time + 1]
-            if new_target_time > next_time:
-                return self
-
-        # Change times
-        new_times = self.times.copy()
-        new_times[self.times == target_time] = new_target_time
-        return Schedule(times=new_times, events=self.events)
-
-    def expand(self, interval, stop):
-        # If there are no times, there should be no expansion
-        # Also, interval = 0 means no expansion
-        if (len(self.times) == 0) or (interval <= 0):
-            return self
-
-        t_unq, t_inv, t_cnt = np.unique(self.times, return_inverse=True, return_counts=True)
-        stop2 = np.maximum(stop, t_unq[-1])
-        diff = np.diff(np.concatenate((t_unq, [stop2])))
-        unq_repeats = np.ceil(diff / interval).astype(int)
-        repeats = np.repeat(unq_repeats, t_cnt)
-
-        base_times = np.repeat(self.times, repeats)
-        offsets = [i * interval for n in repeats for i in range(n)]
-        times = base_times + offsets
-        events = np.repeat(self.events, repeats)
-
-        idx = np.lexsort((events, times))
-
-        return Schedule(times=times[idx], events=events[idx])
-
-    def resolve(self, start, stop, interval):
-        s = self
-        if interval:
-            s = s.rightshift_closest_time_value(start, interval)
-        s = s.trim_head(start)
-        s = s.trim_tail(stop)
-        s = s.expand(interval, stop)
-        return s
+    return df
 
 
-@contextlib.contextmanager
-def open_or_relay(file_or_buf, *args, **kwargs):
-    if hasattr(file_or_buf, 'read'):
-        yield file_or_buf
-    else:
-        with open(file_or_buf, *args, **kwargs) as f:
-            yield f
+def get_nc_attrs(variable: nc.Variable) -> dict:
+    return {k: variable.getncattr(k) for k in variable.ncattrs()}
+
+
+def apply_cf_encoding(values, variable: nc.Variable):
+    attrs = get_nc_attrs(variable)
+
+    if 'since' in attrs.get('units', ''):
+        values = np.asarray(nc.num2date(
+            times=values,
+            units=attrs['units'],
+            calendar=attrs.get('calendar', 'standard'),
+            only_use_cftime_datetimes=False,
+            only_use_python_datetimes=True,
+        )).astype('datetime64')
+
+    return values

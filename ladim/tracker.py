@@ -11,7 +11,7 @@ class Tracker:
         self.diffusion = diffusion  # [m2.s-1]
 
     @staticmethod
-    def from_config(method, diffusion):
+    def create(method, diffusion):
         if not diffusion:
             method += "_nodiff"
         integrator = StochasticDifferentialEquationIntegrator.from_keyword(method)

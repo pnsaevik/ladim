@@ -11,7 +11,7 @@ class Grid:
     """
 
     @staticmethod
-    def from_roms(**conf):
+    def create(**conf):
         return RomsGrid(**conf)
 
     def ingrid(self, X, Y):
@@ -411,7 +411,7 @@ class ArrayGrid(Grid):
         q_lon = p_x * londiff_x + p_y * londiff_y
 
         # Compute bearing
-        bearing_radians = np.atan2(q_lon, q_lat)
+        bearing_radians = np.arctan2(q_lon, q_lat)
         bearing = (bearing_radians * (180 / np.pi)) % 360
         return bearing
 
@@ -432,7 +432,7 @@ class ArrayGrid(Grid):
         p_y = -q_lat * londiff_x + q_lon * latdiff_x
 
         # Compute azimuth
-        az_radians = np.atan2(p_y, p_x)
+        az_radians = np.arctan2(p_y, p_x)
         az = (az_radians * (180 / np.pi)) % 360
         return az
 

@@ -1,7 +1,7 @@
-name: Release workflow
+name: Deploy to github pages
 
 on: workflow_call
-
+    
 jobs:
   # Deploy job
   deploy_sphinx:

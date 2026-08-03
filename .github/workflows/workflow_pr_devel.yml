@@ -1,9 +1,9 @@
-name: Main branch pull request
+name: PR devel
 
 on:
   pull_request:
     branches:
-      - "master"
+      - "devel"
 
 jobs:
   check_changelog:
@@ -12,7 +12,5 @@ jobs:
     uses: ./.github/workflows/action_sphinx_compile.yml
   build_pypi:
     uses: ./.github/workflows/action_pypi_compile.yml
-
-  # The pytest check is already run elsewhere
-  # run_pytest:
-  #   uses: ./.github/workflows/action_pytest.yml
+  run_pytest:
+    uses: ./.github/workflows/action_pytest.yml
