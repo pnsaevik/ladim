@@ -13,15 +13,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
-## [2.3.0] - 2026-08-03
+## [2.3.1] - 2026-08-03
+### Fixed
+- Output split now works also on continuous releases with infrequent writes
+
+
+## [2.3.0] - 2026-02-11
 ### Added
 - Warm start capabilities
 ### Changed
 - Skip forward if no particles
-### Fixed
-- Output split now works also on continuous releases with infrequent writes
-
-### Changed
 - Use sphinx autoapi to generate documentation
 
 
