@@ -41,7 +41,7 @@ class Test_Output_update:
             dset = out.writer.paths[0]
             assert 'release_time' in dset.variables
             assert dset['release_time'].dimensions == ('particle', )
-            assert dset['release_time'].units == "seconds since 1970-01-01"
+            assert dset['release_time'].units == "seconds since 1970-01-01 00:00:00"
             assert dset['release_time'].long_name == "particle release time"
             assert dset['release_time'][:].astype('datetime64[s]').astype(str).tolist() == [
                 '2000-01-01T00:00:00', '2000-01-01T00:00:00',
@@ -88,7 +88,7 @@ class Test_Output_update:
 
             assert 'time' in dset.variables
             assert dset['time'].dimensions == ('time',)
-            assert dset['time'].units == "seconds since 1970-01-01"
+            assert dset['time'].units == "seconds since 1970-01-01 00:00:00"
             assert dset['time'].long_name == "time"
             assert dset['time'][:].astype('datetime64[s]').astype(str).tolist() == [
                 '2000-01-01T00:00:00'

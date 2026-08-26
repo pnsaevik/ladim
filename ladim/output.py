@@ -146,7 +146,7 @@ class Output:
                 attributes=dict(
                     long_name="time",
                     standard_name="time",
-                    units="seconds since 1970-01-01",
+                    units="seconds since 1970-01-01 00:00:00",
                 ),
             ),
             instance_offset=OutputFormat(
@@ -167,7 +167,7 @@ class Output:
                 dimensions='particle',
                 attributes=dict(
                     long_name='particle release time',
-                    units='seconds since 1970-01-01',
+                    units='seconds since 1970-01-01 00:00:00',
                 )
             )
         )
