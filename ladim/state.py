@@ -1,4 +1,5 @@
 import numpy as np
+import line_profiler
 
 
 class State:
@@ -120,6 +121,7 @@ def _add_standard_variables(fields: dict[str, np.ndarray], first_pid: int):
         fields['active'] = np.ones(num_new, dtype=bool)
 
 
+@line_profiler.profile
 def _append_fields(
         oldf: dict[str, np.ndarray],
         newf: dict[str, np.ndarray]):
