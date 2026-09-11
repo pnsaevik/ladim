@@ -13,6 +13,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.3.3] - 2026-09-11
+### Fixed
+- Performance is no longer hindered by having a long explicit list of
+  particles to be released.
+
 ## [2.3.2] - 2026-08-26
 ### Changed
 - Output now uses "seconds since 1970-01-01 00:00:00" instead of "seconds since 1970-01-01",

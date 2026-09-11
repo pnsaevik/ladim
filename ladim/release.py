@@ -21,11 +21,15 @@ class Releaser:
 
         A schedule is a table of release times and release intervals, together
         with initial properties of released particles. Each row represents a
-        particle source. Some columns have special meanings:
+        particle source. It is assumed that the table is sorted by
+        `release_start`, and that `release_stop` of each line never exceeds the
+        release_start value of the next line.
+
+        Some columns have special meanings:
 
         release_start
-            First release time of this particle type, in seconds since the posix
-            epoch (1970-01-01).
+            First release time of this particle type, in seconds since the
+            posix epoch (1970-01-01).
 
         release_stop
             Stop time (not inclusive) for this particle source, in seconds
@@ -94,6 +98,7 @@ class Releaser:
         df = add_start_stop_step_to_release_table(df)
         df = apply_warm_start_file(df, file=warm_start_file)
         df = replace_lonlat_in_release_table(df, lonlat_converter)
+        df = df.sort_values('release_time')
         releaser = Releaser(df)
 
         return releaser
@@ -149,9 +154,9 @@ class Releaser:
             return
 
         # Add new particles
-        new_particles = df.to_dict(orient='list')
-        state = model.state
-        state.append(new_particles)
+        colnames = df.columns.tolist()
+        new_particles = {k: df[k].to_numpy() for k in colnames}
+        model.state.append(new_particles)
 
 
 def load_release_file(stream, names: list, formats: dict) -> pd.DataFrame:
@@ -249,9 +254,10 @@ def add_start_stop_step_to_release_table(df: pd.DataFrame) -> pd.DataFrame:
         step = np.full(start.shape, fill_value=max_step, dtype='int64')
 
     # Define stop times for release events
+    # Every time there is a new release, all previous continuous releases stop
     unq_start, unq_start_inv = np.unique(start, return_inverse=True)
     unq_stop = np.roll(unq_start, -1)
-    if len(unq_stop):
+    if len(unq_stop):  # The last stop time is set to be "infinitely" large
         unq_stop[-1] = np.iinfo(unq_stop.dtype).max
     stop = unq_stop[unq_start_inv]
 
@@ -264,49 +270,58 @@ def truncate_schedule_period(
         t2: int | None = None,
 ) -> pd.DataFrame:
     """
-    Returns a schedule truncated by start and stop time
+    Return a release schedule truncated to the requested time interval.
 
-    A schedule is a data frame with columns release_start, release_stop and
-    release_step. The function returns a truncated version of the data frame
-    with irrelevant rows removed, and with start- and stop times truncated to
-    the given interval.
+    The input table is a pandas data frame containing the columns
+    ``release_start``, ``release_stop`` and ``release_step``. The function
+    removes rows whose release interval falls outside ``[t1, t2)`` and clamps
+    the surviving row boundaries to that interval, while preserving the
+    schedule columns needed for later expansion.
+
+    :param df: Input release schedule as a pandas data frame.
+    :param t1: Optional start time of the interval in POSIX seconds. If
+        omitted, the first scheduled release start is used.
+    :param t2: Optional stop time of the interval in POSIX seconds. If
+        omitted, the last scheduled release stop is used.
+    :returns: A truncated copy of the schedule with rows outside the interval
+        removed and the relevant schedule bounds clipped to ``t1``/``t2``.
+
+    .. note::
+       The returned frame keeps the original schedule columns and is suitable
+       for downstream expansion with ``expand_schedule_range``.
     """
 
-    if t1 is not None:
-        df = _truncate_start(df, t1)
-    if t2 is not None:
-        df = _truncate_stop(df, t2)
+    release_start = df['release_start'].to_numpy()
+    release_stop = df['release_stop'].to_numpy()
 
-    return df
+    start = release_start[0] if t1 is None else t1
+    stop = release_stop[-1] if t2 is None else t2
 
+    # First row whose release_stop is greater than start.
+    first = np.searchsorted(release_stop, start, side="right")
 
-def _truncate_start(df, t1):
+    # First row whose release_start is greater than or equal to stop.
+    last = np.searchsorted(release_start, stop, side="left")
+
+    if first >= last:
+        return df.iloc[0:0].copy()
+
     # Remove irrelevant rows
-    idx = df['release_stop'].values > t1
-    df_subset = df.loc[idx].copy(deep=True)
-
-    start = df_subset['release_start'].values
-    step = df_subset['release_step'].values
+    df = df.iloc[first:last].copy()
 
     # Truncate start times if necessary
-    idx = start < t1
-    new_start = reset_range_start(start[idx], step[idx], t1)
-    df_subset.loc[idx, 'release_start'] = new_start
-
-    return df_subset
-
-
-def _truncate_stop(df, t2):
-    # Remove irrelevant rows
-    idx = df['release_start'].values < t2
-    df_subset = df.loc[idx].copy(deep=True)
+    new_start = df['release_start'].to_numpy().copy()
+    new_step = df['release_step'].to_numpy()
+    idx = new_start < start
+    new_start[idx] = reset_range_start(new_start[idx], new_step[idx], start)
 
     # Truncate stop times if necessary
-    stop = df_subset['release_stop'].values
-    idx = stop > t2
-    df_subset.loc[idx, 'release_stop'] = t2
+    new_stop = np.minimum(df['release_stop'].to_numpy(), stop)
 
-    return df_subset
+    df['release_start'] = new_start
+    df['release_stop'] = new_stop
+
+    return df
 
 
 def expand_schedule_range(df: pd.DataFrame) -> pd.DataFrame:
@@ -321,9 +336,9 @@ def expand_schedule_range(df: pd.DataFrame) -> pd.DataFrame:
     with a single release_time column.
     """
 
-    start = df['release_start'].values
-    stop = df['release_stop'].values
-    step = df['release_step'].values
+    start = df['release_start'].to_numpy()
+    stop = df['release_stop'].to_numpy()
+    step = df['release_step'].to_numpy()
     num = np.maximum(np.ceil((stop - start) / step).astype('int64'), 0)
     seq = [i for n in num for i in range(n)]
     idx = np.repeat(np.arange(len(num)), num)
@@ -433,7 +448,8 @@ def apply_warm_start_file(
         warm_start_values = warm_start_particles[colname].to_numpy()
         if np.issubdtype(warm_start_values.dtype, np.datetime64):
             warm_start_values = warm_start_values.astype('datetime64[s]')
-        warm_df.loc[:, colname] = warm_start_values.astype(warm_df[colname].dtype)
+        target_dtype = np.dtype(str(warm_df[colname].dtype))
+        warm_df.loc[:, colname] = warm_start_values.astype(target_dtype)
     warm_df['release_start'] = new_start_time.astype(np.int64)
     warm_df['release_stop'] = np.iinfo(df['release_stop'].dtype).max  # type: ignore
     warm_df['release_step'] = 60 * 60 * 24 * 366 * 1_000_000
