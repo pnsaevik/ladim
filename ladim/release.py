@@ -154,9 +154,9 @@ class Releaser:
             return
 
         # Add new particles
-        new_particles = df.to_dict(orient='list')
-        state = model.state
-        state.append(new_particles)
+        colnames = df.columns.tolist()
+        new_particles = {k: df[k].to_numpy() for k in colnames}
+        model.state.append(new_particles)
 
 
 def load_release_file(stream, names: list, formats: dict) -> pd.DataFrame:
