@@ -52,26 +52,9 @@ class State:
             if not np.shape(fields[k]) == (num_new, ):
                 raise ValueError('Unequal number of array elements in input')
 
-        # Add standard variables
-        fields['pid'] = np.arange(num_new) + self._num_released
-        fields['alive'] = np.ones(num_new, dtype=bool)
-        if 'active' in fields:
-            fields['active'] = np.array(fields['active'], dtype=bool)
-        else:
-            fields['active'] = np.ones(num_new, dtype=bool)
+        _add_standard_variables(fields, first_pid=self._num_released)
 
-        # Concatenate old and new particles
-        newdata = {}  # type: dict[str, np.ndarray]
-        num_old = self.size
-        for k, v_new in fields.items():
-            if k in self._data:
-                v_old = self._data[k]
-            else:
-                v_old = np.zeros(num_old, dtype=v_new.dtype)
-            
-            newdata[k] = np.concatenate([v_old, v_new], dtype=v_old.dtype)
-
-        self._data = newdata
+        self._data = _append_fields(self._data, fields)
         self._num_released += num_new
 
     def remove(self, particles):
@@ -118,3 +101,50 @@ class State:
             self._data[item] = value
         else:
             raise AttributeError(f"Attribute not defined: '{item}'")
+
+
+def _add_standard_variables(fields: dict[str, np.ndarray], first_pid: int):
+    """
+    Adds standard variables pid, alive and active to a set of particles.
+
+    Modifies the input dictionary.
+    """
+    num_new = next(len(v) for v in fields.values())
+
+    # Add standard variables
+    fields['pid'] = np.arange(num_new) + first_pid
+    fields['alive'] = np.ones(num_new, dtype=bool)
+    if 'active' in fields:
+        fields['active'] = np.array(fields['active'], dtype=bool)
+    else:
+        fields['active'] = np.ones(num_new, dtype=bool)
+
+
+def _append_fields(
+        oldf: dict[str, np.ndarray],
+        newf: dict[str, np.ndarray]):
+    """
+    Append a new set of fields to an old set.
+
+    In this context, "fields" is a dict of one-dimensional numpy arrays, each
+    having the same length. The new field set has the same keys as the union
+    of the two old ones.
+    """
+
+    # Find columns of the new field set
+    old_cols = list(oldf)
+    extra_cols = [c for c in newf if c not in old_cols]
+    cols = old_cols + extra_cols
+
+    num_old = 0 if len(oldf) == 0 else next(len(v) for v in oldf.values())
+    num_new = 0 if len(newf) == 0 else next(len(v) for v in newf.values())
+
+    # Concatenate old and new particles
+    newdata = {}  # type: dict[str, np.ndarray]
+    for c in cols:
+        dtype = oldf[c].dtype if c in oldf else newf[c].dtype
+        oldv = oldf[c] if c in oldf else np.zeros(num_old, dtype=dtype)
+        newv = newf[c] if c in newf else np.zeros(num_new, dtype=dtype)
+        newdata[c] = np.concatenate((oldv, newv), dtype=dtype)
+
+    return newdata
