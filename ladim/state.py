@@ -1,5 +1,4 @@
 import numpy as np
-import line_profiler
 
 
 class State:
@@ -121,7 +120,6 @@ def _add_standard_variables(fields: dict[str, np.ndarray], first_pid: int):
         fields['active'] = np.ones(num_new, dtype=bool)
 
 
-@line_profiler.profile
 def _append_fields(
         oldf: dict[str, np.ndarray],
         newf: dict[str, np.ndarray]):
@@ -140,13 +138,22 @@ def _append_fields(
 
     num_old = 0 if len(oldf) == 0 else next(len(v) for v in oldf.values())
     num_new = 0 if len(newf) == 0 else next(len(v) for v in newf.values())
+    num_total = num_old + num_new
 
     # Concatenate old and new particles
     newdata = {}  # type: dict[str, np.ndarray]
     for c in cols:
         dtype = oldf[c].dtype if c in oldf else newf[c].dtype
-        oldv = oldf[c] if c in oldf else np.zeros(num_old, dtype=dtype)
-        newv = newf[c] if c in newf else np.zeros(num_new, dtype=dtype)
-        newdata[c] = np.concatenate((oldv, newv), dtype=dtype)
+        newdata_c = np.empty(num_total, dtype=dtype)
+        if c in oldf:
+            newdata_c[:num_old] = oldf[c]
+        else:
+            newdata_c[:num_old] = 0
+        if c in newf:
+            newdata_c[num_old:] = newf[c]
+        else:
+            newdata_c[num_old:] = 0
+
+        newdata[c] = newdata_c
 
     return newdata
