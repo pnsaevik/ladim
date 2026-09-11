@@ -270,12 +270,25 @@ def truncate_schedule_period(
         t2: int | None = None,
 ) -> pd.DataFrame:
     """
-    Returns a schedule truncated by start and stop time
+    Return a release schedule truncated to the requested time interval.
 
-    A schedule is a data frame with columns release_start, release_stop and
-    release_step. The function returns a truncated version of the data frame
-    with irrelevant rows removed, and with start- and stop times truncated to
-    the given interval.
+    The input table is a pandas data frame containing the columns
+    ``release_start``, ``release_stop`` and ``release_step``. The function
+    removes rows whose release interval falls outside ``[t1, t2)`` and clamps
+    the surviving row boundaries to that interval, while preserving the
+    schedule columns needed for later expansion.
+
+    :param df: Input release schedule as a pandas data frame.
+    :param t1: Optional start time of the interval in POSIX seconds. If
+        omitted, the first scheduled release start is used.
+    :param t2: Optional stop time of the interval in POSIX seconds. If
+        omitted, the last scheduled release stop is used.
+    :returns: A truncated copy of the schedule with rows outside the interval
+        removed and the relevant schedule bounds clipped to ``t1``/``t2``.
+
+    .. note::
+       The returned frame keeps the original schedule columns and is suitable
+       for downstream expansion with ``expand_schedule_range``.
     """
 
     release_start = df['release_start'].to_numpy()

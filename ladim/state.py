@@ -105,9 +105,25 @@ class State:
 
 def _add_standard_variables(fields: dict[str, np.ndarray], first_pid: int):
     """
-    Adds standard variables pid, alive and active to a set of particles.
+    Add the standard particle metadata fields ``pid``, ``alive`` and
+    ``active`` in-place to a mapping of one-dimensional arrays.
 
-    Modifies the input dictionary.
+    The input dictionary maps variable names to NumPy arrays, all of which are
+    assumed to have the same length ``num_new``. The helper mutates that
+    dictionary by adding the missing standard variables and normalizing the
+    ``active`` field to a boolean array.
+
+    :param fields: Mapping from field names to one-dimensional NumPy arrays.
+        The arrays store values for the same set of newly released particles.
+    :param first_pid: The first particle identifier to assign. The new
+        ``pid`` field is created as ``np.arange(num_new) + first_pid``.
+    :returns: The same dictionary object, updated in-place with the new
+        standard variables ``pid``, ``alive`` and ``active``.
+
+    .. note::
+       ``alive`` is always created as a boolean array of ones, and ``active``
+       is either converted from an existing array to boolean or created as an
+       array of ones if the input dictionary does not already provide it.
     """
     num_new = next(len(v) for v in fields.values())
 
@@ -124,11 +140,28 @@ def _append_fields(
         oldf: dict[str, np.ndarray],
         newf: dict[str, np.ndarray]):
     """
-    Append a new set of fields to an old set.
+    Append two field dictionaries by concatenating their per-variable arrays.
 
-    In this context, "fields" is a dict of one-dimensional numpy arrays, each
-    having the same length. The new field set has the same keys as the union
-    of the two old ones.
+    The input dictionaries map a field name to a one-dimensional NumPy array.
+    Each array stores particles for that variable, and the key sets are allowed
+    to differ: the output contains the union of keys from ``oldf`` and ``newf``.
+    For any variable present only in one input mapping, the missing side is
+    padded with a zero-filled array of the appropriate dtype and length before
+    the concatenation.
+
+    :param oldf: Existing field mapping. The keys are variable names, and each
+        value is a one-dimensional array of shape ``(n_old,)``.
+    :param newf: New field mapping. The keys are variable names, and each
+        value is a one-dimensional array of shape ``(n_new,)``.
+    :returns: A new dictionary whose keys are the union of ``oldf`` and
+        ``newf`` keys, and whose arrays have the shape ``(n_old + n_new,)``.
+        Fields that only exist in either input are appended as zeros on the
+        missing side before concatenation.
+
+    .. note::
+       This helper is used to build the particle state ``State._data`` by
+       appending newly released particles to the previously stored particle
+       fields.
     """
 
     # Find columns of the new field set
