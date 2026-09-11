@@ -116,6 +116,32 @@ class Test_add_start_stop_step_to_release_table:
 
 
 class Test_truncate_schedule:
+    def test_works_as_expected(self):
+        tab = pd.DataFrame(
+            [[0, -1, 0, 1], # One particle with release at -1
+             [0, 0, 3, 1], # Three particles with release at 0, 1, 2
+             [1, 0, 3, 1],
+             [2, 0, 3, 1],
+             [3, 4, 9, 2],    # One particle with release at 4, 6, 8
+             [4, 10, 17, 3],  # Two particles with release at 10, 13, 16
+             [5, 10, 17, 3],
+             [6, 17, 19, 1],  # One particle with release at 17, 18
+            ],
+            columns=['prop', 'release_start', 'release_stop', 'release_step']
+        )
+
+        result = release.truncate_schedule_period(tab, 1, 16)
+        assert result.to_numpy().tolist() == [
+                          # First particle is gone - scheduled outside interval
+            [0, 1, 3, 1], # Next three particles get truncated start time
+            [1, 1, 3, 1],
+            [2, 1, 3, 1],
+            [3, 4, 9, 2],    # Middle particle is untouched
+            [4, 10, 16, 3],  # Two particles with truncated stop time
+            [5, 10, 16, 3],
+                             # Last particle gone - scheduled outside interval
+        ]
+
     def test_can_truncate(self):
         tab = pd.DataFrame({
             'release_start': [0, 0, 15],
