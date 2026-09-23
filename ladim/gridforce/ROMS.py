@@ -327,6 +327,8 @@ class Forcing:
             self.U = self.Unew
             self.V = self.Vnew
             self.Unew, self.Vnew = self._read_velocity(t1)
+            self.dU = (self.Unew - self.U) / (t1 - t0)
+            self.dV = (self.Vnew - self.V) / (t1 - t0)
             for name in self.ibm_forcing:
                 self[name] = self[name + "new"]
                 self[name + "new"] = self._read_field(name, t1)
