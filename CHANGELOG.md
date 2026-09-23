@@ -13,7 +13,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
-## [2.3.4]
+## [2.3.4] - 2026-09-23
 ### Fixed
 - Error in loading intermediate u/v, introduced by commit a191e21
 
