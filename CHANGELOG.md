@@ -13,6 +13,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.3.4]
+### Fixed
+- Error in loading intermediate u/v, introduced by commit a191e21
+
 ## [2.3.3] - 2026-09-11
 ### Fixed
 - Performance is no longer hindered by having a long explicit list of
