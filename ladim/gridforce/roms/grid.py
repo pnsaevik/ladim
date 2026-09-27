@@ -10,6 +10,7 @@ from netCDF4 import Dataset
 
 from ladim.sample import bilin_inv
 
+from .. import parallel
 from . import coords
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class Grid:
     def __init__(self, config):
         logger.info("Initializing ROMS-type grid object")
         gconf = config["gridforce"]
+        parallel.configure(gconf.get("num_threads"))
 
         if "grid_file" in gconf:
             grid_file = gconf["grid_file"]
