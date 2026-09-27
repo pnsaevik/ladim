@@ -14,6 +14,7 @@ filters, or files that are not HDF5, are read through netCDF4 instead
 
 import logging
 import os
+import sys
 import threading
 import zlib
 
@@ -134,11 +135,16 @@ class ChunkLayout:
         nbytes = n * dtype.itemsize
         data = inflate(raw, nbytes) if self.deflate else raw
 
-        if self.shuffle:
+        if self.shuffle and sys.byteorder == "little":
+            # The kernel assembles the bytes as little-endian integers, i.e.
+            # in the stored byte order in memory
             unshuffle, utype = kernels.UNSHUFFLE[dtype.itemsize]
             u = np.empty(n, dtype=utype)
             unshuffle(np.frombuffer(data, dtype=np.uint8, count=nbytes), u)
-            arr = u.view(dtype.newbyteorder("<"))
+            arr = u.view(dtype)
+        elif self.shuffle:
+            planes = np.frombuffer(data, dtype=np.uint8, count=nbytes)
+            arr = planes.reshape(dtype.itemsize, n).T.copy().view(dtype).reshape(n)
         else:
             arr = np.frombuffer(data, dtype=dtype, count=n)
 

@@ -167,9 +167,9 @@ def _near_global(x, i0, n):
 
 
 @numba.njit(parallel=True, nogil=True, cache=True)
-def _z2s(X, Y, Z, i0, j0, H, C, S, hc, vtransform, monotonic, K, A, J, I):
-    """K, A as in legacy.z2s. If J and I have the same size as X, the
-    (global) indices of the water column are stored there as well."""
+def _z2s(X, Y, Z, i0, j0, H, C, S, hc, vtransform, monotonic, frac, K, A, J, I):
+    """K, A as in legacy.z2s (or A = K - A if frac). If J and I have the same
+    size as X, the (global) indices of the water column are stored there."""
     jmax, imax = H.shape
     kmax = C.size
     store_ji = I.size == X.size
@@ -197,7 +197,8 @@ def _z2s(X, Y, Z, i0, j0, H, C, S, hc, vtransform, monotonic, K, A, J, I):
         zk1 = _zlevel(k - 1, h, C, S, hc, vtransform)
         a = (zk + Z[p]) / (zk - zk1)
         K[p] = k
-        A[p] = min(max(a, 0.0), 1.0)
+        a = min(max(a, 0.0), 1.0)
+        A[p] = k - a if frac else a
 
 
 @numba.njit(parallel=True, cache=True)
@@ -250,7 +251,7 @@ class SCoordinate:
             0 <= A <= 1, such that -Z = A * z_r[K-1] + (1-A) * z_r[K] in the
             nearest water column (with constant extension outside the levels).
         """
-        K, A, _, _ = self._z2s(X, Y, Z, cell=False)
+        K, A, _, _ = self._z2s(X, Y, Z, cell=False, frac=False)
         return K, A
 
     def cell(self, X, Y, Z):
@@ -260,10 +261,10 @@ class SCoordinate:
             level just above the particle), J and I are the global indices of
             the nearest rho point within the subgrid.
         """
-        K, _, J, I = self._z2s(X, Y, Z, cell=True)
+        K, _, J, I = self._z2s(X, Y, Z, cell=True, frac=False)
         return K, J, I
 
-    def _z2s(self, X, Y, Z, cell):
+    def _z2s(self, X, Y, Z, cell, frac):
         X, Y, Z = (np.ascontiguousarray(v, dtype=np.float64).reshape(-1)
                    for v in np.broadcast_arrays(X, Y, Z))
         n = X.size if cell else 0
@@ -272,7 +273,7 @@ class SCoordinate:
         J = np.empty(n, dtype=np.int64)
         I = np.empty(n, dtype=np.int64)
         _z2s(X, Y, Z, self.i0, self.j0, self.H, self.C, self.S, self.hc,
-             self.vtransform, self.monotonic, K, A, J, I)
+             self.vtransform, self.monotonic, frac, K, A, J, I)
         return K, A, J, I
 
     def level(self, X, Y, Z):
@@ -281,8 +282,7 @@ class SCoordinate:
         Linear interpolation between levels floor(k) and floor(k)+1 at this
         index gives the same result as the (K, A) weights from z2s.
         """
-        K, A = self.z2s(X, Y, Z)
-        return K - A
+        return self._z2s(X, Y, Z, cell=False, frac=True)[1]
 
 
 # --------------------------------------------------------------------------

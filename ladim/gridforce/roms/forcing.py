@@ -185,8 +185,7 @@ class Forcing:
         X = np.asarray(X, dtype=np.float64)
         Y = np.asarray(Y, dtype=np.float64)
         if method == "bilinear":
-            K, A = grid.scoord.z2s(X, Y, Z)
-            k = K - A
+            k = grid.scoord.level(X, Y, Z)
             iu, ju = X - 0.5, Y
             iv, jv = X, Y - 0.5
         else:
