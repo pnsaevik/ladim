@@ -287,9 +287,12 @@ class _ScalarTiming:
     * At a forcing step reached as the "next" frame: the field becomes the
       previous "next" frame, and "next" advances one frame.
     * At the step after the previous one: unchanged.
-    * Otherwise (initialization, jumps): the field is extrapolated from the
-      forcing interval [t0, t1) to time step -1, and "next" = t1. If t0 == 0,
-      step 0 is treated as the step where "next" is reached.
+    * At initialization (t < 0): the field is extrapolated from the forcing
+      interval [t0, t1) to time step -1, and "next" = t1. If t0 == 0, step 0
+      is treated as the step where "next" is reached.
+    * At other jumps in time (t >= 0): the field is the frame at t0, and
+      "next" = t1. (The original module extrapolated to time step -1 here
+      as well, and never updated the fields again if t0 == 0.)
 
     :ivar frames: (n0, n1, w1), the field is (1 - w1) * F[n0] + w1 * F[n1]
     :ivar new: The "next" frame
@@ -315,9 +318,13 @@ class _ScalarTiming:
             n0 = int(np.searchsorted(steps, t, side="right")) - 1
             n0 = min(max(n0, 0), len(steps) - 2)
             t0, t1 = steps[n0], steps[n0 + 1]
-            self.frames = (n0, n0 + 1, -(t0 + 1) / (t1 - t0))
             self.new = n0 + 1
-            self._tnew = t0 if t0 == 0 else t1
+            if t < 0:
+                self.frames = (n0, n0 + 1, -(t0 + 1) / (t1 - t0))
+                self._tnew = t0 if t0 == 0 else t1
+            else:
+                self.frames = (n0, n0, 0.0)
+                self._tnew = t1
         self._t = t
 
 

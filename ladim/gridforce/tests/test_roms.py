@@ -107,3 +107,24 @@ def test_forcing_matches_dense_sampling(forcing):
 def test_forcing_steps(forcing):
     assert forcing.steps == [0, 6, 12, 18]
     assert list(forcing.stepdiff) == [6, 6, 6]
+
+
+@pytest.mark.parametrize("first_step", [0, 3, 8])
+def test_scalar_field_frames(forcing, first_step):
+    from ladim.gridforce.roms.forcing import _ScalarTiming
+
+    timing = _ScalarTiming(forcing._steps)
+    timing.update(-1)  # Initialization
+    frames = []
+    for t in range(first_step, 20):
+        timing.update(t)
+        n0, n1, w1 = timing.frames
+        frames.append(n0 if w1 == 0 else None)
+    if first_step == 0:
+        # Start at a forcing time: next frame in the first interval (as in
+        # earlier LADiM versions)
+        expected = [1] * 12 + [2] * 6 + [3] * 2
+    else:
+        # Latest frame at or before the step
+        expected = [t // 6 for t in range(first_step, 20)]
+    assert frames == expected
