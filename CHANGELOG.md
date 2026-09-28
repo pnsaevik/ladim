@@ -13,6 +13,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.3.6] - 2026-09-28
+### Fixed
+- ROMS forcing: In the first forcing interval of a simulation, scalar fields
+  (e.g. temp, salt) are now taken from the latest forcing time at or before
+  the model time, as in the rest of the simulation. Previously, the next
+  forcing time was used if the simulation started at a forcing time, and a
+  value interpolated to one time step before the start otherwise.
+
 ## [2.3.5] - 2026-09-28
 ### Fixed
 - ROMS forcing: If the simulation skipped ahead to a later first release
