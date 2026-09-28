@@ -13,6 +13,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.3.7] - 2026-09-28
+### Fixed
+- ROMS forcing: Scalar fields (e.g. temp, salt), and velocity with
+  method="nearest", now return the lowest s-level for positions below it
+  (constant extrapolation). Previously, the second lowest level was used.
+
 ## [2.3.6] - 2026-09-28
 ### Fixed
 - ROMS forcing: In the first forcing interval of a simulation, scalar fields
