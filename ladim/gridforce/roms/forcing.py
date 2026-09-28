@@ -11,12 +11,8 @@ Model time step t lies in the forcing interval [t0, t1) of two consecutive
 forcing frames. Velocities are linearly interpolated in time between the
 frames.
 
-Scalar fields (``field``) are not interpolated in time. They follow the
-update scheme of the original ROMS module (see ``_ScalarTiming``): normally
-the field is taken from the latest forcing frame at or before t, but in the
-first forcing interval after the initialization (or after a jump in time),
-the original scheme gives a time-extrapolated field or the next frame. This
-is reproduced to keep results consistent with earlier LADiM versions.
+Scalar fields (``field``) are not interpolated in time. They are taken from
+the latest forcing frame at or before t (the first frame if t is before it).
 
 Prefetching
 -----------
@@ -81,7 +77,6 @@ class Forcing:
         self._mask_v[grid.Jv, grid.Iv] = grid.Mv
 
         self._t = None
-        self._scalar_timing = _ScalarTiming(self._steps)
         self._dense = {}
 
     def _set_steps(self, config, all_frames):
@@ -137,7 +132,7 @@ class Forcing:
         steps = self._steps
         n = int(np.searchsorted(steps, t, side="right")) - 1
         self._n0 = min(max(n, 0), len(steps) - 2)  # Velocity interval
-        self._scalar_timing.update(t)
+        self._nf = min(max(n, 0), len(steps) - 1)  # Scalar field frame
         if n >= 0 and (self._t is None or n != self._n):
             logger.info("Forcing frame {} at time step {}".format(n, steps[n]))
         self._n = n
@@ -159,13 +154,12 @@ class Forcing:
                 need = var.loaded(n0) | var.loaded(n0 + 1)
                 if need.any():
                     var.prefetch(n0 + 2, need)
-        n_now, _, _ = self._scalar_timing.frames
-        n_next = self._scalar_timing.new
-        if n_next != n_now:
+        nf = self._nf
+        if nf + 1 < len(self._steps):
             for var in self._fields.values():
-                need = var.loaded(n_now)
+                need = var.loaded(nf)
                 if need.any():
-                    var.prefetch(n_next, need)
+                    var.prefetch(nf + 1, need)
 
     # ---------- Sampling ----------
 
@@ -199,12 +193,10 @@ class Forcing:
         """Scalar field in the grid cell of the particles
 
         The value at the nearest rho point, at the s-level just above the
-        particle, without interpolation (see _ScalarTiming for the time).
+        particle, without interpolation, from the latest forcing frame.
         """
         K, J, I = self._grid.scoord.cell(X, Y, Z)
-        n0, n1, w1 = self._scalar_timing.frames
-        frame = (n0, n1, w1) if w1 else n0
-        return self._field(name).interp([K, J, I], frame, linear="t")
+        return self._field(name).interp([K, J, I], self._nf)
 
     def _field(self, name):
         var = self._fields.get(name)
@@ -250,7 +242,7 @@ class Forcing:
             var = self._field(base)
             region = (slice(None),) * (len(var.shape) - 2) + (grid.J, grid.I)
             mask = None
-            now = self._scalar_timing.frames
+            now = self._nf
 
         def frame(f):
             F = var.read(f, region)
@@ -259,7 +251,9 @@ class Forcing:
         if name == "d" + base:
             return (frame(n0 + 1) - frame(n0)) / dt
         if name == base + "new":
-            return frame(n0 + 1 if base in ("U", "V") else self._scalar_timing.new)
+            if base in ("U", "V"):
+                return frame(n0 + 1)
+            return frame(min(self._nf + 1, len(self._steps) - 1))
         return frame(now)
 
     # Allow item notation
@@ -271,56 +265,6 @@ class Forcing:
 
     def close(self):
         self._dset.close()
-
-
-class _ScalarTiming:
-    """Time frames of the scalar fields, as in the original ROMS module.
-
-    The original module kept the fields in arrays that were updated
-    incrementally. This class tracks the same states:
-
-    * At a forcing step reached as the "next" frame: the field becomes the
-      previous "next" frame, and "next" advances one frame.
-    * At the step after the previous one: unchanged.
-    * At initialization (t < 0): the field is extrapolated from the forcing
-      interval [t0, t1) to time step -1, and "next" = t1. If t0 == 0, step 0
-      is treated as the step where "next" is reached.
-    * At other jumps in time (t >= 0): the field is the frame at t0, and
-      "next" = t1. (The original module extrapolated to time step -1 here
-      as well, and never updated the fields again if t0 == 0.)
-
-    :ivar frames: (n0, n1, w1), the field is (1 - w1) * F[n0] + w1 * F[n1]
-    :ivar new: The "next" frame
-    """
-
-    def __init__(self, steps):
-        self.steps = steps
-        self.frames = (0, 0, 0.0)
-        self.new = 0
-        self._t = None
-        self._tnew = None
-
-    def update(self, t):
-        steps = self.steps
-        if t == self._t:
-            return
-        if t == self._tnew:
-            n = int(np.searchsorted(steps, t))
-            self.frames = (self.new, self.new, 0.0)
-            self.new = min(n + 1, len(steps) - 1)
-            self._tnew = steps[self.new]
-        elif self._t is None or t != self._t + 1:
-            n0 = int(np.searchsorted(steps, t, side="right")) - 1
-            n0 = min(max(n0, 0), len(steps) - 2)
-            t0, t1 = steps[n0], steps[n0 + 1]
-            self.new = n0 + 1
-            if t < 0:
-                self.frames = (n0, n0 + 1, -(t0 + 1) / (t1 - t0))
-                self._tnew = t0 if t0 == 0 else t1
-            else:
-                self.frames = (n0, n0, 0.0)
-                self._tnew = t1
-        self._t = t
 
 
 def _check_sorted(all_frames):

@@ -83,25 +83,26 @@ def test_forcing_steps(forcing):
     assert list(forcing.stepdiff) == [6, 6, 6]
 
 
-@pytest.mark.parametrize("first_step", [0, 3, 8])
-def test_scalar_field_frames(forcing, first_step):
-    from ladim.gridforce.roms.forcing import _ScalarTiming
+def test_field_uses_latest_forcing_frame(forcing):
+    from netCDF4 import Dataset as NCDataset
 
-    timing = _ScalarTiming(forcing._steps)
-    timing.update(-1)  # Initialization
-    frames = []
-    for t in range(first_step, 20):
-        timing.update(t)
-        n0, n1, w1 = timing.frames
-        frames.append(n0 if w1 == 0 else None)
-    if first_step == 0:
-        # Start at a forcing time: next frame in the first interval (as in
-        # earlier LADiM versions)
-        expected = [1] * 12 + [2] * 6 + [3] * 2
-    else:
-        # Latest frame at or before the step
-        expected = [t // 6 for t in range(first_step, 20)]
-    assert frames == expected
+    grid = forcing._grid
+    rng = np.random.default_rng(8)
+    X = rng.uniform(grid.xmin + 0.5, grid.xmax - 0.5, 200)
+    Y = rng.uniform(grid.ymin + 0.5, grid.ymax - 0.5, 200)
+    Z = rng.uniform(0, 60, 200)
+    K, A = coords.z2s(grid.z_r, X - grid.i0, Y - grid.j0, Z)
+    with NCDataset(str(SAMPLE)) as nc:
+        nc.set_auto_maskandscale(False)
+        v = nc.variables["temp"]
+        frames = v.add_offset + v.scale_factor * v[:, :, grid.J, grid.I]
+
+    # Forcing frames at steps 0, 6, 12, 18, also after jumps in time
+    for t in [-1, 0, 3, 5, 6, 8, 12, 17, 18, 19, 2]:
+        forcing.update(t)
+        n = min(max(t // 6, 0), 3)
+        ref = coords.sample3D(frames[n], X - grid.i0, Y - grid.j0, K, A, method="nearest")
+        assert np.allclose(forcing.field(X, Y, Z, "temp"), ref, atol=1e-5), t
 
 
 @pytest.fixture(scope="module")
