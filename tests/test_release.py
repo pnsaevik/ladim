@@ -421,6 +421,37 @@ class Test_load_last_timestep:
         ]
 
 
+class Test_apply_warm_start_file:
+    def test_warm_start_particles_are_not_multiplied(self, dataset):
+        dataset.createDimension('time')
+        dataset.createDimension('particle')
+        dataset.createDimension('particle_instance')
+        dataset.createVariable('time', 'i4', 'time')
+        dataset.variables['time'].units = 'seconds since 1970-01-01'
+        dataset.createVariable('particle_count', 'i4', 'time')
+        dataset.createVariable('pid', 'i4', 'particle_instance')
+        dataset.createVariable('X', 'f4', 'particle_instance')
+        dataset.createVariable('Y', 'f4', 'particle_instance')
+        dataset['time'][:] = [3600]
+        dataset['particle_count'][:] = [2]
+        dataset['pid'][:] = [0, 1]
+        dataset['X'][:] = [1, 2]
+        dataset['Y'][:] = [3, 4]
+
+        tab = pd.DataFrame({
+            'release_time': np.array([0, 7200], dtype='datetime64[s]'),
+            'mult': [5, 3],
+            'X': [10., 20.],
+            'Y': [30., 40.],
+            })
+        tab = release.add_start_stop_step_to_release_table(tab)
+        df = release.apply_warm_start_file(tab, dataset)
+        df = release.expand_schedule_multiplicity(df)
+
+        assert df['X'].tolist() == [1, 2, 20, 20, 20]
+        assert df['Y'].tolist() == [3, 4, 40, 40, 40]
+
+
 
 @pytest.fixture
 def dataset():

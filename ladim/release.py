@@ -459,6 +459,8 @@ def apply_warm_start_file(
     num_new = len(warm_start_particles)
     warm_df = df.loc[df.index[:1].repeat(num_new)].reset_index(drop=True)
     warm_df[['X', 'Y']] = np.nan
+    if 'mult' in warm_df:
+        warm_df['mult'] = 1  # Each warm start particle is released once
     for colname in set(df.columns).intersection(warm_start_particles.columns):
         warm_start_values = warm_start_particles[colname].to_numpy()
         if np.issubdtype(warm_start_values.dtype, np.datetime64):
