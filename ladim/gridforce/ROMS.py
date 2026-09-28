@@ -375,8 +375,9 @@ class Forcing:
             self[name] = self._read_field(name, t0)
             self[name + "new"] = self._read_field(name, t1)
             self["d" + name] = (self[name + "new"] - self[name]) / (t1 - t0)
-            if t < 0:  # Initialization: interpolate to time step -1
-                self[name] = self[name] - (t0 + 1) * self["d" + name]
+            if t0 == 0 and t < 0:
+                # Synchronize with start time, as for velocity above
+                self[name + "new"] = self[name]
         
         self._cache_t = t
         self._cache_dt = 1
