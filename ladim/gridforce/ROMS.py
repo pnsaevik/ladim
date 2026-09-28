@@ -842,6 +842,9 @@ def sample3D(F, X, Y, K, A, method="bilinear"):
     I = np.minimum(np.maximum(I, 0), F.shape[-1] - 1)
     J = np.minimum(np.maximum(J, 0), F.shape[-2] - 1)
 
+    # Below the lowest level (A == 1), use the lowest level
+    K = K - (A == 1)
+
     return F[K, J, I]
 
 
