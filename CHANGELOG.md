@@ -13,6 +13,46 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.4.0] - 2026-09-28
+### Added
+- Chunk loader (ladim.gridforce.chunkloader): Reads and decodes HDF5 chunks
+  of the forcing files directly, in parallel, only for the chunks needed by
+  the particles, and prefetches the chunks of the next forcing frame in the
+  background. Falls back to netCDF4 for unsupported file layouts.
+- The number of threads is set with the environment variable
+  LADIM_NUM_THREADS (or the gridforce setting num_threads). Default: all
+  CPUs available to the process.
+- ROMS forcing: Forcing.field() samples variables defined on w levels (such
+  as w and AKs) and at u and v points correctly, based on the dimensions of
+  the variable.
+- ROMS forcing: The interpolation of each field is set with the gridforce
+  setting "interpolation" (e.g. {w: tz}) or the "linear" argument of
+  Forcing.field(), as the letters of the dimensions (t, z, y, x) to
+  interpolate linearly. Default: "tz" for w, no interpolation otherwise.
+### Changed
+- The ROMS grid and forcing module is rewritten for speed and memory use.
+  ladim.gridforce.ROMS is now a thin wrapper around ladim.gridforce.roms
+  (coordinate conversion, grid and forcing) and the chunk loader. With 1.5
+  million particles on NorKyst 800 m forcing, a simulation runs about 11
+  times faster than before, with a peak memory use of 8 GB instead of 15 GB.
+- New dependencies: h5py, deflate and isal
+- Grid.z_r and Grid.z_w are computed when first accessed
+- Linear interpolation of velocity at positions outside the grid uses the
+  value at the boundary (constant extension) instead of extrapolation
+### Removed
+- ROMS forcing: The forcing fields are no longer available as full arrays
+  (Forcing.U, Forcing.V, Forcing.temp, forcing["temp"], etc.). Use
+  Forcing.field() and Forcing.velocity() instead. The gridforce setting
+  ibm_forcing is no longer needed.
+- ROMS forcing: The attributes steps, stepdiff, file_idx, frame_idx and
+  has_been_initialized, and the method find_files()
+- ladim.gridforce.ROMS no longer exports sample2D, bilin_inv, s_stretch,
+  sdepth, z2s, sample3D and sample3DUV. The ROMS-specific functions are
+  available in ladim.gridforce.roms.coords, the others in ladim.sample.
+### Fixed
+- ROMS forcing: A jump backwards in time could read forcing from the wrong
+  file
+
 ## [2.3.7] - 2026-09-28
 ### Fixed
 - ROMS forcing: Scalar fields (e.g. temp, salt), and velocity with
