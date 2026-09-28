@@ -13,6 +13,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.6.0] - 2026-09-28
+### Changed
+- The number of threads defaults to 1 if the environment variable
+  LADIM_NUM_THREADS is not set (previously: all CPUs available to the
+  process). The gridforce setting num_threads still takes precedence.
+
+
 ## [2.5.2] - 2026-09-28
 ### Fixed
 - Updated deprecated CI scripts

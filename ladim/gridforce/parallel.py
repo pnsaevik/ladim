@@ -6,7 +6,7 @@ in order of precedence:
 
 1. an explicit argument (e.g. ``gridforce.num_threads`` in the config),
 2. the environment variable ``LADIM_NUM_THREADS``,
-3. the number of CPUs this process is allowed to run on.
+3. a default of 1 (single-threaded).
 """
 
 import os
@@ -25,7 +25,7 @@ def available_cpus() -> int:
 
 def num_threads(requested=None) -> int:
     """Resolve the number of threads to use (see module docstring)"""
-    n = requested or os.environ.get(ENV_VAR) or available_cpus()
+    n = requested or os.environ.get(ENV_VAR) or 1
     return max(1, min(int(n), numba.config.NUMBA_NUM_THREADS))
 
 
