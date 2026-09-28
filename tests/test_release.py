@@ -85,9 +85,7 @@ class Test_add_start_stop_step_to_release_table:
         step = result['release_step'].values
 
         assert start.tolist() == [0, 10, 30]
-        assert stop[0] == 10
-        assert stop[1] == 30
-        assert stop[2] > 1_000_000
+        assert stop.tolist() == [1, 11, 31]
         assert np.all(step > 1_000_000)
 
     def test_adds_columns_when_continuous_spec(self):
@@ -106,6 +104,19 @@ class Test_add_start_stop_step_to_release_table:
         assert stop[1] == 30
         assert stop[2] > 1_000_000
         assert step.tolist() == [7, 2, 3]
+
+    def test_fails_if_unsorted(self):
+        tab = pd.DataFrame({'release_time': [0, 10, 5]})
+        with pytest.raises(SystemExit):
+            release.add_start_stop_step_to_release_table(tab)
+
+    def test_fails_if_mixed_intervals_at_same_time(self):
+        tab = pd.DataFrame({
+            'release_time': [0, 0, 10],
+            'release_interval': [0, 2, 0]
+            })
+        with pytest.raises(SystemExit):
+            release.add_start_stop_step_to_release_table(tab)
 
     def test_can_convert_string_datetimes(self):
         tab = pd.DataFrame({'release_time': ['1970-01-01', '1970-01-02']})
@@ -408,6 +419,37 @@ class Test_load_last_timestep:
         assert time.astype('datetime64[h]').astype(str).tolist() == [
             '1970-01-01T02', '1970-01-01T02', '1970-01-01T02'
         ]
+
+
+class Test_apply_warm_start_file:
+    def test_warm_start_particles_are_not_multiplied(self, dataset):
+        dataset.createDimension('time')
+        dataset.createDimension('particle')
+        dataset.createDimension('particle_instance')
+        dataset.createVariable('time', 'i4', 'time')
+        dataset.variables['time'].units = 'seconds since 1970-01-01'
+        dataset.createVariable('particle_count', 'i4', 'time')
+        dataset.createVariable('pid', 'i4', 'particle_instance')
+        dataset.createVariable('X', 'f4', 'particle_instance')
+        dataset.createVariable('Y', 'f4', 'particle_instance')
+        dataset['time'][:] = [3600]
+        dataset['particle_count'][:] = [2]
+        dataset['pid'][:] = [0, 1]
+        dataset['X'][:] = [1, 2]
+        dataset['Y'][:] = [3, 4]
+
+        tab = pd.DataFrame({
+            'release_time': np.array([0, 7200], dtype='datetime64[s]'),
+            'mult': [5, 3],
+            'X': [10., 20.],
+            'Y': [30., 40.],
+            })
+        tab = release.add_start_stop_step_to_release_table(tab)
+        df = release.apply_warm_start_file(tab, dataset)
+        df = release.expand_schedule_multiplicity(df)
+
+        assert df['X'].tolist() == [1, 2, 20, 20, 20]
+        assert df['Y'].tolist() == [3, 4, 40, 40, 40]
 
 
 

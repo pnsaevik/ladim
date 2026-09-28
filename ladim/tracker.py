@@ -1,164 +1,191 @@
+import numba
 import numpy as np
+from numba import prange
 import typing
 if typing.TYPE_CHECKING:
     from .model import Model
 
 
 class Tracker:
-    """The physical particle tracking kernel"""
-    def __init__(self, integrator, diffusion):
-        self.integrator = integrator
+    """The physical particle tracking kernel
+
+    Horizontal advection with the Euler-Forward ("EF"), midpoint ("RK2") or
+    fourth order Runge-Kutta ("RK4") method, and horizontal diffusion as a
+    random walk with constant diffusion coefficient. The arithmetic runs in
+    multithreaded numba kernels, the velocity is sampled by the forcing module.
+
+    The random walk uses a counter-based generator: the random numbers of a
+    particle are a hash of its particle identifier and a key drawn from
+    ``np.random`` once per time step. Results are reproducible when the numpy
+    random seed is set (``numerics.seed``), independent of the number of
+    threads and the order of the particles. The random numbers are uniform
+    with variance 1, so the random walk is Gaussian after a few time steps.
+    """
+
+    METHODS = ("EF", "RK2", "RK4")
+
+    def __init__(self, method, diffusion):
+        if method not in self.METHODS:
+            raise NotImplementedError(f"Unknown integration method: {method}")
+        self.method = method
         self.diffusion = diffusion  # [m2.s-1]
 
     @staticmethod
     def create(method, diffusion):
-        if not diffusion:
-            method += "_nodiff"
-        integrator = StochasticDifferentialEquationIntegrator.from_keyword(method)
-        return Tracker(integrator, diffusion)
+        return Tracker(method, diffusion)
 
     def update(self, model: "Model"):
         state = model.state
         grid = model.grid
         forcing = model.forcing
-
-        t0 = model.solver.time
         dt = model.solver.step
 
         act = state['active']
-        X, Y, Z = state['X'][act], state['Y'][act], state['Z'][act]
-        dx, dy = grid.sample_metric(X, Y)
-        r0 = np.stack([X, Y])
+        all_active = bool(np.all(act))
+        if all_active:
+            X, Y, Z = state['X'], state['Y'], state['Z']
+            pid = state['pid']
+        else:
+            X, Y, Z = state['X'][act], state['Y'][act], state['Z'][act]
+            pid = state['pid'][act]
+        if X.size == 0:
+            return
+        X0 = np.ascontiguousarray(X, dtype=np.float64)
+        Y0 = np.ascontiguousarray(Y, dtype=np.float64)
+        dx, dy = (np.ascontiguousarray(a, dtype=np.float64)
+                  for a in grid.sample_metric(X0, Y0))
 
-        # Set diffusion function
-        def mixing(t, r):
-            _ = t
-            stddev = (2 * self.diffusion) ** 0.5
-            u_diff = stddev / dx
-            return np.broadcast_to(u_diff, r.shape)
+        def velocity(x, y, tstep):
+            u, v = forcing.velocity(x, y, Z, tstep=tstep)
+            return (np.ascontiguousarray(u, dtype=np.float64),
+                    np.ascontiguousarray(v, dtype=np.float64))
 
-        # Set advection function
-        def velocity(t, r):
-            x, y = r.reshape([2, -1])
-            u, v = forcing.velocity(x, y, Z, tstep=(t - t0) / dt)
-            return np.concatenate([u / dx, v / dy]).reshape(r.shape)
-
-        X1, Y1 = self.integrator(velocity, mixing, t0, r0, dt)
+        pid = np.ascontiguousarray(pid, dtype=np.int64)
+        X1, Y1 = self.integrate(velocity, X0, Y0, dx, dy, dt, pid)
 
         # Land, boundary treatment. Do not move the particles
-        # Consider a sequence of different actions
-        # I = (grid.ingrid(X1, Y1)) & (grid.atsea(X1, Y1))
-        should_move = grid.atsea(X1, Y1)
-        # I = True
-        X[should_move] = X1[should_move]
-        Y[should_move] = Y1[should_move]
+        should_move = np.ascontiguousarray(grid.atsea(X1, Y1), dtype=np.bool_)
+        _accept(X0, Y0, X1, Y1, should_move)
 
-        state['X'][act] = X
-        state['Y'][act] = Y
+        if all_active:
+            if X0 is not state['X']:
+                state['X'][:] = X0
+            if Y0 is not state['Y']:
+                state['Y'][:] = Y0
+        else:
+            state['X'][act] = X0
+            state['Y'][act] = Y0
 
+    def integrate(self, velocity, X0, Y0, dx, dy, dt, pid):
+        """New positions after one time step
 
-class StochasticDifferentialEquationIntegrator:
-    @staticmethod
-    def from_keyword(kw):
-        integrators = {
-            "RK4": RK4Integrator,
-            "EF": EFIntegrator,
-            "RK4_nodiff": RK4NodiffIntegrator,
-            "EF_nodiff": EFNodiffIntegrator,
-        }
-        if kw not in integrators:
-            raise NotImplementedError(f"Unknown integration method: {kw}")
-        return integrators[kw]()
-
-    def __call__(self, vel, mix, t0, r0, dt):
+        :param velocity: Function (x, y, tstep) -> (u, v), velocity [m/s] at
+            positions x, y and time t0 + tstep * dt
+        :param X0, Y0: Initial positions [grid units], float64 arrays
+        :param dx, dy: Grid spacing [m] at the initial positions
+        :param dt: Time step [s]
+        :param pid: Particle identifiers (int64), for the random walk
+        :return: X1, Y1
         """
-        Integrate a stochastic differential equation, one time step
+        n = X0.size
+        X1 = np.empty(n)
+        Y1 = np.empty(n)
+        AX = AY = np.empty(0)
+        if self.method == "EF":
+            U, V = velocity(X0, Y0, 0.0)
+        elif self.method == "RK2":
+            U, V = velocity(X0, Y0, 0.0)
+            _stage(X0, Y0, U, V, dx, dy, 0.5 * dt, X1, Y1, AX, AY, 0.0, False, False)
+            U, V = velocity(X1, Y1, 0.5)
+        else:  # RK4
+            AX = np.empty(n)
+            AY = np.empty(n)
+            U, V = velocity(X0, Y0, 0.0)
+            _stage(X0, Y0, U, V, dx, dy, 0.5 * dt, X1, Y1, AX, AY, 1.0, True, True)
+            U, V = velocity(X1, Y1, 0.5)
+            _stage(X0, Y0, U, V, dx, dy, 0.5 * dt, X1, Y1, AX, AY, 2.0, True, False)
+            U, V = velocity(X1, Y1, 0.5)
+            _stage(X0, Y0, U, V, dx, dy, dt, X1, Y1, AX, AY, 2.0, True, False)
+            U, V = velocity(X1, Y1, 1.0)
 
-        For both ``vel`` and ``mix``, the calling signature is fun(t, r) where t is
-        scalar time and r is an array of particle positions. The function should
-        return an array of the same shape as r.
+        # Random walk, with a new random key for each time step
+        key = np.uint64(0)
+        if self.diffusion:
+            key = np.uint64(np.random.randint(0, 2**63, dtype=np.int64))
+        stddev = (2 * self.diffusion) ** 0.5 * dt ** 0.5
 
-        Both ``vel`` and ``mix`` should  assume the same coordinate system and units as
-        the input particle positions and time. For instance, if time is given in
-        seconds and positions are given in grid coordinates, velocity should have units
-        of grid cells per second and mixing should have units of grid cells squared per
-        second.
-
-        :param vel: Velocity function. Calling signature is fun(t, r) where t is scalar
-        and r is an array of particle positions. Should return an array of the
-        same shape as r.
-
-        :param mix: Mixing function. Calling signature is fun(t, r) where t is scalar
-        and r is an array of particle positions. Should return an array of the
-        same shape as r.
-
-        :param t0: Initial time
-
-        :param r0: Initial positions
-
-        :param dt: Time step size
-
-        :return: Final particle positions (same shape as r0)
-        """
-
-        return r0
-
-
-class RK4Integrator(StochasticDifferentialEquationIntegrator):
-    def __call__(self, velocity, mixing, t0, r0, dt):
-        u1 = velocity(t0, r0)
-        r1 = r0 + 0.5 * u1 * dt
-
-        u2 = velocity(t0 + 0.5 * dt, r1)
-        r2 = r0 + 0.5 * u2 * dt
-
-        u3 = velocity(t0 + 0.5 * dt, r2)
-        r3 = r0 + u3 * dt
-
-        u4 = velocity(t0 + dt, r3)
-
-        u_adv = (u1 + 2 * u2 + 2 * u3 + u4) / 6.0
-        r_adv = r0 + u_adv * dt
-
-        # Diffusive velocity
-        u_diff = mixing(t0, r_adv)
-        dw = np.random.normal(size=np.size(r0)).reshape(r0.shape) * np.sqrt(dt)
-
-        return r_adv + u_diff * dw
+        scale = dt / 6.0 if self.method == "RK4" else dt
+        _final(X0, Y0, U, V, dx, dy, AX, AY, self.method == "RK4", scale,
+               pid, key, stddev, bool(self.diffusion), X1, Y1)
+        return X1, Y1
 
 
-class EFIntegrator(StochasticDifferentialEquationIntegrator):
-    def __call__(self, velocity, mixing, t0, r0, dt):
-        u1 = velocity(t0, r0)
-        r_adv = r0 + u1 * dt
+@numba.njit(parallel=True, nogil=True, cache=True)
+def _stage(X0, Y0, U, V, dx, dy, h, X, Y, AX, AY, w, accumulate, first):
+    """Intermediate position X = X0 + h * u, and AX (+)= w * u
 
-        # Diffusive velocity
-        u_diff = mixing(t0, r_adv)
-        dw = np.random.normal(size=np.size(r0)).reshape(r0.shape) * np.sqrt(dt)
-
-        return r_adv + u_diff * dw
-
-
-class RK4NodiffIntegrator(StochasticDifferentialEquationIntegrator):
-    def __call__(self, velocity, mixing, t0, r0, dt):
-        u1 = velocity(t0, r0)
-        r1 = r0 + 0.5 * u1 * dt
-
-        u2 = velocity(t0 + 0.5 * dt, r1)
-        r2 = r0 + 0.5 * u2 * dt
-
-        u3 = velocity(t0 + 0.5 * dt, r2)
-        r3 = r0 + u3 * dt
-
-        u4 = velocity(t0 + dt, r3)
-
-        u_adv = (u1 + 2 * u2 + 2 * u3 + u4) / 6.0
-        r_adv = r0 + u_adv * dt
-
-        return r_adv
+    Here u = U / dx is the velocity in grid units.
+    """
+    for p in prange(X0.size):
+        ux = U[p] / dx[p]
+        vy = V[p] / dy[p]
+        X[p] = X0[p] + h * ux
+        Y[p] = Y0[p] + h * vy
+        if accumulate:
+            if first:
+                AX[p] = w * ux
+                AY[p] = w * vy
+            else:
+                AX[p] += w * ux
+                AY[p] += w * vy
 
 
-class EFNodiffIntegrator(StochasticDifferentialEquationIntegrator):
-    def __call__(self, velocity, mixing, t0, r0, dt):
-        u1 = velocity(t0, r0)
-        return r0 + u1 * dt
+@numba.njit(inline="always")
+def _splitmix64(z):
+    z = z + np.uint64(0x9E3779B97F4A7C15)
+    z = (z ^ (z >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
+    z = (z ^ (z >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
+    return z ^ (z >> np.uint64(31))
+
+
+@numba.njit(inline="always")
+def _noise_pair(key, pid):
+    """Two independent random numbers from (key, pid), mean 0 and variance 1
+
+    Uniform on [-sqrt(3), sqrt(3)), about 10 times cheaper than normal
+    deviates (Box-Muller).
+    """
+    h1 = _splitmix64(key ^ _splitmix64(np.uint64(pid)))
+    h2 = _splitmix64(h1)
+    scale = 2.0 * np.sqrt(3.0) / 9007199254740992.0  # 2 * sqrt(3) / 2**53
+    return (np.float64(h1 >> np.uint64(11)) * scale - np.sqrt(3.0),
+            np.float64(h2 >> np.uint64(11)) * scale - np.sqrt(3.0))
+
+
+@numba.njit(parallel=True, nogil=True, cache=True)
+def _final(X0, Y0, U, V, dx, dy, AX, AY, accumulate, scale, pid, key, stddev,
+           diffuse, X, Y):
+    """Final position X = X0 + scale * (AX + U / dx) + stddev / dx * noise"""
+    for p in prange(X0.size):
+        ux = U[p] / dx[p]
+        vy = V[p] / dy[p]
+        if accumulate:
+            ux += AX[p]
+            vy += AY[p]
+        x = X0[p] + scale * ux
+        y = Y0[p] + scale * vy
+        if diffuse:
+            nx, ny = _noise_pair(key, pid[p])
+            x += stddev / dx[p] * nx
+            y += stddev / dy[p] * ny
+        X[p] = x
+        Y[p] = y
+
+
+@numba.njit(parallel=True, nogil=True, cache=True)
+def _accept(X, Y, X1, Y1, ok):
+    """Move the particles where ok is True"""
+    for p in prange(X.size):
+        if ok[p]:
+            X[p] = X1[p]
+            Y[p] = Y1[p]

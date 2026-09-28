@@ -8,7 +8,9 @@ Surface ligth module
 # Meteorological report series, 1988-7
 # University of Bergen
 
+import numba
 import numpy as np
+from numba import prange
 
 
 def light(time, lon, lat, depth=0, extinction_coef=0.2):
@@ -17,7 +19,69 @@ def light(time, lon, lat, depth=0, extinction_coef=0.2):
 
 
 def surface_light(dtime, lon, lat):
-    """Surface light in absence of clouds"""
+    """Surface light in absence of clouds
+
+    Multithreaded numba version of :func:`surface_light_numpy`, with the same
+    formulas and results.
+    """
+    lat = np.array(lat, dtype=np.float64)
+    lon = np.array(lon, dtype=np.float64)
+    lon, lat = np.broadcast_arrays(lon, lat)
+    shape = lat.shape
+    lon = np.ascontiguousarray(lon).reshape(-1)
+    lat = np.ascontiguousarray(lat).reshape(-1)
+
+    # day of year (original does not consider leap years) and hours in UTC
+    time_tuple = np.datetime64(dtime).astype(object).timetuple()
+    yday = time_tuple.tm_yday
+    hours = time_tuple.tm_hour
+
+    out = np.empty(lat.size, dtype=np.float64)
+    _surface_light(lon, lat, float(yday), float(hours), out)
+    return out.reshape(shape)
+
+
+@numba.njit(parallel=True, nogil=True, cache=True)
+def _surface_light(lon, lat, yday, hours, out):
+    RAD = np.pi / 180.0
+    DEG = 180 / np.pi
+    maxlight = 1500  # value between 200 and 2000
+    twilight = 5.76
+
+    # Declination
+    a0 = 0.3979
+    a1 = 0.9856 * RAD  # day-1
+    a2 = 1.9171 * RAD
+    a3 = 0.98112
+    sindelta = a0 * np.sin(a1 * (yday - 80) + a2 * (np.sin(a1 * yday) - a3))
+    cosdelta = (1 - sindelta ** 2) ** 0.5
+
+    for p in prange(lat.size):
+        phi = lat[p] * RAD
+        TST = hours * 15 + lon[p]
+        sinheight = sindelta * np.sin(phi) - cosdelta * np.cos(phi) * np.cos(TST * RAD)
+        height = np.arcsin(sinheight) * DEG
+        sinh12 = sindelta * np.sin(phi) + cosdelta * np.cos(phi)
+
+        if height >= 0:
+            out[p] = maxlight * (sinheight / sinh12) + twilight
+        elif height >= -6:
+            out[p] = ((twilight - 0.048) / 6) * (6 + height) + 0.048
+        elif height >= -12:
+            out[p] = ((0.048 - 1.15e-4) / 6) * (12 + height) + 1.15e-4
+        elif height >= -18:
+            out[p] = ((1.15e-4 - 1.15e-5) / 6) * (18 + height) + 1.15e-5
+        elif height < -18:
+            out[p] = 1.15e-5
+        else:  # NaN
+            out[p] = 0.0
+
+
+def surface_light_numpy(dtime, lon, lat):
+    """Surface light in absence of clouds
+
+    Reference numpy implementation of :func:`surface_light`.
+    """
 
     RAD = np.pi / 180.0
     DEG = 180 / np.pi
