@@ -31,7 +31,15 @@ def test_z2s_matches_dense(vtransform):
     assert np.allclose(sc.level(X, Y, Z), K0 - A0, rtol=0, atol=1e-12)
 
     Kc, J, I = sc.cell(X, Y, Z)
-    assert np.array_equal(Kc, K0)
+    # The level just above, or the lowest level if below all levels
+    col = z_r[:, J - j0, I - i0]
+    count = np.sum(col < -Z, axis=0)
+    assert np.array_equal(Kc, np.minimum(count, len(Cs_r) - 1))
+    assert np.any(Kc == 0)
+    # Same as the legacy rule (K from z2s, lowest level if A == 1) where the
+    # levels are monotonic (not for Vtransform 1 with bottom depth < hc)
+    mono = np.all(np.diff(col, axis=0) > 0, axis=0)
+    assert np.array_equal(Kc[mono], (K0 - (A0 == 1))[mono])
     assert np.array_equal(I - i0, np.clip(np.around(X - i0), 0, 16).astype(int))
     assert np.array_equal(J - j0, np.clip(np.around(Y - j0), 0, 11).astype(int))
 
@@ -90,6 +98,8 @@ def test_field_uses_latest_forcing_frame(forcing):
     X = rng.uniform(grid.xmin + 0.5, grid.xmax - 0.5, 200)
     Y = rng.uniform(grid.ymin + 0.5, grid.ymax - 0.5, 200)
     Z = rng.uniform(0, 60, 200)
+    Z[:20] = grid.sample_depth(X[:20], Y[:20])  # At the bottom
+    Z[20:40] = 1e4  # Far below the bottom
     K, A = coords.z2s(grid.z_r, X - grid.i0, Y - grid.j0, Z)
     with NCDataset(str(SAMPLE)) as nc:
         nc.set_auto_maskandscale(False)
@@ -101,7 +111,11 @@ def test_field_uses_latest_forcing_frame(forcing):
         forcing.update(t)
         n = min(max(t // 6, 0), 3)
         ref = coords.sample3D(frames[n], X - grid.i0, Y - grid.j0, K, A, method="nearest")
-        assert np.allclose(forcing.field(X, Y, Z, "temp"), ref, atol=1e-5), t
+        field = forcing.field(X, Y, Z, "temp")
+        assert np.allclose(field, ref, atol=1e-5), t
+        # Lowest level at and below the bottom
+        J, I = np.round(Y[:40] - grid.j0).astype(int), np.round(X[:40] - grid.i0).astype(int)
+        assert np.allclose(field[:40], frames[n][0, J, I], atol=1e-5), t
 
 
 @pytest.fixture(scope="module")

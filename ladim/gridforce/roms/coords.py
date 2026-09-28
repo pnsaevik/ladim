@@ -269,6 +269,9 @@ def sample3D(F, X, Y, K, A, method="bilinear"):
     I = np.minimum(np.maximum(I, 0), F.shape[-1] - 1)
     J = np.minimum(np.maximum(J, 0), F.shape[-2] - 1)
 
+    # Below the lowest level (A == 1), use the lowest level
+    K = K - (A == 1)
+
     return F[K, J, I]
 
 
@@ -309,16 +312,20 @@ def _near_global(x, i0, n):
 
 @numba.njit(parallel=True, nogil=True, cache=True)
 def _z2s(X, Y, Z, i0, j0, H, C, S, hc, vtransform, monotonic, frac, K, A, J, I):
-    """K, A as in z2s (or A = K - A if frac). If J and I have the same
-    size as X, the (global) indices of the water column are stored there."""
+    """K, A as in z2s (or A = K - A if frac).
+
+    Cell mode (J and I have the same size as X): K is the level just above
+    the particle, or the lowest level if the particle is below it, and the
+    (global) indices of the water column are stored in J and I. A is not set.
+    """
     jmax, imax = H.shape
     kmax = C.size
-    store_ji = I.size == X.size
+    cell = I.size == X.size
     for p in prange(X.size):
         # Nearest rho point, rounded in subgrid coordinates as z2s
         i = _near(X[p] - i0, imax)
         j = _near(Y[p] - j0, jmax)
-        if store_ji:
+        if cell:
             I[p] = i + i0
             J[p] = j + j0
         h = H[j, i]
@@ -333,6 +340,9 @@ def _z2s(X, Y, Z, i0, j0, H, C, S, hc, vtransform, monotonic, frac, K, A, J, I):
             for kk in range(kmax):
                 if _zlevel(kk, h, C, S, hc, vtransform) < mz:
                     k += 1
+        if cell:
+            K[p] = min(k, kmax - 1)
+            continue
         k = min(max(k, 1), kmax - 1)
         zk = _zlevel(k, h, C, S, hc, vtransform)
         zk1 = _zlevel(k - 1, h, C, S, hc, vtransform)
@@ -398,9 +408,10 @@ class SCoordinate:
     def cell(self, X, Y, Z):
         """Grid cell of the particles
 
-        :return: (K, J, I), integer arrays. K is the s-level from z2s (the
-            level just above the particle), J and I are the global indices of
-            the nearest rho point within the subgrid.
+        :return: (K, J, I), integer arrays. K is the s-level just above the
+            particle, or the lowest level if the particle is below it
+            (constant extrapolation). J and I are the global indices of the
+            nearest rho point within the subgrid.
         """
         K, _, J, I = self._z2s(X, Y, Z, cell=True, frac=False)
         return K, J, I
