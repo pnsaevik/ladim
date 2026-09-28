@@ -13,6 +13,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.5.1] - 2026-09-28
+### Fixed
+- Updated deprecated CI scripts
+
+
 ## [2.5.0] - 2026-09-28
 ### Added
 - Tracker: Midpoint integration method (advection: RK2)
