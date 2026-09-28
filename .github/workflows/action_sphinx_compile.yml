@@ -16,6 +16,6 @@ jobs:
       - name: Check links
         run: python -m sphinx --verbose --builder linkcheck --nitpicky --fail-on-warning doc/source doc/linkcheck
       - name: Upload documentation
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: doc/build/

@@ -21,6 +21,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - The thread setting is applied to numba at model startup. Previously it
   was only applied by the ROMS gridforce, so the tracker and IBM kernels
   used all CPUs with other gridforce modules.
+### Fixed
+- CI: Updated the remaining GitHub actions that ran on Node.js 20
 
 
 ## [2.5.2] - 2026-09-28
