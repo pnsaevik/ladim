@@ -79,8 +79,7 @@ def forcing():
 
 
 def test_forcing_steps(forcing):
-    assert forcing.steps == [0, 6, 12, 18]
-    assert list(forcing.stepdiff) == [6, 6, 6]
+    assert forcing._steps.tolist() == [0, 6, 12, 18]
 
 
 def test_field_uses_latest_forcing_frame(forcing):

@@ -7,6 +7,5 @@ Compatibility layer. The implementation is in :mod:`ladim.gridforce.roms`
 forcing files).
 """
 
-from .roms.coords import s_stretch, sdepth, z2s  # noqa: F401
 from .roms.forcing import Forcing  # noqa: F401
 from .roms.grid import Grid  # noqa: F401

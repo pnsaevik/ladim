@@ -43,9 +43,8 @@ class Forcing:
         self._grid = grid = Grid(config)
         gconf = config["gridforce"]
         self.ibm_forcing = list(config.get("ibm_forcing", []) or [])
-        self.has_been_initialized = False
 
-        files = self.find_files(gconf)
+        files = _find_files(gconf)
         if not files:
             logger.error("No input file: {}".format(gconf["input_file"]))
             raise SystemExit(3)
@@ -78,6 +77,7 @@ class Forcing:
 
         self._t = None
         self._dense = {}
+        self._set_time(0)
 
     def _set_steps(self, config, all_frames):
         """Model time step of each forcing frame, and coverage checks"""
@@ -96,33 +96,12 @@ class Forcing:
         seconds = (all_frames - start_time) / np.timedelta64(1, "s")
         steps = np.trunc(seconds / float(config["dt"])).astype(np.int64)
         self._steps = steps
-        self.steps = steps.tolist()
-        self.stepdiff = np.diff(steps)
-
-    @staticmethod
-    def find_files(force_config):
-        """Find (and sort) the forcing file(s)"""
-        # Use unix-style filenames to provide consistency between windows and linux
-        first_file = force_config.get("first_file", "").replace("\\", "/")
-        last_file = force_config.get("last_file", "").replace("\\", "/")
-        files = sorted(f.replace("\\", "/") for f in glob.glob(force_config["input_file"]))
-        if first_file:
-            files = [f for f in files if f >= first_file]
-        if last_file:
-            files = [f for f in files if f <= last_file]
-        return files
 
     # ---------- Time stepping ----------
-
-    def _remaining_initialization(self):
-        self._set_time(-1)
-        self.has_been_initialized = True
 
     def update(self, t):
         """Update the fields to time step t"""
         logger.debug("Updating forcing, time step = {}".format(t))
-        if not self.has_been_initialized:
-            self._remaining_initialization()
         self._set_time(t)
 
     def _set_time(self, t):
@@ -219,8 +198,6 @@ class Forcing:
             base = name[:-3]
         else:
             raise AttributeError(name)
-        if self._t is None:
-            self._remaining_initialization()
         value = self._dense.get(name)
         if value is None:
             value = self._dense[name] = self._dense_array(name, base)
@@ -265,6 +242,19 @@ class Forcing:
 
     def close(self):
         self._dset.close()
+
+
+def _find_files(force_config):
+    """Find (and sort) the forcing file(s)"""
+    # Use unix-style filenames to provide consistency between windows and linux
+    first_file = force_config.get("first_file", "").replace("\\", "/")
+    last_file = force_config.get("last_file", "").replace("\\", "/")
+    files = sorted(f.replace("\\", "/") for f in glob.glob(force_config["input_file"]))
+    if first_file:
+        files = [f for f in files if f >= first_file]
+    if last_file:
+        files = [f for f in files if f <= last_file]
+    return files
 
 
 def _check_sorted(all_frames):
