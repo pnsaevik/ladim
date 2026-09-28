@@ -40,6 +40,12 @@ class Model:
         :return: An initialized Model class
         """
 
+        # Apply the thread setting to numba before any module is created,
+        # so that it also holds for kernels outside the ROMS gridforce.
+        # Imported here since gridforce is excluded from the API docs.
+        from ladim.gridforce import parallel
+        parallel.configure(config['forcing'].get('num_threads'))
+
         grid = Grid.create(**config['grid'])
         forc = Forcing.create(**config['forcing'])
         rele = Releaser.create(lonlat_converter=grid.ll2xy, **config['release'])
