@@ -356,7 +356,7 @@ class Forcing:
         self.dU = (self.Unew - U) / (t1 - t0)
         self.dV = (self.Vnew - V) / (t1 - t0)
 
-        if t0 == 0:
+        if t0 == 0 and t < 0:
             # Simulation start at first forcing time
             # Runge-Kutta needs dU and dV in this case as well
             # Synchronize with start time
@@ -375,7 +375,8 @@ class Forcing:
             self[name] = self._read_field(name, t0)
             self[name + "new"] = self._read_field(name, t1)
             self["d" + name] = (self[name + "new"] - self[name]) / (t1 - t0)
-            self[name] = self[name] - (t0 + 1) * self["d" + name]
+            if t < 0:  # Initialization: interpolate to time step -1
+                self[name] = self[name] - (t0 + 1) * self["d" + name]
         
         self._cache_t = t
         self._cache_dt = 1

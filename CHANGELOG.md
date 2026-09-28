@@ -13,6 +13,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.3.5] - 2026-09-28
+### Fixed
+- ROMS forcing: If the simulation skipped ahead to a later first release
+  time, scalar fields (e.g. temp, salt) were extrapolated to time step -1
+  until the next forcing time. If the skip ended within the first forcing
+  interval, neither velocity nor scalar fields were updated again.
+
 ## [2.3.4] - 2026-09-23
 ### Fixed
 - Error in loading intermediate u/v, introduced by commit a191e21
