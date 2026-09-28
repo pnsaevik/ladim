@@ -137,14 +137,22 @@ def random_walk(n=200_000, seed=1, steps=1, pid=None):
     return model.state['X'] / sigma, model.state['Y'] / sigma
 
 
-def test_diffusion_is_standard_normal():
+def test_diffusion_has_unit_variance():
     for d in random_walk():
         assert d.mean() == pytest.approx(0, abs=0.01)
         assert d.var() == pytest.approx(1, rel=0.02)
-        # Normal distribution: fraction within 1 and 2 std, kurtosis
-        assert np.mean(np.abs(d) < 1) == pytest.approx(0.6827, abs=0.005)
-        assert np.mean(np.abs(d) < 2) == pytest.approx(0.9545, abs=0.003)
-        assert np.mean(d ** 4) == pytest.approx(3, rel=0.05)
+        # Uniform distribution on [-sqrt(3), sqrt(3))
+        assert np.all(np.abs(d) <= 3 ** 0.5)
+        assert np.mean(np.abs(d) < 1) == pytest.approx(3 ** -0.5, abs=0.005)
+
+
+def test_diffusion_becomes_gaussian():
+    d, _ = random_walk(steps=10)
+    d /= 10 ** 0.5
+    assert d.var() == pytest.approx(1, rel=0.02)
+    # Normal distribution: fraction within 1 and 2 std
+    assert np.mean(np.abs(d) < 1) == pytest.approx(0.6827, abs=0.005)
+    assert np.mean(np.abs(d) < 2) == pytest.approx(0.9545, abs=0.003)
 
 
 def test_diffusion_is_uncorrelated():

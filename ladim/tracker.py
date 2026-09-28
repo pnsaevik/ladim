@@ -13,6 +13,13 @@ class Tracker:
     fourth order Runge-Kutta ("RK4") method, and horizontal diffusion as a
     random walk with constant diffusion coefficient. The arithmetic runs in
     multithreaded numba kernels, the velocity is sampled by the forcing module.
+
+    The random walk uses a counter-based generator: the random numbers of a
+    particle are a hash of its particle identifier and a key drawn from
+    ``np.random`` once per time step. Results are reproducible when the numpy
+    random seed is set (``numerics.seed``), independent of the number of
+    threads and the order of the particles. The random numbers are uniform
+    with variance 1, so the random walk is Gaussian after a few time steps.
     """
 
     METHODS = ("EF", "RK2", "RK4")
@@ -142,21 +149,23 @@ def _splitmix64(z):
 
 
 @numba.njit(inline="always")
-def _normal_pair(key, pid):
-    """Two independent standard normal deviates from (key, pid), Box-Muller"""
+def _noise_pair(key, pid):
+    """Two independent random numbers from (key, pid), mean 0 and variance 1
+
+    Uniform on [-sqrt(3), sqrt(3)), about 10 times cheaper than normal
+    deviates (Box-Muller).
+    """
     h1 = _splitmix64(key ^ _splitmix64(np.uint64(pid)))
     h2 = _splitmix64(h1)
-    u1 = (np.float64(h1 >> np.uint64(11)) + 1.0) * (1.0 / 9007199254740992.0)  # (0, 1]
-    u2 = np.float64(h2 >> np.uint64(11)) * (1.0 / 9007199254740992.0)  # [0, 1)
-    r = np.sqrt(-2.0 * np.log(u1))
-    theta = 2.0 * np.pi * u2
-    return r * np.cos(theta), r * np.sin(theta)
+    scale = 2.0 * np.sqrt(3.0) / 9007199254740992.0  # 2 * sqrt(3) / 2**53
+    return (np.float64(h1 >> np.uint64(11)) * scale - np.sqrt(3.0),
+            np.float64(h2 >> np.uint64(11)) * scale - np.sqrt(3.0))
 
 
 @numba.njit(parallel=True, nogil=True, cache=True)
 def _final(X0, Y0, U, V, dx, dy, AX, AY, accumulate, scale, pid, key, stddev,
            diffuse, X, Y):
-    """Final position X = X0 + scale * (AX + U / dx) + stddev / dx * N(0, 1)"""
+    """Final position X = X0 + scale * (AX + U / dx) + stddev / dx * noise"""
     for p in prange(X0.size):
         ux = U[p] / dx[p]
         vy = V[p] / dy[p]
@@ -166,7 +175,7 @@ def _final(X0, Y0, U, V, dx, dy, AX, AY, accumulate, scale, pid, key, stddev,
         x = X0[p] + scale * ux
         y = Y0[p] + scale * vy
         if diffuse:
-            nx, ny = _normal_pair(key, pid[p])
+            nx, ny = _noise_pair(key, pid[p])
             x += stddev / dx[p] * nx
             y += stddev / dy[p] * ny
         X[p] = x
