@@ -85,9 +85,7 @@ class Test_add_start_stop_step_to_release_table:
         step = result['release_step'].values
 
         assert start.tolist() == [0, 10, 30]
-        assert stop[0] == 10
-        assert stop[1] == 30
-        assert stop[2] > 1_000_000
+        assert stop.tolist() == [1, 11, 31]
         assert np.all(step > 1_000_000)
 
     def test_adds_columns_when_continuous_spec(self):
@@ -106,6 +104,16 @@ class Test_add_start_stop_step_to_release_table:
         assert stop[1] == 30
         assert stop[2] > 1_000_000
         assert step.tolist() == [7, 2, 3]
+
+    def test_mixed_spec_stops_at_next_release_time(self):
+        tab = pd.DataFrame({
+            'release_time': [0, 0, 10, 10],
+            'release_interval': [0, 2, 0, 0]
+            })
+        result = release.add_start_stop_step_to_release_table(tab)
+
+        stop = result['release_stop'].values
+        assert stop.tolist() == [10, 10, 11, 11]
 
     def test_can_convert_string_datetimes(self):
         tab = pd.DataFrame({'release_time': ['1970-01-01', '1970-01-02']})

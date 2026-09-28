@@ -98,7 +98,7 @@ class Releaser:
         df = add_start_stop_step_to_release_table(df)
         df = apply_warm_start_file(df, file=warm_start_file)
         df = replace_lonlat_in_release_table(df, lonlat_converter)
-        df = df.sort_values('release_time')
+        df = df.sort_values('release_start', kind='stable')
         releaser = Releaser(df)
 
         return releaser
@@ -259,6 +259,11 @@ def add_start_stop_step_to_release_table(df: pd.DataFrame) -> pd.DataFrame:
     unq_stop = np.roll(unq_start, -1)
     if len(unq_stop):  # The last stop time is set to be "infinitely" large
         unq_stop[-1] = np.iinfo(unq_stop.dtype).max
+    # Release times without repeats stop right after the first release, so that
+    # they are not re-scanned at every later time step
+    repeats = np.zeros(len(unq_start), dtype=bool)
+    np.logical_or.at(repeats, unq_start_inv, step != max_step)
+    unq_stop = np.where(repeats, unq_stop, unq_start + 1)
     stop = unq_stop[unq_start_inv]
 
     return df.assign(release_start=start, release_stop=stop, release_step=step)
@@ -451,7 +456,7 @@ def apply_warm_start_file(
         target_dtype = np.dtype(str(warm_df[colname].dtype))
         warm_df.loc[:, colname] = warm_start_values.astype(target_dtype)
     warm_df['release_start'] = new_start_time.astype(np.int64)
-    warm_df['release_stop'] = np.iinfo(df['release_stop'].dtype).max  # type: ignore
+    warm_df['release_stop'] = new_start_time.astype(np.int64) + 1
     warm_df['release_step'] = 60 * 60 * 24 * 366 * 1_000_000
 
     return pd.concat([warm_df, df_truncated], ignore_index=True)
