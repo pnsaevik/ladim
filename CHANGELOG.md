@@ -18,6 +18,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - The number of threads defaults to 1 if the environment variable
   LADIM_NUM_THREADS is not set (previously: all CPUs available to the
   process). The gridforce setting num_threads still takes precedence.
+- The thread setting is applied to numba at model startup. Previously it
+  was only applied by the ROMS gridforce, so the tracker and IBM kernels
+  used all CPUs with other gridforce modules.
 
 
 ## [2.5.2] - 2026-09-28

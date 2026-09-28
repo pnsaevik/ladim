@@ -6,6 +6,7 @@ from ladim.forcing import Forcing
 from ladim.state import State
 from ladim.tracker import Tracker
 from ladim.output import Output
+from ladim.gridforce import parallel
 
 
 class Model:
@@ -39,6 +40,10 @@ class Model:
         :param config: Configuration parameters for each submodule
         :return: An initialized Model class
         """
+
+        # Apply the thread setting to numba before any module is created,
+        # so that it also holds for kernels outside the ROMS gridforce
+        parallel.configure(config['forcing'].get('num_threads'))
 
         grid = Grid.create(**config['grid'])
         forc = Forcing.create(**config['forcing'])
