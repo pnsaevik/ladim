@@ -253,17 +253,27 @@ def add_start_stop_step_to_release_table(df: pd.DataFrame) -> pd.DataFrame:
     else:
         step = np.full(start.shape, fill_value=max_step, dtype='int64')
 
+    # The release table must be sorted by release time, and all releases at the
+    # same time must have the same release interval
+    if np.any(start[1:] < start[:-1]):
+        logger.critical("Release times are not sorted")
+        raise SystemExit(1)
+    same_start = start[1:] == start[:-1]
+    if np.any(same_start & (step[1:] != step[:-1])):
+        logger.critical("Releases at the same time have different release intervals")
+        raise SystemExit(1)
+
     # Define stop times for release events
     # Every time there is a new release, all previous continuous releases stop
-    unq_start, unq_start_inv = np.unique(start, return_inverse=True)
+    unq_start, unq_start_idx, unq_start_inv = np.unique(
+        start, return_index=True, return_inverse=True)
     unq_stop = np.roll(unq_start, -1)
     if len(unq_stop):  # The last stop time is set to be "infinitely" large
         unq_stop[-1] = np.iinfo(unq_stop.dtype).max
     # Release times without repeats stop right after the first release, so that
     # they are not re-scanned at every later time step
-    repeats = np.zeros(len(unq_start), dtype=bool)
-    np.logical_or.at(repeats, unq_start_inv, step != max_step)
-    unq_stop = np.where(repeats, unq_stop, unq_start + 1)
+    single = step[unq_start_idx] == max_step
+    unq_stop[single] = unq_start[single] + 1
     stop = unq_stop[unq_start_inv]
 
     return df.assign(release_start=start, release_stop=stop, release_step=step)
