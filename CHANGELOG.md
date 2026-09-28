@@ -13,6 +13,30 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.5.0] - 2026-09-28
+### Added
+- Tracker: Midpoint integration method (advection: RK2)
+### Changed
+- Tracker: The integrators (EF, RK2, RK4) are multithreaded numba kernels.
+  About 0.35 s per time step faster for 1.5 million particles.
+- Tracker: The random walk uses uniform random numbers with variance 1
+  (instead of normal deviates) from a counter-based generator: a hash of
+  the particle identifier and a key drawn from np.random each time step.
+  Runs are reproducible with numerics.seed, and independent of the number
+  of threads and the particle order. The random stream differs from
+  earlier versions, so results with diffusion are not bit-identical.
+- ibms.light.surface_light is a multithreaded numba kernel with the same
+  results. The numpy version is kept as surface_light_numpy.
+- The release schedule is sorted by release_start (stable sort)
+- The program exits with an error if the release times are not sorted, or
+  if releases at the same time have different release intervals
+### Fixed
+- Release groups without repeats (discrete releases and warm start
+  particles) were re-scanned at every later time step. With 1.5 million
+  particles in one discrete release this cost 0.34 s per time step.
+- Warm start particles were released 'mult' times when the release file
+  has a 'mult' column
+
 ## [2.4.0] - 2026-09-28
 ### Added
 - Chunk loader (ladim.gridforce.chunkloader): Reads and decodes HDF5 chunks
