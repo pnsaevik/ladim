@@ -64,17 +64,14 @@ def reference(method, velocity, X, Y, dx, dt, diffusion):
 
 
 @pytest.mark.parametrize("method", ["EF", "RK2", "RK4"])
-@pytest.mark.parametrize("diffusion", [0.0, 1.0])
-def test_matches_reference_implementation(method, diffusion):
+def test_matches_reference_implementation(method):
     rng = np.random.default_rng(0)
     X = rng.uniform(0, 1000, 1000)
     Y = rng.uniform(0, 1000, 1000)
     model = make_model(X, Y)
 
-    np.random.seed(1)
-    Tracker.create(method, diffusion).update(model)
-    np.random.seed(1)
-    expected = reference(method, rotation, X, Y, 100.0, 600, diffusion)
+    Tracker.create(method, 0).update(model)
+    expected = reference(method, rotation, X, Y, 100.0, 600, 0)
 
     assert np.allclose(model.state['X'], expected[0], rtol=0, atol=1e-10)
     assert np.allclose(model.state['Y'], expected[1], rtol=0, atol=1e-10)
@@ -122,19 +119,57 @@ def test_keeps_float32_state():
     assert model.state['X'].dtype == np.float32
 
 
-def test_diffusion_variance():
-    n = 200_000
+def still(x, y, t):
+    return np.zeros(len(x)), np.zeros(len(x))
+
+
+def random_walk(n=200_000, seed=1, steps=1, pid=None):
+    """Displacements (in standard deviations) of a pure random walk"""
     diffusion, dt, dx = 2.0, 600, 100.0
-
-    def still(x, y, t):
-        return np.zeros(len(x)), np.zeros(len(x))
-
     model = make_model(np.zeros(n), np.zeros(n), velocity=still, dx=dx, dt=dt)
-    Tracker.create("RK4", diffusion).update(model)
-    expected_var = 2 * diffusion * dt / dx ** 2
-    for k in ('X', 'Y'):
-        assert model.state[k].mean() == pytest.approx(0, abs=0.01)
-        assert model.state[k].var() == pytest.approx(expected_var, rel=0.02)
+    if pid is not None:
+        model.state['pid'] = pid
+    np.random.seed(seed)
+    tracker = Tracker.create("RK4", diffusion)
+    for _ in range(steps):
+        tracker.update(model)
+    sigma = (2 * diffusion * dt) ** 0.5 / dx
+    return model.state['X'] / sigma, model.state['Y'] / sigma
+
+
+def test_diffusion_is_standard_normal():
+    for d in random_walk():
+        assert d.mean() == pytest.approx(0, abs=0.01)
+        assert d.var() == pytest.approx(1, rel=0.02)
+        # Normal distribution: fraction within 1 and 2 std, kurtosis
+        assert np.mean(np.abs(d) < 1) == pytest.approx(0.6827, abs=0.005)
+        assert np.mean(np.abs(d) < 2) == pytest.approx(0.9545, abs=0.003)
+        assert np.mean(d ** 4) == pytest.approx(3, rel=0.05)
+
+
+def test_diffusion_is_uncorrelated():
+    dx, dy = random_walk()
+    assert np.corrcoef(dx, dy)[0, 1] == pytest.approx(0, abs=0.01)
+    # Neighbouring particle identifiers
+    assert np.corrcoef(dx[1:], dx[:-1])[0, 1] == pytest.approx(0, abs=0.01)
+    # Consecutive time steps: variance grows linearly
+    dx2, _ = random_walk(steps=2)
+    assert dx2.var() == pytest.approx(2, rel=0.02)
+
+
+def test_diffusion_is_reproducible():
+    a = random_walk(n=1000, seed=3)
+    b = random_walk(n=1000, seed=3)
+    c = random_walk(n=1000, seed=4)
+    assert np.array_equal(a[0], b[0]) and np.array_equal(a[1], b[1])
+    assert not np.allclose(a[0], c[0])
+
+
+def test_diffusion_follows_particle_identifier():
+    pid = np.arange(1000)
+    a, _ = random_walk(n=1000, pid=pid)
+    b, _ = random_walk(n=1000, pid=pid[::-1].copy())
+    assert np.array_equal(a, b[::-1])
 
 
 def test_unknown_method():

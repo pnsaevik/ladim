@@ -37,8 +37,10 @@ class Tracker:
         all_active = bool(np.all(act))
         if all_active:
             X, Y, Z = state['X'], state['Y'], state['Z']
+            pid = state['pid']
         else:
             X, Y, Z = state['X'][act], state['Y'][act], state['Z'][act]
+            pid = state['pid'][act]
         if X.size == 0:
             return
         X0 = np.ascontiguousarray(X, dtype=np.float64)
@@ -51,7 +53,8 @@ class Tracker:
             return (np.ascontiguousarray(u, dtype=np.float64),
                     np.ascontiguousarray(v, dtype=np.float64))
 
-        X1, Y1 = self.integrate(velocity, X0, Y0, dx, dy, dt)
+        pid = np.ascontiguousarray(pid, dtype=np.int64)
+        X1, Y1 = self.integrate(velocity, X0, Y0, dx, dy, dt, pid)
 
         # Land, boundary treatment. Do not move the particles
         should_move = np.ascontiguousarray(grid.atsea(X1, Y1), dtype=np.bool_)
@@ -66,7 +69,7 @@ class Tracker:
             state['X'][act] = X0
             state['Y'][act] = Y0
 
-    def integrate(self, velocity, X0, Y0, dx, dy, dt):
+    def integrate(self, velocity, X0, Y0, dx, dy, dt, pid):
         """New positions after one time step
 
         :param velocity: Function (x, y, tstep) -> (u, v), velocity [m/s] at
@@ -74,6 +77,7 @@ class Tracker:
         :param X0, Y0: Initial positions [grid units], float64 arrays
         :param dx, dy: Grid spacing [m] at the initial positions
         :param dt: Time step [s]
+        :param pid: Particle identifiers (int64), for the random walk
         :return: X1, Y1
         """
         n = X0.size
@@ -97,17 +101,15 @@ class Tracker:
             _stage(X0, Y0, U, V, dx, dy, dt, X1, Y1, AX, AY, 2.0, True, False)
             U, V = velocity(X1, Y1, 1.0)
 
-        # Random walk
+        # Random walk, with a new random key for each time step
+        key = np.uint64(0)
         if self.diffusion:
-            noise = np.random.normal(size=2 * n)
-            NX, NY = noise[:n], noise[n:]
-        else:
-            NX = NY = np.empty(0)
+            key = np.uint64(np.random.randint(0, 2**63, dtype=np.int64))
         stddev = (2 * self.diffusion) ** 0.5 * dt ** 0.5
 
         scale = dt / 6.0 if self.method == "RK4" else dt
         _final(X0, Y0, U, V, dx, dy, AX, AY, self.method == "RK4", scale,
-               NX, NY, stddev, bool(self.diffusion), X1, Y1)
+               pid, key, stddev, bool(self.diffusion), X1, Y1)
         return X1, Y1
 
 
@@ -131,10 +133,30 @@ def _stage(X0, Y0, U, V, dx, dy, h, X, Y, AX, AY, w, accumulate, first):
                 AY[p] += w * vy
 
 
+@numba.njit(inline="always")
+def _splitmix64(z):
+    z = z + np.uint64(0x9E3779B97F4A7C15)
+    z = (z ^ (z >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
+    z = (z ^ (z >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
+    return z ^ (z >> np.uint64(31))
+
+
+@numba.njit(inline="always")
+def _normal_pair(key, pid):
+    """Two independent standard normal deviates from (key, pid), Box-Muller"""
+    h1 = _splitmix64(key ^ _splitmix64(np.uint64(pid)))
+    h2 = _splitmix64(h1)
+    u1 = (np.float64(h1 >> np.uint64(11)) + 1.0) * (1.0 / 9007199254740992.0)  # (0, 1]
+    u2 = np.float64(h2 >> np.uint64(11)) * (1.0 / 9007199254740992.0)  # [0, 1)
+    r = np.sqrt(-2.0 * np.log(u1))
+    theta = 2.0 * np.pi * u2
+    return r * np.cos(theta), r * np.sin(theta)
+
+
 @numba.njit(parallel=True, nogil=True, cache=True)
-def _final(X0, Y0, U, V, dx, dy, AX, AY, accumulate, scale, NX, NY, stddev,
+def _final(X0, Y0, U, V, dx, dy, AX, AY, accumulate, scale, pid, key, stddev,
            diffuse, X, Y):
-    """Final position X = X0 + scale * (AX + U / dx) + stddev / dx * NX"""
+    """Final position X = X0 + scale * (AX + U / dx) + stddev / dx * N(0, 1)"""
     for p in prange(X0.size):
         ux = U[p] / dx[p]
         vy = V[p] / dy[p]
@@ -144,8 +166,9 @@ def _final(X0, Y0, U, V, dx, dy, AX, AY, accumulate, scale, NX, NY, stddev,
         x = X0[p] + scale * ux
         y = Y0[p] + scale * vy
         if diffuse:
-            x += stddev / dx[p] * NX[p]
-            y += stddev / dy[p] * NY[p]
+            nx, ny = _normal_pair(key, pid[p])
+            x += stddev / dx[p] * nx
+            y += stddev / dy[p] * ny
         X[p] = x
         Y[p] = y
 
