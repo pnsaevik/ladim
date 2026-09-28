@@ -138,6 +138,63 @@ def sdepth(H, Hc, C, stagger="rho", Vtransform=1):
 
 
 
+def z2s(z_rho, X, Y, Z):
+    """
+    Find s-level and coefficients for vertical interpolation.
+
+    :param z_rho: 3D array with vertical s-coordinate structure at rho-points.
+    :param X: 1D array, horizontal position in grid coordinates.
+    :param Y: 1D array, horizontal position in grid coordinates.
+    :param Z: 1D array, particle depth [meters, positive].
+
+    :return:  (K, A), where K is integer and A is float, both 1D arrays.
+
+    Notes
+    -----
+    With:
+
+    * ``1 <= K < kmax = z_rho.shape[0]``
+    * ``z_rho[K-1] < -Z < z_rho[K]`` for ``1 < K < kmax - 1``
+    * ``-Z < z_rho[1]`` for ``K = 1``
+    * ``z_rho[-1] < -Z`` for ``K = kmax - 1``
+    * ``0.0 <= A <= 1``
+
+    Interior linear interpolation::
+
+        A * z_rho[K - 1] + (1 - A) * z_rho[K] = -Z
+        for z_rho[0] < -Z < z_rho[-1]
+
+    Extend constant below lowest::
+
+        A * z_rho[K - 1] + (1 - A) * z_rho[K] = z_rho[0]
+        for -Z < z_rho[0]  (K=1, A=1)
+
+    Extend constant above highest::
+
+        A * z_rho[K - 1] + (1 - A) * z_rho[K] = z_rho[-1]
+        for -Z > z_rho[-1]  (K=kmax-1, A=0)
+    """
+
+    kmax = z_rho.shape[0]  # Number of vertical levels
+
+    # Find rho-based horizontal grid cell (rho-point)
+    I = np.around(X).astype("int")
+    J = np.around(Y).astype("int")
+
+    # Constrain to valid indices
+    I = np.minimum(np.maximum(I, 0), z_rho.shape[-1] - 1)
+    J = np.minimum(np.maximum(J, 0), z_rho.shape[-2] - 1)
+
+    # Vectorized searchsorted
+    K = np.sum(z_rho[:, J, I] < -Z, axis=0)
+    K = K.clip(1, kmax - 1)
+
+    A = (z_rho[K, J, I] + Z) / (z_rho[K, J, I] - z_rho[K - 1, J, I])
+    A = A.clip(0, 1)  # Extend constantly
+
+    return K, A
+
+
 @numba.njit(inline="always")
 def _zlevel(k, h, C, S, hc, vtransform):
     """Depth (negative) of s-level k in a column of bottom depth h"""
@@ -168,13 +225,13 @@ def _near_global(x, i0, n):
 
 @numba.njit(parallel=True, nogil=True, cache=True)
 def _z2s(X, Y, Z, i0, j0, H, C, S, hc, vtransform, monotonic, frac, K, A, J, I):
-    """K, A as in legacy.z2s (or A = K - A if frac). If J and I have the same
+    """K, A as in z2s (or A = K - A if frac). If J and I have the same
     size as X, the (global) indices of the water column are stored there."""
     jmax, imax = H.shape
     kmax = C.size
     store_ji = I.size == X.size
     for p in prange(X.size):
-        # Nearest rho point, rounded in subgrid coordinates as legacy.z2s
+        # Nearest rho point, rounded in subgrid coordinates as z2s
         i = _near(X[p] - i0, imax)
         j = _near(Y[p] - j0, jmax)
         if store_ji:
@@ -245,7 +302,7 @@ class SCoordinate:
         return len(self.C)
 
     def z2s(self, X, Y, Z):
-        """s-level and weight for vertical interpolation (see roms.legacy.z2s)
+        """s-level and weight for vertical interpolation (see z2s)
 
         :return: (K, A), integer and float arrays with 1 <= K <= N-1 and
             0 <= A <= 1, such that -Z = A * z_r[K-1] + (1-A) * z_r[K] in the

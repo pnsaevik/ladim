@@ -104,11 +104,6 @@ class Forcing:
         self.steps = steps.tolist()
         self.stepdiff = np.diff(steps)
 
-        # Forcing file and frame of each forcing step
-        ds = self._dset
-        self.file_idx = {s: ds.files[f] for s, f in zip(self.steps, ds.file_of_frame)}
-        self.frame_idx = {s: int(n) for s, n in zip(self.steps, ds.index_in_file)}
-
     @staticmethod
     def find_files(force_config):
         """Find (and sort) the forcing file(s)"""

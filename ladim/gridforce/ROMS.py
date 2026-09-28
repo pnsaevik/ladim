@@ -7,9 +7,6 @@ Compatibility layer. The implementation is in :mod:`ladim.gridforce.roms`
 forcing files).
 """
 
-from ladim.sample import sample2D, bilin_inv  # noqa: F401
-
-from .roms.coords import s_stretch, sdepth  # noqa: F401
+from .roms.coords import s_stretch, sdepth, z2s  # noqa: F401
 from .roms.forcing import Forcing  # noqa: F401
 from .roms.grid import Grid  # noqa: F401
-from .roms.legacy import sample3D, sample3DUV, z2s  # noqa: F401

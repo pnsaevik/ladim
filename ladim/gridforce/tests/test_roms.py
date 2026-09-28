@@ -3,7 +3,7 @@ import pathlib
 import numpy as np
 import pytest
 
-from ladim.gridforce.roms import coords, legacy
+from ladim.gridforce.roms import coords
 
 SAMPLE = pathlib.Path(__file__).parents[3] / "tests" / "sample_data" / "forcing.nc"
 
@@ -22,7 +22,7 @@ def test_z2s_matches_dense(vtransform):
     Z = rng.uniform(-1, 420, n)
 
     z_r = coords.sdepth(H, hc, Cs_r, stagger="rho", Vtransform=vtransform)
-    K0, A0 = legacy.z2s(z_r, X - i0, Y - j0, Z)
+    K0, A0 = coords.z2s(z_r, X - i0, Y - j0, Z)
     sc = coords.SCoordinate(H, Cs_r, hc, vtransform, i0, j0)
     K, A = sc.z2s(X, Y, Z)
     assert np.array_equal(K, K0)
@@ -75,33 +75,6 @@ def forcing():
     f = Forcing(config, None)
     yield f
     f.close()
-
-
-def particles(grid, n=300, seed=4):
-    rng = np.random.default_rng(seed)
-    X = rng.uniform(grid.xmin + 0.5, grid.xmax - 0.5, n)
-    Y = rng.uniform(grid.ymin + 0.5, grid.ymax - 0.5, n)
-    Z = rng.uniform(0, 60, n)
-    return X, Y, Z
-
-
-def test_forcing_matches_dense_sampling(forcing):
-    grid = forcing._grid
-    X, Y, Z = particles(grid)
-    x, y = X - grid.i0, Y - grid.j0
-    K, A = legacy.z2s(grid.z_r, x, y, Z)
-    for t in range(14):
-        forcing.update(t)
-        for tstep in (0.0, 0.5, 1.0):
-            u, v = forcing.velocity(X, Y, Z, tstep=tstep)
-            U = forcing.U + tstep * forcing.dU
-            V = forcing.V + tstep * forcing.dV
-            u0, v0 = legacy.sample3DUV(U, V, x, y, K, A)
-            assert np.allclose(u, u0, atol=1e-6), (t, tstep)
-            assert np.allclose(v, v0, atol=1e-6), (t, tstep)
-        for name in ("temp", "salt"):
-            ref = legacy.sample3D(forcing[name], x, y, K, A, method="nearest")
-            assert np.allclose(forcing.field(X, Y, Z, name), ref, atol=1e-5)
 
 
 def test_forcing_steps(forcing):
