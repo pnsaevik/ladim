@@ -6,7 +6,7 @@ import pytest
 
 from ladim.gridforce.roms import coords
 
-SAMPLE = pathlib.Path(__file__).parents[3] / "tests" / "sample_data" / "forcing.nc"
+SAMPLE = pathlib.Path(__file__).parent / "sample_data" / "forcing.nc"
 
 
 @pytest.mark.parametrize("vtransform", [1, 2])
