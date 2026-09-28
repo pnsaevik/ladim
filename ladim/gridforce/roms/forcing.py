@@ -49,7 +49,6 @@ class Forcing:
 
         self._grid = grid = Grid(config)
         gconf = config["gridforce"]
-        self.ibm_forcing = list(config.get("ibm_forcing", []) or [])
         self._interpolation = {
             **DEFAULT_INTERPOLATION, **(gconf.get("interpolation") or {})
         }
@@ -86,7 +85,6 @@ class Forcing:
         self._mask_v[grid.Jv, grid.Iv] = grid.Mv
 
         self._t = None
-        self._dense = {}
         self._set_time(0)
 
     def _set_steps(self, config, all_frames):
@@ -126,7 +124,6 @@ class Forcing:
             logger.info("Forcing frame {} at time step {}".format(n, steps[n]))
         self._n = n
         self._t = t
-        self._dense.clear()
         self._prefetch()
 
     def _velocity_frames(self, tstep=0.0):
@@ -241,63 +238,6 @@ class Forcing:
         if var is None:
             var = self._fields[name] = self._dset[name]
         return var
-
-    # ---------- Dense arrays (for code that uses the full fields) ----------
-
-    def __getattr__(self, name):
-        # Only called when normal attribute lookup fails
-        if name.startswith("_"):
-            raise AttributeError(name)
-        names = ["U", "V"] + self.ibm_forcing
-        if name in names:
-            base = name
-        elif name[:1] == "d" and name[1:] in names:
-            base = name[1:]
-        elif name[-3:] == "new" and name[:-3] in names:
-            base = name[:-3]
-        else:
-            raise AttributeError(name)
-        value = self._dense.get(name)
-        if value is None:
-            value = self._dense[name] = self._dense_array(name, base)
-        return value
-
-    def _dense_array(self, name, base):
-        """Subgrid array of U, V, an IBM field, its next frame ('new') or its
-        time derivative per time step ('d')"""
-        grid = self._grid
-        n0 = self._n0
-        dt = self._steps[n0 + 1] - self._steps[n0]
-        if base in ("U", "V"):
-            var, region, mask = (
-                (self._u, (slice(None), grid.Ju, grid.Iu), grid.Mu) if base == "U"
-                else (self._v, (slice(None), grid.Jv, grid.Iv), grid.Mv)
-            )
-            now = self._velocity_frames()
-        else:
-            var = self._field(base)
-            region = (slice(None),) * (len(var.shape) - 2) + (grid.J, grid.I)
-            mask = None
-            now = self._nf
-
-        def frame(f):
-            F = var.read(f, region)
-            return F * mask.astype(F.dtype) if mask is not None else F
-
-        if name == "d" + base:
-            return (frame(n0 + 1) - frame(n0)) / dt
-        if name == base + "new":
-            if base in ("U", "V"):
-                return frame(n0 + 1)
-            return frame(min(self._nf + 1, len(self._steps) - 1))
-        return frame(now)
-
-    # Allow item notation
-    def __setitem__(self, key, value):
-        setattr(self, key, value)
-
-    def __getitem__(self, key):
-        return getattr(self, key)
 
     def close(self):
         self._dset.close()
