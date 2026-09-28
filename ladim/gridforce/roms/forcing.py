@@ -11,8 +11,10 @@ Model time step t lies in the forcing interval [t0, t1) of two consecutive
 forcing frames. Velocities are linearly interpolated in time between the
 frames.
 
-Scalar fields (``field``) are not interpolated in time. They are taken from
-the latest forcing frame at or before t (the first frame if t is before it).
+Other fields (``field``) are by default not interpolated: they are taken
+from the latest forcing frame at or before t (the first frame if t is before
+it), and from the nearest grid point. Linear interpolation in time, depth and
+horizontally can be chosen for each variable (see ``Forcing.field``).
 
 Prefetching
 -----------
@@ -27,9 +29,14 @@ import numpy as np
 
 from .. import parallel
 from ..chunkloader import Dataset, read_times
+from .coords import nearest_cell
 from .grid import Grid
 
 logger = logging.getLogger(__name__)
+
+# Default interpolation of forcing fields (letters of "tzyx", see
+# Forcing.field). Variables that are not listed are not interpolated.
+DEFAULT_INTERPOLATION = {"w": "tz"}
 
 
 class Forcing:
@@ -43,6 +50,9 @@ class Forcing:
         self._grid = grid = Grid(config)
         gconf = config["gridforce"]
         self.ibm_forcing = list(config.get("ibm_forcing", []) or [])
+        self._interpolation = {
+            **DEFAULT_INTERPOLATION, **(gconf.get("interpolation") or {})
+        }
 
         files = _find_files(gconf)
         if not files:
@@ -168,14 +178,63 @@ class Forcing:
         v = self._v.interp([k, jv, iv], frames, linear="tzyx", mask=self._mask_v)
         return u, v
 
-    def field(self, X, Y, Z, name):
-        """Scalar field in the grid cell of the particles
+    def field(self, X, Y, Z, name, linear=None):
+        """Forcing field at particle positions
 
-        The value at the nearest rho point, at the s-level just above the
-        particle, without interpolation, from the latest forcing frame.
+        The field may be defined at rho or w levels (vertical dimension s_rho
+        or s_w), at rho, u or v points horizontally, or be two-dimensional.
+        Z is the depth below the sea surface (positive), converted to an
+        s-level in the nearest water column.
+
+        Along dimensions that are not interpolated linearly, the value is
+        taken from the forcing frame at or before the model time, the level
+        just above the particle (the lowest level if the particle is below
+        it) and the nearest horizontal grid point. Linear interpolation uses
+        constant extrapolation outside the levels.
+
+        :param name: Name of the variable in the forcing files
+        :param linear: Dimensions to interpolate linearly, any combination of
+            the letters "tzyx" (time, depth, y, x). The default is taken from
+            the gridforce setting ``interpolation`` ({name: letters}), with
+            built-in default "tz" for w and "" (none) for other variables.
         """
-        K, J, I = self._grid.scoord.cell(X, Y, Z)
-        return self._field(name).interp([K, J, I], self._nf)
+        if linear is None:
+            linear = self._interpolation.get(name, "")
+        if set(linear) - set("tzyx"):
+            raise ValueError(f"Invalid interpolation letters: {linear}")
+        grid = self._grid
+        var = self._field(name)
+        spatial_dims = var.dims[len(var.dims) - len(var.shape):]
+        X = np.asarray(X, dtype=np.float64)
+        Y = np.asarray(Y, dtype=np.float64)
+
+        # Horizontal staggering: u points at x = i + 1/2, v points at y = j + 1/2
+        dx = 0.5 if spatial_dims[-1].endswith("_u") else 0.0
+        dy = 0.5 if spatial_dims[-2].endswith("_v") else 0.0
+
+        # Vertical level, and the nearest rho point if it comes for free
+        J = I = None
+        position = []
+        if len(var.shape) == 3:
+            scoord = grid.scoord_w if spatial_dims[0] == "s_w" else grid.scoord
+            if "z" in linear:
+                position.append(scoord.level(X, Y, Z))
+            else:
+                K, J, I = scoord.cell(X, Y, Z)
+                position.append(K)
+
+        # Horizontal position
+        if "x" in linear or "y" in linear or dx or dy:
+            j = Y - dy if "y" in linear else np.rint(Y - dy).astype(np.int64)
+            i = X - dx if "x" in linear else np.rint(X - dx).astype(np.int64)
+        else:
+            if J is None:
+                J, I = _nearest_rho(grid, X, Y)
+            j, i = J, I
+        position += [j, i]
+
+        frame = self._velocity_frames() if "t" in linear else self._nf
+        return var.interp(position, frame, linear=linear)
 
     def _field(self, name):
         var = self._fields.get(name)
@@ -242,6 +301,11 @@ class Forcing:
 
     def close(self):
         self._dset.close()
+
+
+def _nearest_rho(grid, X, Y):
+    """Global indices (J, I) of the nearest rho point within the subgrid"""
+    return nearest_cell(X, Y, grid.i0, grid.j0, grid.H.shape)
 
 
 def _find_files(force_config):

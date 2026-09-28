@@ -52,8 +52,13 @@ class Grid:
             ncid.set_auto_mask(False)
             self._read_grid(ncid, gconf)
 
+        # Vertical coordinates at rho and w levels
         self.scoord = coords.SCoordinate(
             self.H, self.Cs_r, self.hc, self.Vtransform, self.i0, self.j0
+        )
+        self.scoord_w = coords.SCoordinate(
+            self.H, self.Cs_w, self.hc, self.Vtransform, self.i0, self.j0,
+            stagger="w",
         )
         self._M8 = np.ascontiguousarray(self.M, dtype=np.int8)
         self._z_r = None

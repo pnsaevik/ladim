@@ -368,22 +368,30 @@ def _count_nonmonotonic(H, C, S, hc, vtransform):
 
 
 class SCoordinate:
-    """Vertical s-coordinate at rho points of a (sub)grid
+    """Vertical s-coordinate of a (sub)grid, at rho or w levels
 
     :param H: Bottom depth, 2-D subgrid array
-    :param C: Stretching curve at rho points (Cs_r)
+    :param C: Stretching curve (Cs_r for rho levels, Cs_w for w levels)
     :param hc: Critical depth
     :param vtransform: 1 (Song and Haidvogel) or 2 (Shchepetkin)
     :param i0, j0: Global indices of subgrid point [0, 0]
+    :param stagger: "rho" (levels in the middle of the layers) or "w" (levels
+        at the layer interfaces, from the bottom to the surface)
     """
 
-    def __init__(self, H, C, hc, vtransform, i0=0, j0=0):
+    def __init__(self, H, C, hc, vtransform, i0=0, j0=0, stagger="rho"):
         if int(vtransform) not in (1, 2):
             raise ValueError("Unknown Vtransform")
         self.H = np.ascontiguousarray(H, dtype=np.float64)
         self.C = np.ascontiguousarray(C, dtype=np.float64)
         n = len(self.C)
-        self.S = -1.0 + (0.5 + np.arange(n)) / n
+        if stagger == "rho":
+            self.S = -1.0 + (0.5 + np.arange(n)) / n
+        elif stagger == "w":
+            self.S = np.linspace(-1.0, 0.0, n)
+        else:
+            raise ValueError("stagger must be 'rho' or 'w'")
+        self.stagger = stagger
         self.hc = float(hc)
         self.vtransform = int(vtransform)
         self.i0 = int(i0)
@@ -399,8 +407,9 @@ class SCoordinate:
         """s-level and weight for vertical interpolation (see z2s)
 
         :return: (K, A), integer and float arrays with 1 <= K <= N-1 and
-            0 <= A <= 1, such that -Z = A * z_r[K-1] + (1-A) * z_r[K] in the
-            nearest water column (with constant extension outside the levels).
+            0 <= A <= 1, such that -Z = A * z[K-1] + (1-A) * z[K] in the
+            nearest water column, where z are the level depths (with constant
+            extension outside the levels).
         """
         K, A, _, _ = self._z2s(X, Y, Z, cell=False, frac=False)
         return K, A
@@ -429,7 +438,7 @@ class SCoordinate:
         return K, A, J, I
 
     def level(self, X, Y, Z):
-        """Fractional s-level index of depth Z (0 = lowest rho level)
+        """Fractional s-level index of depth Z (0 = lowest level)
 
         Linear interpolation between levels floor(k) and floor(k)+1 at this
         index gives the same result as the (K, A) weights from z2s.
@@ -440,6 +449,30 @@ class SCoordinate:
 # --------------------------------------------------------------------------
 # Horizontal
 # --------------------------------------------------------------------------
+
+@numba.njit(parallel=True, nogil=True, cache=True)
+def _nearest_cell(X, Y, i0, j0, imax, jmax, J, I):
+    for p in prange(X.size):
+        I[p] = _near(X[p] - i0, imax) + i0
+        J[p] = _near(Y[p] - j0, jmax) + j0
+
+
+def nearest_cell(X, Y, i0, j0, shape):
+    """Global indices (J, I) of the nearest rho point within a subgrid
+
+    The coordinates are rounded (half to even) in subgrid coordinates, as in
+    SCoordinate.cell.
+
+    :param shape: (jmax, imax) of the subgrid
+    """
+    X, Y = (np.ascontiguousarray(v, dtype=np.float64).reshape(-1)
+            for v in np.broadcast_arrays(X, Y))
+    J = np.empty(X.size, dtype=np.int64)
+    I = np.empty(X.size, dtype=np.int64)
+    jmax, imax = shape
+    _nearest_cell(X, Y, i0, j0, imax, jmax, J, I)
+    return J, I
+
 
 @numba.njit(parallel=True, nogil=True, cache=True)
 def _lookup(F, X, Y, i0, j0, imax, jmax, out):

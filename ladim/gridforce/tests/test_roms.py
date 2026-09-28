@@ -118,6 +118,110 @@ def test_field_uses_latest_forcing_frame(forcing):
         assert np.allclose(field[:40], frames[n][0, J, I], atol=1e-5), t
 
 
+@pytest.mark.parametrize("vtransform", [1, 2])
+def test_w_levels_match_dense(vtransform):
+    rng = np.random.default_rng(9)
+    H = rng.uniform(25, 400, size=(12, 17))  # Monotonic levels (H > hc)
+    Cs_w = coords.s_stretch(30, 6.0, 0.5, stagger="w")
+    hc = 20.0
+    i0, j0 = 3, 5
+    n = 2000
+    X = rng.uniform(i0 - 2, i0 + 18, n)
+    Y = rng.uniform(j0 - 2, j0 + 13, n)
+    Z = rng.uniform(-1, 420, n)
+
+    z_w = coords.sdepth(H, hc, Cs_w, stagger="w", Vtransform=vtransform)
+    sc = coords.SCoordinate(H, Cs_w, hc, vtransform, i0, j0, stagger="w")
+    K0, A0 = coords.z2s(z_w, X - i0, Y - j0, Z)
+    K, A = sc.z2s(X, Y, Z)
+    assert np.array_equal(K, K0)
+    assert np.allclose(A, A0, rtol=0, atol=1e-12)
+
+    Kc, J, I = sc.cell(X, Y, Z)
+    count = np.sum(z_w[:, J - j0, I - i0] < -Z, axis=0)
+    assert np.array_equal(Kc, np.minimum(count, len(Cs_w) - 1))
+
+
+def _particles(grid, n=300, seed=10):
+    rng = np.random.default_rng(seed)
+    X = rng.uniform(grid.xmin + 0.5, grid.xmax - 0.5, n)
+    Y = rng.uniform(grid.ymin + 0.5, grid.ymax - 0.5, n)
+    Z = rng.uniform(0, 60, n)
+    Z[:20] = grid.sample_depth(X[:20], Y[:20])  # At the bottom
+    Z[20:40] = 1e4  # Far below the bottom
+    return X, Y, Z
+
+
+def _frames(name, J, I):
+    """Decoded values of a forcing variable at grid points (J, I)"""
+    from netCDF4 import Dataset as NCDataset
+
+    with NCDataset(str(SAMPLE)) as nc:
+        nc.set_auto_maskandscale(False)
+        v = nc.variables[name]
+        raw = v[:][..., J, I]
+        return getattr(v, "add_offset", 0) + getattr(v, "scale_factor", 1) * raw
+
+
+def test_field_on_w_levels(forcing):
+    grid = forcing._grid
+    X, Y, Z = _particles(grid)
+    J = np.round(Y - grid.j0).astype(int)
+    I = np.round(X - grid.i0).astype(int)
+    z_w = grid.z_w[:, J, I]
+    W = _frames("w", J + grid.j0, I + grid.i0)  # (time, s_w, particle)
+    K, A = coords.z2s(grid.z_w, X - grid.i0, Y - grid.j0, Z)
+    level = np.minimum(np.sum(z_w < -Z, axis=0), grid.N)
+    p = np.arange(len(X))
+
+    for t in range(14):
+        forcing.update(t)
+        # Default for w: linear in time and depth, nearest horizontally
+        n0 = min(t // 6, 2)
+        wt = (t - 6 * n0) / 6
+        F = (1 - wt) * W[n0] + wt * W[n0 + 1]
+        ref = A * F[K - 1, p] + (1 - A) * F[K, p]
+        assert np.allclose(forcing.field(X, Y, Z, "w"), ref, atol=1e-6), t
+
+        # No interpolation: latest frame, level just above (or the lowest)
+        ref = W[min(t // 6, 3)][level, p]
+        assert np.allclose(forcing.field(X, Y, Z, "w", linear=""), ref, atol=1e-6), t
+
+
+def test_field_at_u_points(forcing):
+    grid = forcing._grid
+    X, Y, Z = _particles(grid)
+    forcing.update(0)
+    K, _, _ = grid.scoord.cell(X, Y, Z)
+    J = np.rint(Y).astype(int)
+    I = np.rint(X - 0.5).astype(int)  # u point i is at x = i + 1/2
+    U = _frames("u", J, I)
+    ref = U[0][K, np.arange(len(X))]
+    assert np.allclose(forcing.field(X, Y, Z, "u"), ref, atol=1e-6)
+
+
+def test_interpolation_setting():
+    from ladim.gridforce.ROMS import Forcing
+
+    config = dict(
+        gridforce=dict(input_file=str(SAMPLE), num_threads=2,
+                       interpolation=dict(temp="tz", w="")),
+        ibm_forcing=[],
+        start_time="2015-09-07T01:00:00",
+        stop_time="2015-09-07T04:00:00",
+        dt=600,
+    )
+    f = Forcing(config, None)
+    X, Y, Z = _particles(f._grid)
+    f.update(3)
+    assert np.array_equal(f.field(X, Y, Z, "temp"), f.field(X, Y, Z, "temp", linear="tz"))
+    assert np.array_equal(f.field(X, Y, Z, "w"), f.field(X, Y, Z, "w", linear=""))
+    assert not np.allclose(f.field(X, Y, Z, "w"), f.field(X, Y, Z, "w", linear="tz"))
+    with pytest.raises(ValueError):
+        f.field(X, Y, Z, "w", linear="q")
+    f.close()
+
+
 @pytest.fixture(scope="module")
 def dense_fields(tmp_path_factory):
     """Random fields F (rho points), U and V (u and v points) in a netCDF file"""
