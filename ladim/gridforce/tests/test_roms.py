@@ -1,4 +1,5 @@
 import pathlib
+import warnings
 
 import numpy as np
 import pytest
@@ -101,3 +102,74 @@ def test_scalar_field_frames(forcing, first_step):
         # Latest frame at or before the step
         expected = [t // 6 for t in range(first_step, 20)]
     assert frames == expected
+
+
+@pytest.fixture(scope="module")
+def dense_fields(tmp_path_factory):
+    """Random fields F (rho points), U and V (u and v points) in a netCDF file"""
+    from netCDF4 import Dataset as NCDataset
+
+    from ladim.gridforce.chunkloader import Dataset
+
+    rng = np.random.default_rng(5)
+    nt, nz, ny, nx = 2, 8, 11, 13
+    shapes = dict(F=(ny, nx), U=(ny, nx + 1), V=(ny + 1, nx))
+    fields = {k: rng.normal(size=(nt, nz) + s) for k, s in shapes.items()}
+    path = str(tmp_path_factory.mktemp("dense") / "fields.nc")
+    with warnings.catch_warnings(), NCDataset(path, "w") as nc:
+        warnings.simplefilter("ignore")
+        for name, n in [("time", nt), ("z", nz), ("y", ny), ("x", nx),
+                        ("yv", ny + 1), ("xu", nx + 1)]:
+            nc.createDimension(name, n)
+        v = nc.createVariable("time", "f8", ("time",))
+        v.units = "hours since 2000-01-01"
+        v[:] = np.arange(nt)
+        dims = dict(F=("y", "x"), U=("y", "xu"), V=("yv", "x"))
+        for name, values in fields.items():
+            nc.createVariable(name, "f8", ("time", "z") + dims[name],
+                              chunksizes=(1, 3, 4, 5))[:] = values
+    dset = Dataset(path, time_name="time", num_threads=2)
+    yield dset, fields
+    dset.close()
+
+
+def test_sample3D_matches_interp(dense_fields):
+    dset, fields = dense_fields
+    F = fields["F"][1]
+    nz, ny, nx = F.shape
+    rng = np.random.default_rng(6)
+    n = 400
+    X = rng.uniform(0, nx - 1.001, n)
+    Y = rng.uniform(0, ny - 1.001, n)
+    K = rng.integers(1, nz, n)
+    A = rng.uniform(0, 1, n)
+
+    ref = coords.sample3D(F, X, Y, K, A, method="bilinear")
+    new = dset["F"].interp([K - A, Y, X], frame=1, linear="zyx")
+    assert np.allclose(new, ref, rtol=0, atol=1e-12)
+
+    ref = coords.sample3D(F, X, Y, K, A, method="nearest")
+    J, I = np.round(Y).astype(int), np.round(X).astype(int)
+    new = dset["F"].interp([K, J, I], frame=1)
+    assert np.array_equal(new, ref)
+
+
+def test_sample3DUV_matches_interp(dense_fields):
+    dset, fields = dense_fields
+    U, V = fields["U"][0], fields["V"][0]
+    nz, ny, nx = fields["F"][0].shape
+    rng = np.random.default_rng(7)
+    n = 400
+    # Inside the rho grid (outside, sample3D extrapolates linearly while
+    # interp extends the values at the boundary)
+    X = rng.uniform(0, nx - 1.001, n)
+    Y = rng.uniform(0, ny - 1.001, n)
+    K = rng.integers(1, nz, n)
+    A = rng.uniform(0, 1, n)
+
+    u0, v0 = coords.sample3DUV(U, V, X, Y, K, A)
+    # u point i is at x = i - 0.5, v point j at y = j - 0.5 (local indices)
+    u = dset["U"].interp([K - A, Y, X + 0.5], frame=0)
+    v = dset["V"].interp([K - A, Y + 0.5, X], frame=0)
+    assert np.allclose(u, u0, rtol=0, atol=1e-12)
+    assert np.allclose(v, v0, rtol=0, atol=1e-12)
