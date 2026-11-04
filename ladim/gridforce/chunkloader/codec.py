@@ -57,6 +57,23 @@ INFLATE_BACKEND, inflate = _select_inflate()
 
 
 # --------------------------------------------------------------------------
+# Positional read
+# --------------------------------------------------------------------------
+
+if hasattr(os, "pread"):
+    _pread = os.pread
+else:  # pragma: no cover
+    # Windows has no os.pread. The seek position is shared between threads,
+    # so seek + read must be done atomically.
+    _seek_lock = threading.Lock()
+
+    def _pread(fd, size, off):
+        with _seek_lock:
+            os.lseek(fd, off, os.SEEK_SET)
+            return os.read(fd, size)
+
+
+# --------------------------------------------------------------------------
 # HDF5 chunk layout
 # --------------------------------------------------------------------------
 
@@ -127,7 +144,7 @@ class ChunkLayout:
             return np.full(self.chunks, self.fillvalue, dtype=dtype.newbyteorder("="))
 
         size = int(self.size[cidx])
-        raw = os.pread(fd, size, off)
+        raw = _pread(fd, size, off)
         if len(raw) != size:
             raise IOError(f"Short read ({len(raw)} of {size} bytes)")
 
