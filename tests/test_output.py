@@ -364,3 +364,16 @@ class Test_Writer:
         assert w.paths[1].variables['xd_offset'][...] == 5
 
         w.close()
+
+
+class Test_create_netcdf_file:
+    def test_history_includes_plugins_version_when_installed(self, monkeypatch):
+        monkeypatch.setattr(output, '_get_plugins_version', lambda: '1.2.3')
+        dset = output.create_netcdf_file('mem.nc', {}, diskless=True)
+        assert dset.history.startswith('Created by ladim ')
+        assert dset.history.endswith(', ladim_plugins 1.2.3')
+
+    def test_history_omits_plugins_when_not_installed(self, monkeypatch):
+        monkeypatch.setattr(output, '_get_plugins_version', lambda: '')
+        dset = output.create_netcdf_file('mem.nc', {}, diskless=True)
+        assert 'ladim_plugins' not in dset.history

@@ -13,6 +13,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.7.0] - 2026-11-04
+### Added
+- The version of ladim_plugins (if installed) is included in the `history`
+  attribute of the output files.
+
+
 ## [2.6.0] - 2026-09-28
 ### Changed
 - The number of threads defaults to 1 if the environment variable

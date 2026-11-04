@@ -215,6 +215,15 @@ class OutputFormat:
         )
 
 
+def _get_plugins_version() -> str:
+    """Return the installed ladim_plugins version, or empty string if absent"""
+    from importlib import metadata
+    try:
+        return metadata.version("ladim_plugins")
+    except metadata.PackageNotFoundError:
+        return ""
+
+
 def create_netcdf_file(fname: str, formats: dict[str, OutputFormat], diskless=False) -> nc.Dataset:
     """
     Create new netCDF file
@@ -234,6 +243,9 @@ def create_netcdf_file(fname: str, formats: dict[str, OutputFormat], diskless=Fa
     dset.institution = "Institute of Marine Research"
     dset.source = "Lagrangian Advection and Diffusion Model"
     dset.history = "Created by ladim " + ladim_version
+    plugins_version = _get_plugins_version()
+    if plugins_version:
+        dset.history += ", ladim_plugins " + plugins_version
     dset.date = str(np.datetime64('now', 'D'))
 
     # Create dimensions
