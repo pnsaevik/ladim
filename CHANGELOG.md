@@ -13,6 +13,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.7.1] - 2026-11-04
+### Fixed
+- The chunk loader works on Windows. `os.pread` is not available there, so
+  `os.lseek` + `os.read` (guarded by a lock) is used instead, and files are
+  opened in binary mode.
+
 ## [2.7.0] - 2026-11-04
 ### Added
 - The version of ladim_plugins (if installed) is included in the `history`

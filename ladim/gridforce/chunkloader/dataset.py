@@ -193,7 +193,7 @@ class Dataset:
             )
             if ok_shape and ok_chunks:
                 if fnum not in self._fds:
-                    self._fds[fnum] = os.open(path, os.O_RDONLY)
+                    self._fds[fnum] = os.open(path, os.O_RDONLY | getattr(os, "O_BINARY", 0))
                 return layout
         return codec.NetCDFReader(path, var.name, var.chunks)
 
