@@ -37,16 +37,21 @@ class Grid:
         if "grid_file" in gconf:
             grid_file = gconf["grid_file"]
         elif "input_file" in gconf:
-            grid_file = sorted(glob.glob(gconf["input_file"]))[0]
+            files = sorted(glob.glob(gconf["input_file"]))
+            if not files:
+                raise FileNotFoundError(
+                    "No grid file specified, and no input files found: "
+                    + str(gconf["input_file"])
+                )
+            grid_file = files[0]
+            logger.info(f"No grid_file in the gridforce config, reading the grid from {grid_file}")
         else:
-            logger.error("No grid file specified")
-            raise SystemExit(1)
+            raise ValueError("No grid file specified (grid_file or input_file)")
 
         try:
             ncid = Dataset(grid_file)
-        except OSError:
-            logger.error("Could not open grid file " + grid_file)
-            raise SystemExit(1)
+        except OSError as err:
+            raise OSError(f"Could not open grid file {grid_file}") from err
 
         with ncid:
             ncid.set_auto_mask(False)
@@ -77,6 +82,7 @@ class Grid:
         limits = list(gconf.get("subgrid") or whole_grid)
         limits = [w if v is None else v for v, w in zip(limits, whole_grid)]
 
+        self.shape_rho = (jmax, imax)  # Shape of the full (not sub-) grid
         self.i0, self.i1, self.j0, self.j1 = limits
         self.imax = self.i1 - self.i0
         self.jmax = self.j1 - self.j0
@@ -125,7 +131,9 @@ class Grid:
             self.N = Vinfo["N"]
             self.hc = Vinfo["hc"]
             self.Vstretching = Vinfo.get("Vstretching", 1)
-            self.Vtransform = Vinfo.get("Vtransform", 1)
+            if "Vtransform" not in Vinfo:
+                raise ValueError("Vtransform is missing in gridforce.Vinfo")
+            self.Vtransform = Vinfo["Vtransform"]
             args = (self.N, Vinfo["theta_s"], Vinfo["theta_b"])
             self.Cs_r = coords.s_stretch(*args, stagger="rho", Vstretching=self.Vstretching)
             self.Cs_w = coords.s_stretch(*args, stagger="w", Vstretching=self.Vstretching)
@@ -134,10 +142,12 @@ class Grid:
             self.Cs_r = ncid.variables["Cs_r"][:]
             self.Cs_w = ncid.variables["Cs_w"][:]
             self.N = len(self.Cs_r)
-            if "Vtransform" in ncid.variables:
-                self.Vtransform = ncid.variables["Vtransform"].getValue()
-            else:
-                self.Vtransform = 1  # Default = old way
+            if "Vtransform" not in ncid.variables:
+                raise ValueError(
+                    "Vtransform is missing in the grid file. Specify it in "
+                    "gridforce.Vinfo (Vtransform: 1 or 2)."
+                )
+            self.Vtransform = ncid.variables["Vtransform"].getValue()
 
     # Full 3-D depth arrays (1 GB each for large grids), computed on access
     @property

@@ -26,10 +26,17 @@ class Forcing(RomsForcing):
         super().__init__(config, _)
         nz = self._u.shape[0]
         n = self._grid.N
+        if n is None:
+            raise ValueError(
+                "The depths of the z levels are unknown. Specify them with "
+                "gridforce.z_levels, or provide a variable 'zlevels' in the "
+                "grid file or the forcing files."
+            )
         if n > nz:
-            logger.error(f"Number of z levels ({n}) exceeds the number of "
-                         f"levels in the forcing files ({nz})")
-            raise SystemExit(3)
+            raise ValueError(f"Number of z levels ({n}) exceeds the number of "
+                             f"levels in the forcing files ({nz})")
         if n < nz:
-            logger.warning(f"Only the first {n} of {nz} levels in the forcing "
-                           f"files are used")
+            if config["gridforce"].get("z_levels") is None:
+                raise ValueError(f"Number of z levels ({n}) is less than the number "
+                                 f"of levels in the forcing files ({nz})")
+            logger.info(f"Using the first {n} of {nz} levels in the forcing files")

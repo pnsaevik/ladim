@@ -13,7 +13,11 @@ def _linear(z, y, x, t):
 
 @pytest.fixture(scope="module")
 def files(tmp_path_factory):
-    path = tmp_path_factory.mktemp("zroms")
+    return _make_files(tmp_path_factory.mktemp("zroms"), zlevels="forcing")
+
+
+def _make_files(path, zlevels):
+    path.mkdir(parents=True, exist_ok=True)
     grid_file = str(path / "grid.nc")
     forc_file = str(path / "forcing_001.nc")
 
@@ -28,15 +32,20 @@ def files(tmp_path_factory):
         nc["pn"][:] = 1 / 800.0
         nc["lon_rho"][:] = np.arange(NX) * 0.01 + np.zeros((NY, 1))
         nc["lat_rho"][:] = np.arange(NY)[:, None] * 0.01 + np.zeros(NX)
+        if zlevels == "grid3":
+            nc.createDimension("zlev", 3)
+            nc.createVariable("zlevels", "f8", ("zlev",))[:] = ZLEV[:3]
 
     nt = 3
     with Dataset(forc_file, "w") as nc:
         for name, n in [("time", nt), ("depth", len(ZLEV)), ("eta_rho", NY),
-                        ("xi_rho", NX), ("eta_v", NY + 1), ("xi_u", NX + 1)]:
+                        ("xi_rho", NX), ("eta_v", NY - 1), ("xi_u", NX - 1)]:
             nc.createDimension(name, n)
         t = nc.createVariable("time", "f8", ("time",))
         t.units = "hours since 2000-01-01"
         t[:] = np.arange(nt)
+        if zlevels == "forcing":
+            nc.createVariable("zlevels", "f8", ("depth",))[:] = ZLEV
         for name, dims, dy, dx in [
             ("u", ("eta_rho", "xi_u"), 0.0, 0.5),
             ("v", ("eta_v", "xi_rho"), 0.5, 0.0),
@@ -44,7 +53,7 @@ def files(tmp_path_factory):
         ]:
             v = nc.createVariable(name, "f4", ("time", "depth") + dims,
                                   chunksizes=(1, 3, 4, 5))
-            ny, nx = NY + (name == "v"), NX + (name == "u")
+            ny, nx = NY - (name == "v"), NX - (name == "u")
             Z = ZLEV[None, :, None, None]
             Y = np.arange(ny)[None, None, :, None] + dy
             X = np.arange(nx)[None, None, None, :] + dx
@@ -117,7 +126,7 @@ class TestZCoordinate:
             ZCoordinate([0, 5, 2], np.zeros((2, 2)))
 
 
-def test_grid_z_levels_default(files):
+def test_grid_z_levels_from_forcing_file(files):
     from ladim.gridforce.zROMS import Grid
 
     grid = Grid(_config(files))
@@ -130,6 +139,36 @@ def test_grid_z_levels_from_config(files):
 
     grid = Grid(_config(files, z_levels=[0, 10, 20]))
     assert np.array_equal(grid.z_levels, [0, 10, 20])
+
+
+def test_missing_z_levels_is_an_error_in_forcing(tmp_path):
+    from ladim.gridforce.zROMS import Forcing, Grid
+
+    files = _make_files(tmp_path, zlevels=None)
+    assert Grid(_config(files)).z_levels is None  # Not needed by the grid itself
+    with pytest.raises(ValueError, match="z levels"):
+        Forcing(_config(files), None)
+    f = Forcing(_config(files, z_levels=ZLEV), None)
+    assert np.array_equal(f._grid.z_levels, ZLEV)
+    f.close()
+
+
+def test_fewer_levels_than_in_files_requires_explicit_z_levels(tmp_path):
+    from ladim.gridforce.zROMS import Forcing
+
+    files = _make_files(tmp_path / "a", zlevels="grid3")
+    with pytest.raises(ValueError, match="less than"):
+        Forcing(_config(files), None)
+
+    f = Forcing(_config(files, z_levels=[0, 1, 2]), None)
+    f.close()
+
+
+def test_z_w_is_not_available(files):
+    from ladim.gridforce.zROMS import Grid
+
+    with pytest.raises(NotImplementedError):
+        Grid(_config(files)).z_w
 
 
 def test_velocity_is_linear_in_all_dimensions(forcing):
@@ -181,5 +220,36 @@ def test_depths_outside_levels_use_nearest_level(forcing):
 def test_too_many_z_levels_is_an_error(files):
     from ladim.gridforce.zROMS import Forcing
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(ValueError, match="exceeds"):
         Forcing(_config(files, z_levels=list(range(20))), None)
+
+
+def test_unknown_velocity_method_is_an_error(forcing):
+    X, Y, Z = _particles(5)
+    with pytest.raises(ValueError, match="method"):
+        forcing.velocity(X, Y, Z, method="cubic")
+
+
+def test_staggering_is_found_from_shapes(forcing):
+    assert forcing._staggering(forcing._u) == (0.0, 0.5)
+    assert forcing._staggering(forcing._v) == (0.5, 0.0)
+    assert forcing._staggering(forcing._field("temp")) == (0.0, 0.0)
+
+
+def test_unstaggered_velocity_is_an_error(tmp_path):
+    from ladim.gridforce.zROMS import Forcing
+
+    files = _make_files(tmp_path, zlevels="forcing")
+    with Dataset(files[1].replace("*", "001"), "a") as nc:
+        nc.renameVariable("u", "u_old")
+        nc.renameVariable("temp", "u")  # Shape of rho points
+    with pytest.raises(ValueError, match="u-points"):
+        Forcing(_config(files), None)
+
+
+def test_missing_input_files_is_an_error(files):
+    from ladim.gridforce.zROMS import Forcing
+
+    config = _config((files[0], files[1].replace("forcing", "nothing")))
+    with pytest.raises(FileNotFoundError):
+        Forcing(config, None)

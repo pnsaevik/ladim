@@ -21,10 +21,30 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   background, and interpolation uses multithreaded numba kernels.
   `ladim.gridforce.zROMS` is kept as a compatibility wrapper.
 - zROMS: The depths of the vertical levels are taken from the gridforce
-  setting `z_levels`, else the variable `zlevels` of the grid file, else the
-  old default `[0, 1, 2, 3, 5, 10, 15, 20]`.
+  setting `z_levels`, else the variable `zlevels` of the grid file or of the
+  first forcing file. It is an error if none of these exist (previously
+  the default `[0, 1, 2, 3, 5, 10, 15, 20]` was assumed). It is also an
+  error if the forcing files have more levels than given, unless
+  `z_levels` is set explicitly.
 - zROMS: The `angle` variable is not required in the grid file.
+- ROMS and zROMS: Errors in grid and forcing (missing files, no forcing at
+  start/stop time, unsorted time frames, ...) are raised as exceptions
+  (`FileNotFoundError`, `ValueError`) instead of `SystemExit`.
+- ROMS and zROMS: A missing `Vtransform` is an error (previously 1 was
+  assumed).
+- ROMS and zROMS: The staggering of variables is determined from the shape
+  (compared to the grid) instead of the dimension names. `u` and `v` that
+  are not at u- and v-points are an error. Unknown interpolation methods in
+  `velocity` are an error.
+- ROMS and zROMS: The log shows which file the grid is read from when
+  `grid_file` is not set.
 ### Fixed
+- `z2s` and `sample3D` can again be imported from `ladim.gridforce.ROMS`
+  (needed by `ladim_plugins.salmon_lice`). The dense `z2s` is also still
+  in `ladim.gridforce.roms.coords`.
+- `files.grid_file` is passed on to the gridforce module (previously it was
+  only used if given as `gridforce.grid_file`, otherwise the forcing module
+  looked for the grid in the first forcing file).
 - zROMS: Vertical interpolation used the wrong level (K-1 instead of K+1)
   for the second interpolation weight. Particles at depths outside the
   levels (above the first or below the last) used to wrap around or fail,
