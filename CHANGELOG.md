@@ -13,6 +13,24 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.8.0] - 2026-11-06
+### Changed
+- The zROMS gridforce module is rewritten on top of the ROMS grid and
+  forcing and the chunk loader (`ladim.gridforce.zroms`). It gets the same
+  speedups as the ROMS module: chunks are decoded on demand and in the
+  background, and interpolation uses multithreaded numba kernels.
+  `ladim.gridforce.zROMS` is kept as a compatibility wrapper.
+- zROMS: The depths of the vertical levels are taken from the gridforce
+  setting `z_levels`, else the variable `zlevels` of the grid file, else the
+  old default `[0, 1, 2, 3, 5, 10, 15, 20]`.
+- zROMS: The `angle` variable is not required in the grid file.
+### Fixed
+- zROMS: Vertical interpolation used the wrong level (K-1 instead of K+1)
+  for the second interpolation weight. Particles at depths outside the
+  levels (above the first or below the last) used to wrap around or fail,
+  and now use the nearest level.
+
+
 ## [2.7.1] - 2026-11-04
 ### Fixed
 - The chunk loader works on Windows. `os.pread` is not available there, so

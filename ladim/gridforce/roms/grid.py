@@ -51,8 +51,15 @@ class Grid:
         with ncid:
             ncid.set_auto_mask(False)
             self._read_grid(ncid, gconf)
+            self._read_vertical(ncid, gconf)
 
-        # Vertical coordinates at rho and w levels
+        self._make_coordinates()
+        self._M8 = np.ascontiguousarray(self.M, dtype=np.int8)
+        self._z_r = None
+        self._z_w = None
+
+    def _make_coordinates(self):
+        """Vertical coordinates at rho and w levels"""
         self.scoord = coords.SCoordinate(
             self.H, self.Cs_r, self.hc, self.Vtransform, self.i0, self.j0
         )
@@ -60,9 +67,6 @@ class Grid:
             self.H, self.Cs_w, self.hc, self.Vtransform, self.i0, self.j0,
             stagger="w",
         )
-        self._M8 = np.ascontiguousarray(self.M, dtype=np.int8)
-        self._z_r = None
-        self._z_w = None
 
     def _read_grid(self, ncid, gconf):
         # Subgrid, only considers internal grid cells
@@ -91,6 +95,30 @@ class Grid:
         self.Iv = self.I
         self.Jv = slice(self.j0 - 1, self.j1)
 
+        J, I = self.J, self.I
+        self.H = ncid.variables["h"][J, I]
+        self.M = ncid.variables["mask_rho"][J, I].astype(int)
+        self.dx = 1.0 / ncid.variables["pm"][J, I]
+        self.dy = 1.0 / ncid.variables["pn"][J, I]
+        self.lon = ncid.variables["lon_rho"][J, I]
+        self.lat = ncid.variables["lat_rho"][J, I]
+        self.angle = self._read_angle(ncid)
+
+        # Land masks at u- and v-points, boundary points copied from rho
+        M = self.M
+        self.Mu = np.zeros((self.jmax, self.imax + 1), dtype=int)
+        self.Mu[:, 1:-1] = M[:, :-1] * M[:, 1:]
+        self.Mu[:, 0] = M[:, 0]
+        self.Mu[:, -1] = M[:, -1]
+        self.Mv = np.zeros((self.jmax + 1, self.imax), dtype=int)
+        self.Mv[1:-1, :] = M[:-1, :] * M[1:, :]
+        self.Mv[0, :] = M[0, :]
+        self.Mv[-1, :] = M[-1, :]
+
+    def _read_angle(self, ncid):
+        return ncid.variables["angle"][self.J, self.I]
+
+    def _read_vertical(self, ncid, gconf):
         # Vertical grid
         if "Vinfo" in gconf:
             Vinfo = gconf["Vinfo"]
@@ -110,26 +138,6 @@ class Grid:
                 self.Vtransform = ncid.variables["Vtransform"].getValue()
             else:
                 self.Vtransform = 1  # Default = old way
-
-        J, I = self.J, self.I
-        self.H = ncid.variables["h"][J, I]
-        self.M = ncid.variables["mask_rho"][J, I].astype(int)
-        self.dx = 1.0 / ncid.variables["pm"][J, I]
-        self.dy = 1.0 / ncid.variables["pn"][J, I]
-        self.lon = ncid.variables["lon_rho"][J, I]
-        self.lat = ncid.variables["lat_rho"][J, I]
-        self.angle = ncid.variables["angle"][J, I]
-
-        # Land masks at u- and v-points, boundary points copied from rho
-        M = self.M
-        self.Mu = np.zeros((self.jmax, self.imax + 1), dtype=int)
-        self.Mu[:, 1:-1] = M[:, :-1] * M[:, 1:]
-        self.Mu[:, 0] = M[:, 0]
-        self.Mu[:, -1] = M[:, -1]
-        self.Mv = np.zeros((self.jmax + 1, self.imax), dtype=int)
-        self.Mv[1:-1, :] = M[:-1, :] * M[1:, :]
-        self.Mv[0, :] = M[0, :]
-        self.Mv[-1, :] = M[-1, :]
 
     # Full 3-D depth arrays (1 GB each for large grids), computed on access
     @property

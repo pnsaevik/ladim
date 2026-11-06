@@ -42,12 +42,18 @@ DEFAULT_INTERPOLATION = {"w": "tz"}
 class Forcing:
     """
     Class for ROMS forcing
+
+    Subclasses with other vertical coordinates or file conventions can
+    override the class attributes ``grid_class`` and ``time_name``.
     """
+
+    grid_class = Grid
+    time_name = "ocean_time"
 
     def __init__(self, config, _=None):
         logger.info("Initiating forcing")
 
-        self._grid = grid = Grid(config)
+        self._grid = grid = self.grid_class(config)
         gconf = config["gridforce"]
         self._interpolation = {
             **DEFAULT_INTERPOLATION, **(gconf.get("interpolation") or {})
@@ -64,12 +70,12 @@ class Forcing:
         times = []
         for fname in files:
             logger.info(f"Open forcing file {fname}")
-            times.append(read_times(fname, "ocean_time"))
+            times.append(read_times(fname, self.time_name))
         all_frames = np.concatenate(times)
         _check_sorted(all_frames)
         logger.info(f"Number of available forcing times = {len(all_frames)}")
 
-        self._dset = Dataset(files, "ocean_time", num_threads=num_threads, times=times)
+        self._dset = Dataset(files, self.time_name, num_threads=num_threads, times=times)
         self._set_steps(config, all_frames)
 
         # Forcing variables
