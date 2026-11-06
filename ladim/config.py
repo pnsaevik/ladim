@@ -94,6 +94,9 @@ def convert_1_to_2(c):
 
     out['forcing'] = {k: v for k, v in c.get('gridforce', {}).items() if k not in ('input_file', 'module')}
     out['forcing']['file'] = dict_get(c, ['gridforce.input_file', 'files.input_file'])
+    grid_file = dict_get(c, ['gridforce.grid_file', 'files.grid_file'], None)
+    if grid_file is not None:
+        out['forcing']['grid_file'] = grid_file
     out['forcing']['first_file'] = dict_get(c, 'gridforce.first_file', "")
     out['forcing']['last_file'] = dict_get(c, 'gridforce.last_file', "")
     out['forcing']['legacy_module'] = dict_get(c, 'gridforce.module', '') + '.Forcing'

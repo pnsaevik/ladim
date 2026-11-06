@@ -9,3 +9,7 @@ forcing files).
 
 from .roms.forcing import Forcing  # noqa: F401
 from .roms.grid import Grid  # noqa: F401
+
+# Dense-array helpers, kept for modules that import them from here (e.g.
+# ladim_plugins.salmon_lice). New code should use Forcing.field.
+from .roms.coords import sample3D, z2s  # noqa: F401

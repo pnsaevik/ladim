@@ -42,12 +42,18 @@ DEFAULT_INTERPOLATION = {"w": "tz"}
 class Forcing:
     """
     Class for ROMS forcing
+
+    Subclasses with other vertical coordinates or file conventions can
+    override the class attributes ``grid_class`` and ``time_name``.
     """
+
+    grid_class = Grid
+    time_name = "ocean_time"
 
     def __init__(self, config, _=None):
         logger.info("Initiating forcing")
 
-        self._grid = grid = Grid(config)
+        self._grid = grid = self.grid_class(config)
         gconf = config["gridforce"]
         self._interpolation = {
             **DEFAULT_INTERPOLATION, **(gconf.get("interpolation") or {})
@@ -55,8 +61,7 @@ class Forcing:
 
         files = _find_files(gconf)
         if not files:
-            logger.error("No input file: {}".format(gconf["input_file"]))
-            raise SystemExit(3)
+            raise FileNotFoundError("No input file: {}".format(gconf["input_file"]))
         logger.info("Number of forcing files = {}".format(len(files)))
         num_threads = parallel.configure(gconf.get("num_threads"))
 
@@ -64,17 +69,23 @@ class Forcing:
         times = []
         for fname in files:
             logger.info(f"Open forcing file {fname}")
-            times.append(read_times(fname, "ocean_time"))
+            times.append(read_times(fname, self.time_name))
         all_frames = np.concatenate(times)
         _check_sorted(all_frames)
         logger.info(f"Number of available forcing times = {len(all_frames)}")
 
-        self._dset = Dataset(files, "ocean_time", num_threads=num_threads, times=times)
+        self._dset = Dataset(files, self.time_name, num_threads=num_threads, times=times)
         self._set_steps(config, all_frames)
 
         # Forcing variables
         self._u = self._dset["u"]
         self._v = self._dset["v"]
+        if (self._staggering(self._u), self._staggering(self._v)) != ((0.0, 0.5), (0.5, 0.0)):
+            raise ValueError(
+                "Expected u at u-points (one point fewer in x) and v at v-points "
+                f"(one point fewer in y), got shapes {self._u.shape} and "
+                f"{self._v.shape} on a grid of shape {grid.shape_rho}"
+            )
         self._fields = {}
 
         # Land masks at u- and v-points, global index space, zero outside
@@ -95,11 +106,11 @@ class Forcing:
         start_time = np.datetime64(config["start_time"])
         stop_time = np.datetime64(config["stop_time"])
         if time0 > start_time:
-            logger.error("No forcing at start time")
-            raise SystemExit(3)
+            raise ValueError(f"No forcing at start time ({start_time}), "
+                             f"first forcing time is {time0}")
         if time1 < stop_time:
-            logger.error("No forcing at stop time")
-            raise SystemExit(3)
+            raise ValueError(f"No forcing at stop time ({stop_time}), "
+                             f"last forcing time is {time1}")
 
         seconds = (all_frames - start_time) / np.timedelta64(1, "s")
         steps = np.trunc(seconds / float(config["dt"])).astype(np.int64)
@@ -155,6 +166,8 @@ class Forcing:
         :param method: "bilinear" (linear interpolation in all dimensions) or
             "nearest" (values at the nearest u- and v-points, linear in time)
         """
+        if method not in ("bilinear", "nearest"):
+            raise ValueError(f"Unknown interpolation method: {method!r}")
         grid = self._grid
         frames = self._velocity_frames(tstep)
         X = np.asarray(X, dtype=np.float64)
@@ -206,8 +219,7 @@ class Forcing:
         Y = np.asarray(Y, dtype=np.float64)
 
         # Horizontal staggering: u points at x = i + 1/2, v points at y = j + 1/2
-        dx = 0.5 if spatial_dims[-1].endswith("_u") else 0.0
-        dy = 0.5 if spatial_dims[-2].endswith("_v") else 0.0
+        dy, dx = self._staggering(var)
 
         # Vertical level, and the nearest rho point if it comes for free
         J = I = None
@@ -232,6 +244,27 @@ class Forcing:
 
         frame = self._velocity_frames() if "t" in linear else self._nf
         return var.interp(position, frame, linear=linear)
+
+    def _staggering(self, var):
+        """Offsets (dy, dx) of the horizontal grid points of a variable
+
+        Points of variables at u-points (one point fewer in the x direction
+        than at rho-points) are located at x = i + 1/2, and similarly for
+        v-points in the y direction. The shape is compared with the shape of
+        the full grid.
+        """
+        offsets = []
+        for n, full in zip(var.shape[-2:], self._grid.shape_rho):
+            if n == full:
+                offsets.append(0.0)
+            elif n == full - 1:
+                offsets.append(0.5)
+            else:
+                raise ValueError(
+                    f"Horizontal shape {var.shape[-2:]} of {var.name} does not "
+                    f"match the grid shape {self._grid.shape_rho}"
+                )
+        return tuple(offsets)
 
     def _field(self, name):
         var = self._fields.get(name)
@@ -267,6 +300,6 @@ def _check_sorted(all_frames):
     if bad.size:
         i = bad[0] + 1  # Index of first out-of-order frame
         oooframe = str(all_frames[i]).split(".")[0]  # Remove microseconds
-        logger.info(f"Time frame {i} = {oooframe} out of order")
-        logger.critical("Forcing time frames not strictly sorted")
-        raise SystemExit(4)
+        raise ValueError(
+            f"Forcing time frames not strictly sorted: time frame {i} = {oooframe} is out of order"
+        )
