@@ -21,11 +21,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   background, and interpolation uses multithreaded numba kernels.
   `ladim.gridforce.zROMS` is kept as a compatibility wrapper.
 - zROMS: The depths of the vertical levels are taken from the gridforce
-  setting `z_levels`, else the variable `zlevels` of the grid file or of the
-  first forcing file. It is an error if none of these exist (previously
-  the default `[0, 1, 2, 3, 5, 10, 15, 20]` was assumed). It is also an
-  error if the forcing files have more levels than given, unless
-  `z_levels` is set explicitly.
+  setting `z_levels` if given, and otherwise from the coordinate variable of
+  the vertical dimension of `u` in the first forcing file. The variable must
+  have units in meters and `positive = "down"`, and it is an error if it is
+  missing or has other units (previously the depths `[0, 1, 2, 3, 5, 10, 15,
+  20]` were assumed). `z_levels` may be shorter than the number of levels in
+  the files (the first levels are used), but not longer.
 - zROMS: The `angle` variable is not required in the grid file.
 - ROMS and zROMS: Errors in grid and forcing (missing files, no forcing at
   start/stop time, unsorted time frames, ...) are raised as exceptions

@@ -1,0 +1,204 @@
+{
+    "coords": {
+        "time": {
+            "dims": [
+                "time"
+            ],
+            "attrs": {
+                "long_name": "time",
+                "standard_name": "time"
+            },
+            "data": [
+                "2015-09-07 00:00:00",
+                "2015-09-07 00:01:00",
+                "2015-09-07 00:02:00",
+                "2015-09-07 00:03:00",
+                "2015-09-07 00:04:00",
+                "2015-09-07 00:05:00"
+            ]
+        }
+    },
+    "attrs": {
+        "Conventions": "CF-1.8",
+        "institution": "Institute of Marine Research",
+        "source": "Lagrangian Advection and Diffusion Model"
+    },
+    "dims": {
+        "time": 6,
+        "particle": 2,
+        "particle_instance": 12
+    },
+    "data_vars": {
+        "instance_offset": {
+            "dims": [],
+            "attrs": {
+                "long_name": "particle instance offset for file"
+            },
+            "data": 0
+        },
+        "particle_count": {
+            "dims": [
+                "time"
+            ],
+            "attrs": {
+                "long_name": "number of particles in a given timestep",
+                "ragged_row_count": "particle count at nth timestep"
+            },
+            "data": [
+                2,
+                2,
+                2,
+                2,
+                2,
+                2
+            ]
+        },
+        "release_time": {
+            "dims": [
+                "particle"
+            ],
+            "attrs": {
+                "long_name": "particle release time"
+            },
+            "data": [
+                "2015-09-07 00:00:00",
+                "2015-09-07 00:00:00"
+            ]
+        },
+        "pid": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle identifier"
+            },
+            "data": [
+                0,
+                1,
+                0,
+                1,
+                0,
+                1,
+                0,
+                1,
+                0,
+                1,
+                0,
+                1
+            ]
+        },
+        "X": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle X-coordinate"
+            },
+            "data": [
+                3.0,
+                3.0,
+                3.3,
+                3.3,
+                3.6,
+                3.6,
+                3.9,
+                3.9,
+                4.2,
+                4.2,
+                4.5,
+                4.5
+            ]
+        },
+        "Y": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle Y-coordinate"
+            },
+            "data": [
+                3.0,
+                3.0,
+                3.15,
+                3.45,
+                3.3,
+                3.9,
+                3.45,
+                4.35,
+                3.6,
+                4.8,
+                3.75,
+                5.25
+            ]
+        },
+        "Z": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "particle depth",
+                "standard_name": "depth_below_surface",
+                "units": "m",
+                "positive": "down"
+            },
+            "data": [
+                2.5,
+                7.5,
+                2.5,
+                7.5,
+                2.5,
+                7.5,
+                2.5,
+                7.5,
+                2.5,
+                7.5,
+                2.5,
+                7.5
+            ]
+        },
+        "temp": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "temperature"
+            },
+            "data": [
+                9.600000381469727,
+                9.0,
+                9.600000381469727,
+                9.0,
+                9.600000381469727,
+                9.0,
+                9.600000381469727,
+                9.0,
+                9.600000381469727,
+                9.0,
+                9.600000381469727,
+                9.0
+            ]
+        },
+        "salt": {
+            "dims": [
+                "particle_instance"
+            ],
+            "attrs": {
+                "long_name": "salinity"
+            },
+            "data": [
+                33.029998779296875,
+                33.029998779296875,
+                33.029998779296875,
+                33.029998779296875,
+                33.040000915527344,
+                33.040000915527344,
+                33.040000915527344,
+                33.040000915527344,
+                33.040000915527344,
+                33.040000915527344,
+                33.040000915527344,
+                33.040000915527344
+            ]
+        }
+    }
+}

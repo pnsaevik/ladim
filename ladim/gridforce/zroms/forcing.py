@@ -29,14 +29,11 @@ class Forcing(RomsForcing):
         if n is None:
             raise ValueError(
                 "The depths of the z levels are unknown. Specify them with "
-                "gridforce.z_levels, or provide a variable 'zlevels' in the "
-                "grid file or the forcing files."
+                "gridforce.z_levels, or provide u in the forcing files with a "
+                "coordinate variable for the vertical dimension."
             )
         if n > nz:
             raise ValueError(f"Number of z levels ({n}) exceeds the number of "
                              f"levels in the forcing files ({nz})")
-        if n < nz:
-            if config["gridforce"].get("z_levels") is None:
-                raise ValueError(f"Number of z levels ({n}) is less than the number "
-                                 f"of levels in the forcing files ({nz})")
+        if n < nz:  # Only possible with z_levels in the config
             logger.info(f"Using the first {n} of {nz} levels in the forcing files")
