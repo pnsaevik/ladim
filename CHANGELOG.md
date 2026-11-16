@@ -13,6 +13,24 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.8.1] - 2026-11-16
+### Fixed
+- ROMS: The depths of the vertical levels were computed from evenly spaced
+  s-coordinates combined with the stretching curve (`Cs_r`, `Cs_w`) of the
+  model. This is correct for Vstretching 1-4, but not for Vstretching 5
+  (used by NorKyst v3), where the s-coordinates are unevenly spaced. The
+  levels were then too deep, by up to about 5 m in the upper 20 m, which
+  affected the depth where particles sample currents, temperature and
+  salinity. The s-coordinates (`s_rho`, `s_w`) are now read from the forcing
+  or grid file, or computed from `Vstretching` (`gridforce.Vinfo` or the
+  `Vstretching` variable). If `s_w` is missing, it is deduced from the form of
+  `s_rho`. If the file has neither `s_rho` nor `Vstretching`, evenly spaced
+  s-coordinates are assumed, with a warning. Results for Vstretching 1-4 are
+  unchanged.
+### Added
+- `coords.s_coordinate`, and the argument `S` to `coords.sdepth` and
+  `coords.SCoordinate`.
+
 ## [2.8.0] - 2026-11-06
 ### Changed
 - The zROMS gridforce module is rewritten on top of the ROMS grid and

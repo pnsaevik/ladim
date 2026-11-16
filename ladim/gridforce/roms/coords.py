@@ -21,6 +21,35 @@ from numba import prange
 # Vertical
 # --------------------------------------------------------------------------
 
+def s_coordinate(N, stagger="rho", Vstretching=1):
+    """
+    Compute the s-coordinate (sigma) of the levels, from -1 (bottom) to 0.
+
+    The s-coordinate is the dimensionless vertical coordinate (``s_rho`` or
+    ``s_w`` in ROMS files). It is evenly spaced for Vstretching 1-4, but not
+    for Vstretching 5, where the spacing is quadratic.
+
+    :param int N: Number of vertical levels.
+    :param str stagger: Grid staggering option ("rho" or "w").
+    :param int Vstretching: Stretching function choice (1, 2, 3, 4, or 5).
+    :return: The s-coordinate, with N values for "rho" and N+1 for "w".
+    """
+    if stagger == "rho":
+        K = np.arange(0.5, N)
+    elif stagger == "w":
+        K = np.arange(N + 1)
+    else:
+        raise ValueError("stagger must be 'rho' or 'w'")
+
+    if Vstretching in (1, 2, 3, 4):
+        return -1 + K / N
+    if Vstretching == 5:
+        S1 = (K * K - 2 * K * N + K + N * N - N) / (N * N - N)
+        S2 = (K * K - K * N) / (1 - N)
+        return -S1 - 0.01 * S2
+    raise ValueError(f"Unknown Vstretching: {Vstretching}")
+
+
 def s_stretch(N, theta_s, theta_b, stagger="rho", Vstretching=1):
     """
     Compute an s-level stretching array.
@@ -32,18 +61,7 @@ def s_stretch(N, theta_s, theta_b, stagger="rho", Vstretching=1):
     :param int Vstretching: Stretching function choice (1, 2, 3, 4, or 5).
     :return: Computed s-level stretching array.
     """
-
-    # if stagger == "rho":
-    #     S = -1.0 + (0.5 + np.arange(N)) / N
-    # elif stagger == "w":
-    #     S = np.linspace(-1.0, 0.0, N + 1)
-    if stagger == "rho":
-        K = np.arange(0.5, N)
-    elif stagger == "w":
-        K = np.arange(N + 1)
-    else:
-        raise ValueError("stagger must be 'rho' or 'w'")
-    S = -1 + K / N
+    S = s_coordinate(N, stagger, Vstretching)
 
     if Vstretching == 1:
         cff1 = 1.0 / np.sinh(theta_s)
@@ -68,25 +86,13 @@ def s_stretch(N, theta_s, theta_b, stagger="rho", Vstretching=1):
         mu = 0.5 * (1 - np.tanh(gamma_ * (S + 0.5)))
         return mu * Csur + (1 - mu) * Cbot
 
-    elif Vstretching == 4:
+    else:  # 4 or 5
         C = (1 - np.cosh(theta_s * S)) / (np.cosh(theta_s) - 1)
         C = (np.exp(theta_b * C) - 1) / (1 - np.exp(-theta_b))
         return C
 
-    elif Vstretching == 5:
-        S1 = (K * K - 2 * K * N + K + N * N - N) / (N * N - N)
-        S2 = (K * K - K * N) / (1 - N)
-        S = -S1 - 0.01 * S2
 
-        C = (1 - np.cosh(theta_s * S)) / (np.cosh(theta_s) - 1)
-        C = (np.exp(theta_b * C) - 1) / (1 - np.exp(-theta_b))
-        return C
-
-    else:
-        raise ValueError(f"Unknown Vstretching: {Vstretching}")
-
-
-def sdepth(H, Hc, C, stagger="rho", Vtransform=1):
+def sdepth(H, Hc, C, stagger="rho", Vtransform=1, S=None):
     """
     Return depth of rho-points in s-levels.
 
@@ -96,6 +102,10 @@ def sdepth(H, Hc, C, stagger="rho", Vtransform=1):
     :param str stagger: Grid staggering option ("rho" or "w").
     :param int Vtransform: Defines the transform used.
         Defaults to 1 = Song-Haidvogel.
+    :param numpy.ndarray S: The s-coordinate of the levels (``s_rho`` or
+        ``s_w``), same length as ``C``. Defaults to evenly spaced levels,
+        which is correct for Vstretching 1-4 but not for Vstretching 5. See
+        :func:`s_coordinate`.
 
     :return: Depths of mid-points in the s-levels with
         ``ndim = H.ndim + 1`` and
@@ -116,12 +126,7 @@ def sdepth(H, Hc, C, stagger="rho", Vtransform=1):
     C = np.asarray(C)
     N = len(C)
     outshape = (N,) + Hshape  # Shape of output
-    if stagger == "rho":
-        S = -1.0 + (0.5 + np.arange(N)) / N  # Unstretched coordinates
-    elif stagger == "w":
-        S = np.linspace(-1.0, 0.0, N)
-    else:
-        raise ValueError("stagger must be 'rho' or 'w'")
+    S = _check_s(S, stagger, N)
 
     if Vtransform == 1:  # Default transform by Song and Haidvogel
         A = Hc * (S - C)[:, None]
@@ -136,6 +141,20 @@ def sdepth(H, Hc, C, stagger="rho", Vtransform=1):
     # else:
     raise ValueError("Unknown Vtransform")
 
+
+
+def _check_s(S, stagger, N):
+    """The s-coordinate of N levels, evenly spaced by default"""
+    if stagger not in ("rho", "w"):
+        raise ValueError("stagger must be 'rho' or 'w'")
+    if S is None:
+        if stagger == "rho":
+            return -1.0 + (0.5 + np.arange(N)) / N
+        return np.linspace(-1.0, 0.0, N)
+    S = np.asarray(S, dtype=np.float64)
+    if S.shape != (N,):
+        raise ValueError(f"S must have the same length as C ({N}), got shape {S.shape}")
+    return S
 
 
 def z2s(z_rho, X, Y, Z):
@@ -377,20 +396,16 @@ class SCoordinate:
     :param i0, j0: Global indices of subgrid point [0, 0]
     :param stagger: "rho" (levels in the middle of the layers) or "w" (levels
         at the layer interfaces, from the bottom to the surface)
+    :param S: The s-coordinate of the levels (``s_rho`` or ``s_w``), same
+        length as C. Defaults to evenly spaced levels (Vstretching 1-4).
     """
 
-    def __init__(self, H, C, hc, vtransform, i0=0, j0=0, stagger="rho"):
+    def __init__(self, H, C, hc, vtransform, i0=0, j0=0, stagger="rho", S=None):
         if int(vtransform) not in (1, 2):
             raise ValueError("Unknown Vtransform")
         self.H = np.ascontiguousarray(H, dtype=np.float64)
         self.C = np.ascontiguousarray(C, dtype=np.float64)
-        n = len(self.C)
-        if stagger == "rho":
-            self.S = -1.0 + (0.5 + np.arange(n)) / n
-        elif stagger == "w":
-            self.S = np.linspace(-1.0, 0.0, n)
-        else:
-            raise ValueError("stagger must be 'rho' or 'w'")
+        self.S = _check_s(S, stagger, len(self.C))
         self.stagger = stagger
         self.hc = float(hc)
         self.vtransform = int(vtransform)

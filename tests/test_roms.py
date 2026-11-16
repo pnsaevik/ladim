@@ -291,3 +291,160 @@ def test_sample3DUV_matches_interp(dense_fields):
     v = dset["V"].interp([K - A, Y + 0.5, X], frame=0)
     assert np.allclose(u, u0, rtol=0, atol=1e-12)
     assert np.allclose(v, v0, rtol=0, atol=1e-12)
+
+
+# --------------------------------------------------------------------------
+# s-coordinate (s_rho, s_w)
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("vstretching", [1, 2, 3, 4])
+def test_s_coordinate_is_even_for_vstretching_1_to_4(vstretching):
+    N = 12
+    assert np.allclose(coords.s_coordinate(N, "rho", vstretching),
+                       -1 + (0.5 + np.arange(N)) / N)
+    assert np.allclose(coords.s_coordinate(N, "w", vstretching),
+                       np.linspace(-1, 0, N + 1))
+
+
+def test_s_coordinate_vstretching_5_matches_norkyst():
+    # s_rho in the Norkyst files (40 levels, Vstretching 5)
+    s_rho = coords.s_coordinate(40, "rho", 5)
+    assert np.allclose(s_rho[[0, 1, 2, -2, -1]],
+                       [-0.979904, -0.940288, -0.901442, -0.015288, -0.004904],
+                       rtol=0, atol=1e-6)
+    s_w = coords.s_coordinate(40, "w", 5)
+    assert s_w[0] == -1 and s_w[-1] == 0
+    assert np.all(np.diff(s_w) > 0)
+    # The levels are in the middle of the layers
+    assert not np.allclose(s_rho, -1 + (0.5 + np.arange(40)) / 40, atol=0.01)
+
+
+def test_s_stretch_unchanged_by_s_coordinate():
+    # Vstretching 5 curve of Norkyst: bottom -1, surface 0
+    Cs_w = coords.s_stretch(40, 5.0, 4.0, stagger="w", Vstretching=5)
+    assert Cs_w[0] == pytest.approx(-1.0) and Cs_w[-1] == pytest.approx(0.0)
+
+
+def test_sdepth_uses_given_s_coordinate():
+    N, hc, H = 40, 100.0, np.array([200.0])
+    Cs_w = coords.s_stretch(N, 5.0, 4.0, stagger="w", Vstretching=5)
+    S_w = coords.s_coordinate(N, "w", 5)
+    z_w = coords.sdepth(H, hc, Cs_w, stagger="w", Vtransform=2, S=S_w)[:, 0]
+    # Surface and bottom
+    assert z_w[0] == pytest.approx(-200.0) and z_w[-1] == pytest.approx(0.0)
+    # Thickness of the uppermost layer (0.676 m), not 1.676 m as with evenly
+    # spaced s-coordinates
+    assert z_w[-1] - z_w[-2] == pytest.approx(0.676, abs=0.005)
+    z_even = coords.sdepth(H, hc, Cs_w, stagger="w", Vtransform=2)[:, 0]
+    assert z_even[-1] - z_even[-2] == pytest.approx(1.676, abs=0.005)
+    # Vtransform 2: z = H * (hc * S + H * C) / (hc + H)
+    assert np.allclose(z_w, 200 * (hc * S_w + 200 * Cs_w) / (hc + 200))
+
+
+@pytest.mark.parametrize("vtransform", [1, 2])
+@pytest.mark.parametrize("stagger", ["rho", "w"])
+def test_scoordinate_with_s_matches_dense(vtransform, stagger):
+    rng = np.random.default_rng(1)
+    H = rng.uniform(120, 400, size=(8, 9))
+    N, hc, i0, j0 = 30, 100.0, 2, 3
+    C = coords.s_stretch(N, 5.0, 4.0, stagger=stagger, Vstretching=5)
+    S = coords.s_coordinate(N, stagger, 5)
+    n = 1000
+    X = rng.uniform(i0, i0 + 8, n)
+    Y = rng.uniform(j0, j0 + 7, n)
+    Z = rng.uniform(0, 380, n)
+
+    z = coords.sdepth(H, hc, C, stagger=stagger, Vtransform=vtransform, S=S)
+    K0, A0 = coords.z2s(z, X - i0, Y - j0, Z)
+    sc = coords.SCoordinate(H, C, hc, vtransform, i0, j0, stagger=stagger, S=S)
+    K, A = sc.z2s(X, Y, Z)
+    assert np.array_equal(K, K0)
+    assert np.allclose(A, A0, rtol=0, atol=1e-12)
+    assert np.allclose(sc.level(X, Y, Z), K0 - A0, rtol=0, atol=1e-12)
+
+    # Not the same as with evenly spaced s-coordinates
+    sc_even = coords.SCoordinate(H, C, hc, vtransform, i0, j0, stagger=stagger)
+    assert not np.allclose(sc_even.level(X, Y, Z), sc.level(X, Y, Z), atol=0.01)
+
+
+def test_sdepth_rejects_wrong_length_of_s():
+    with pytest.raises(ValueError, match="same length"):
+        coords.sdepth(np.array([100.0]), 10.0, np.linspace(-1, 0, 5), S=np.zeros(4))
+
+
+def _write_vertical_grid_file(path, *, N=20, s_rho=True, s_w=True,
+                              vstretching=True, vtransform=2):
+    from netCDF4 import Dataset as NC
+
+    jmax, imax = 6, 7
+    Cs_r = coords.s_stretch(N, 5.0, 4.0, stagger="rho", Vstretching=5)
+    Cs_w = coords.s_stretch(N, 5.0, 4.0, stagger="w", Vstretching=5)
+    with NC(path, "w") as nc:
+        nc.createDimension("eta_rho", jmax)
+        nc.createDimension("xi_rho", imax)
+        nc.createDimension("s_rho", N)
+        nc.createDimension("s_w", N + 1)
+        dims = ("eta_rho", "xi_rho")
+        for name, value in [("h", 300.0), ("mask_rho", 1.0), ("pm", 1 / 800.0),
+                            ("pn", 1 / 800.0), ("lon_rho", 5.0),
+                            ("lat_rho", 60.0), ("angle", 0.0)]:
+            nc.createVariable(name, "f8", dims)[:] = value
+        nc.createVariable("hc", "f8", ())[:] = 100.0
+        nc.createVariable("Vtransform", "i4", ())[:] = vtransform
+        nc.createVariable("Cs_r", "f8", ("s_rho",))[:] = Cs_r
+        nc.createVariable("Cs_w", "f8", ("s_w",))[:] = Cs_w
+        if vstretching:
+            nc.createVariable("Vstretching", "i4", ())[:] = 5
+        if s_rho:
+            nc.createVariable("s_rho", "f8", ("s_rho",))[:] = coords.s_coordinate(N, "rho", 5)
+        if s_w:
+            nc.createVariable("s_w", "f8", ("s_w",))[:] = coords.s_coordinate(N, "w", 5)
+
+
+def _grid(path):
+    from ladim.gridforce.ROMS import Grid
+
+    return Grid(dict(gridforce=dict(grid_file=str(path), num_threads=1)))
+
+
+@pytest.mark.parametrize("s_rho, s_w, vstretching", [
+    (True, True, False),    # s_rho and s_w in the file
+    (True, False, False),   # s_w deduced from the form of s_rho
+    (True, False, True),    # s_w from Vstretching
+    (False, False, True),   # Only Vstretching
+])
+def test_grid_reads_s_coordinate_from_file(tmp_path, s_rho, s_w, vstretching):
+    N = 20
+    f = tmp_path / "grid.nc"
+    _write_vertical_grid_file(f, N=N, s_rho=s_rho, s_w=s_w, vstretching=vstretching)
+    grid = _grid(f)
+    assert np.allclose(grid.S_r, coords.s_coordinate(N, "rho", 5))
+    assert np.allclose(grid.S_w, coords.s_coordinate(N, "w", 5))
+    assert np.allclose(grid.scoord.S, grid.S_r)
+    assert np.allclose(grid.scoord_w.S, grid.S_w)
+    # The depths use the s-coordinate
+    z_w = grid.z_w[:, 0, 0]
+    S, C = grid.S_w, grid.Cs_w
+    assert np.allclose(z_w, 300 * (100 * S + 300 * C) / (100 + 300))
+
+
+def test_grid_reads_even_s_coordinate_without_s_rho_and_vstretching(tmp_path, caplog):
+    N = 20
+    f = tmp_path / "grid.nc"
+    _write_vertical_grid_file(f, N=N, s_rho=False, s_w=False, vstretching=False)
+    with caplog.at_level("WARNING"):
+        grid = _grid(f)
+    assert "evenly spaced" in caplog.text
+    assert np.allclose(grid.S_r, -1 + (0.5 + np.arange(N)) / N)
+    assert np.allclose(grid.S_w, np.linspace(-1, 0, N + 1))
+
+
+def test_grid_with_vinfo_uses_vstretching(tmp_path):
+    f = tmp_path / "grid.nc"
+    _write_vertical_grid_file(f, N=20)
+    from ladim.gridforce.ROMS import Grid
+
+    vinfo = dict(N=20, hc=100.0, theta_s=5.0, theta_b=4.0, Vstretching=5, Vtransform=2)
+    grid = Grid(dict(gridforce=dict(grid_file=str(f), num_threads=1, Vinfo=vinfo)))
+    assert np.allclose(grid.S_r, coords.s_coordinate(20, "rho", 5))
+    assert np.allclose(grid.S_w, coords.s_coordinate(20, "w", 5))
