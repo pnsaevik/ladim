@@ -227,54 +227,22 @@ class Grid:
         return X + self.i0, Y + self.j0
 
 
-def _read_levels(ncid, name, n):
-    """Values of the 1-D variable `name` (None if it is not in the file)"""
-    if name not in ncid.variables:
-        return None
-    var = ncid.variables[name]
-    if var.shape != (n,):
-        raise ValueError(f"Expected {name} to have shape ({n},), got {var.shape}")
-    return np.array(var[:], dtype=np.float64)
-
 
 def _read_s_coordinates(ncid, N):
-    """The s-coordinates at rho and w levels of a ROMS file
+    """The s-coordinates at rho and w levels, computed from Vstretching
 
-    The s-coordinate (``s_rho``, ``s_w``) must be used together with the
-    stretching curve (``Cs_r``, ``Cs_w``) to get the depths. It is evenly
-    spaced for Vstretching 1-4, but not for Vstretching 5. The coordinates
-    are read from the file if they are there. Otherwise they are computed from
-    ``Vstretching``, or, if that is missing as well, from the form of ``s_rho``.
+    The s-coordinate must be used together with the stretching curve (``Cs_r``,
+    ``Cs_w``) to get the depths. It is evenly spaced for Vstretching 1-4, but
+    not for Vstretching 5. It is computed from the ``Vstretching`` variable
+    of the file, and is not read from ``s_rho`` and ``s_w``.
     """
-    Vstretching = None
-    if "Vstretching" in ncid.variables:
-        Vstretching = int(ncid.variables["Vstretching"].getValue())
-
-    S_r = _read_levels(ncid, "s_rho", N)
-    S_w = _read_levels(ncid, "s_w", N + 1)
-
-    if S_r is None:
-        if Vstretching is None:
-            logger.warning(
-                "The grid file has neither s_rho nor Vstretching, assuming "
-                "evenly spaced s-coordinates (Vstretching 1-4). Depths are wrong "
-                "for Vstretching 5."
-            )
-            Vstretching = 1
-        S_r = coords.s_coordinate(N, "rho", Vstretching)
-
-    if S_w is None:
-        if Vstretching is None:  # Find which Vstretching s_rho corresponds to
-            for v in (1, 5):
-                if np.allclose(coords.s_coordinate(N, "rho", v), S_r, rtol=0, atol=1e-7):
-                    Vstretching = v
-                    break
-            else:
-                logger.warning(
-                    "Could not determine s_w from the grid file, assuming evenly "
-                    "spaced levels. Depths at w levels may be wrong."
-                )
-                Vstretching = 1
-        S_w = coords.s_coordinate(N, "w", Vstretching)
-
-    return S_r, S_w
+    if "Vstretching" not in ncid.variables:
+        raise ValueError(
+            "Vstretching is missing in the grid file. Specify it in "
+            "gridforce.Vinfo (N, hc, theta_s, theta_b, Vtransform, Vstretching)."
+        )
+    Vstretching = int(ncid.variables["Vstretching"].getValue())
+    return (
+        coords.s_coordinate(N, "rho", Vstretching),
+        coords.s_coordinate(N, "w", Vstretching),
+    )

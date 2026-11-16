@@ -372,8 +372,7 @@ def test_sdepth_rejects_wrong_length_of_s():
         coords.sdepth(np.array([100.0]), 10.0, np.linspace(-1, 0, 5), S=np.zeros(4))
 
 
-def _write_vertical_grid_file(path, *, N=20, s_rho=True, s_w=True,
-                              vstretching=True, vtransform=2):
+def _write_vertical_grid_file(path, *, N=20, vstretching=5, vtransform=2):
     from netCDF4 import Dataset as NC
 
     jmax, imax = 6, 7
@@ -393,12 +392,8 @@ def _write_vertical_grid_file(path, *, N=20, s_rho=True, s_w=True,
         nc.createVariable("Vtransform", "i4", ())[:] = vtransform
         nc.createVariable("Cs_r", "f8", ("s_rho",))[:] = Cs_r
         nc.createVariable("Cs_w", "f8", ("s_w",))[:] = Cs_w
-        if vstretching:
-            nc.createVariable("Vstretching", "i4", ())[:] = 5
-        if s_rho:
-            nc.createVariable("s_rho", "f8", ("s_rho",))[:] = coords.s_coordinate(N, "rho", 5)
-        if s_w:
-            nc.createVariable("s_w", "f8", ("s_w",))[:] = coords.s_coordinate(N, "w", 5)
+        if vstretching is not None:
+            nc.createVariable("Vstretching", "i4", ())[:] = vstretching
 
 
 def _grid(path):
@@ -407,16 +402,10 @@ def _grid(path):
     return Grid(dict(gridforce=dict(grid_file=str(path), num_threads=1)))
 
 
-@pytest.mark.parametrize("s_rho, s_w, vstretching", [
-    (True, True, False),    # s_rho and s_w in the file
-    (True, False, False),   # s_w deduced from the form of s_rho
-    (True, False, True),    # s_w from Vstretching
-    (False, False, True),   # Only Vstretching
-])
-def test_grid_reads_s_coordinate_from_file(tmp_path, s_rho, s_w, vstretching):
+def test_grid_computes_s_coordinate_from_vstretching(tmp_path):
     N = 20
     f = tmp_path / "grid.nc"
-    _write_vertical_grid_file(f, N=N, s_rho=s_rho, s_w=s_w, vstretching=vstretching)
+    _write_vertical_grid_file(f, N=N, vstretching=5)
     grid = _grid(f)
     assert np.allclose(grid.S_r, coords.s_coordinate(N, "rho", 5))
     assert np.allclose(grid.S_w, coords.s_coordinate(N, "w", 5))
@@ -428,15 +417,20 @@ def test_grid_reads_s_coordinate_from_file(tmp_path, s_rho, s_w, vstretching):
     assert np.allclose(z_w, 300 * (100 * S + 300 * C) / (100 + 300))
 
 
-def test_grid_reads_even_s_coordinate_without_s_rho_and_vstretching(tmp_path, caplog):
+def test_grid_with_vstretching_1_has_even_s_coordinate(tmp_path):
     N = 20
     f = tmp_path / "grid.nc"
-    _write_vertical_grid_file(f, N=N, s_rho=False, s_w=False, vstretching=False)
-    with caplog.at_level("WARNING"):
-        grid = _grid(f)
-    assert "evenly spaced" in caplog.text
+    _write_vertical_grid_file(f, N=N, vstretching=1)
+    grid = _grid(f)
     assert np.allclose(grid.S_r, -1 + (0.5 + np.arange(N)) / N)
     assert np.allclose(grid.S_w, np.linspace(-1, 0, N + 1))
+
+
+def test_grid_requires_vstretching(tmp_path):
+    f = tmp_path / "grid.nc"
+    _write_vertical_grid_file(f, vstretching=None)
+    with pytest.raises(ValueError, match="Vstretching is missing"):
+        _grid(f)
 
 
 def test_grid_with_vinfo_uses_vstretching(tmp_path):

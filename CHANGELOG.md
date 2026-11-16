@@ -21,12 +21,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   (used by NorKyst v3), where the s-coordinates are unevenly spaced. The
   levels were then too deep, by up to about 5 m in the upper 20 m, which
   affected the depth where particles sample currents, temperature and
-  salinity. The s-coordinates (`s_rho`, `s_w`) are now read from the forcing
-  or grid file, or computed from `Vstretching` (`gridforce.Vinfo` or the
-  `Vstretching` variable). If `s_w` is missing, it is deduced from the form of
-  `s_rho`. If the file has neither `s_rho` nor `Vstretching`, evenly spaced
-  s-coordinates are assumed, with a warning. Results for Vstretching 1-4 are
-  unchanged.
+  salinity. The s-coordinates are now computed from `Vstretching` (the
+  `Vstretching` variable in the file, or `gridforce.Vinfo`), and are not read
+  from `s_rho` and `s_w`. A missing `Vstretching` is an error (previously
+  evenly spaced s-coordinates were implicitly assumed). Results for
+  Vstretching 1-4 are unchanged.
 ### Added
 - `coords.s_coordinate`, and the argument `S` to `coords.sdepth` and
   `coords.SCoordinate`.
