@@ -442,3 +442,17 @@ def test_grid_with_vinfo_uses_vstretching(tmp_path):
     grid = Grid(dict(gridforce=dict(grid_file=str(f), num_threads=1, Vinfo=vinfo)))
     assert np.allclose(grid.S_r, coords.s_coordinate(20, "rho", 5))
     assert np.allclose(grid.S_w, coords.s_coordinate(20, "w", 5))
+
+
+def test_vinfo_overrides_the_vertical_grid_of_the_file(tmp_path):
+    f = tmp_path / "grid.nc"
+    _write_vertical_grid_file(f, N=20, vstretching=5, vtransform=2)
+    from ladim.gridforce.ROMS import Grid
+
+    vinfo = dict(N=10, hc=50.0, theta_s=3.0, theta_b=0.4, Vstretching=1, Vtransform=1)
+    grid = Grid(dict(gridforce=dict(grid_file=str(f), num_threads=1, Vinfo=vinfo)))
+    assert grid.N == 10 and grid.hc == 50.0
+    assert grid.Vtransform == 1 and grid.Vstretching == 1
+    assert np.allclose(grid.Cs_r, coords.s_stretch(10, 3.0, 0.4, "rho", 1))
+    assert np.allclose(grid.S_r, -1 + (0.5 + np.arange(10)) / 10)
+    assert grid.z_r.shape[0] == 10

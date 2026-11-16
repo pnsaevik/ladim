@@ -24,6 +24,8 @@ class Grid:
     Ordinary python style, start points included, not end points. Each of the
     elements can be replaced with None, for no limitation. Vinfo: dictionary
     with N, hc, theta_s and theta_b (and optionally Vstretching, Vtransform).
+    If Vinfo is given, it replaces the vertical grid information in the file
+    (hc, Cs_r, Cs_w, Vtransform, Vstretching), which is then ignored.
 
     Horizontal positions X, Y are global grid coordinates, while the 2-D
     arrays (H, M, dx, ...) cover the subgrid only.
