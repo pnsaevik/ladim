@@ -23,7 +23,7 @@ class Grid:
     Possible grid arguments are subgrid and Vinfo. subgrid = [i0, i1, j0, j1].
     Ordinary python style, start points included, not end points. Each of the
     elements can be replaced with None, for no limitation. Vinfo: dictionary
-    with N, hc, theta_s and theta_b (and optionally Vstretching, Vtransform).
+    with N, hc, theta_s, theta_b, Vtransform and Vstretching (all required).
     If Vinfo is given, it replaces the vertical grid information in the file
     (hc, Cs_r, Cs_w, Vtransform, Vstretching), which is then ignored.
 
@@ -133,10 +133,11 @@ class Grid:
             Vinfo = gconf["Vinfo"]
             self.N = Vinfo["N"]
             self.hc = Vinfo["hc"]
-            self.Vstretching = Vinfo.get("Vstretching", 1)
-            if "Vtransform" not in Vinfo:
-                raise ValueError("Vtransform is missing in gridforce.Vinfo")
+            for name in ("Vtransform", "Vstretching"):
+                if name not in Vinfo:
+                    raise ValueError(f"{name} is missing in gridforce.Vinfo")
             self.Vtransform = Vinfo["Vtransform"]
+            self.Vstretching = Vinfo["Vstretching"]
             args = (self.N, Vinfo["theta_s"], Vinfo["theta_b"])
             self.Cs_r = coords.s_stretch(*args, stagger="rho", Vstretching=self.Vstretching)
             self.Cs_w = coords.s_stretch(*args, stagger="w", Vstretching=self.Vstretching)

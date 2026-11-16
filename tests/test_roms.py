@@ -389,7 +389,8 @@ def _write_vertical_grid_file(path, *, N=20, vstretching=5, vtransform=2):
                             ("lat_rho", 60.0), ("angle", 0.0)]:
             nc.createVariable(name, "f8", dims)[:] = value
         nc.createVariable("hc", "f8", ())[:] = 100.0
-        nc.createVariable("Vtransform", "i4", ())[:] = vtransform
+        if vtransform is not None:
+            nc.createVariable("Vtransform", "i4", ())[:] = vtransform
         nc.createVariable("Cs_r", "f8", ("s_rho",))[:] = Cs_r
         nc.createVariable("Cs_w", "f8", ("s_w",))[:] = Cs_w
         if vstretching is not None:
@@ -456,3 +457,22 @@ def test_vinfo_overrides_the_vertical_grid_of_the_file(tmp_path):
     assert np.allclose(grid.Cs_r, coords.s_stretch(10, 3.0, 0.4, "rho", 1))
     assert np.allclose(grid.S_r, -1 + (0.5 + np.arange(10)) / 10)
     assert grid.z_r.shape[0] == 10
+
+
+@pytest.mark.parametrize("missing", ["Vtransform", "Vstretching"])
+def test_vinfo_requires_vtransform_and_vstretching(tmp_path, missing):
+    f = tmp_path / "grid.nc"
+    _write_vertical_grid_file(f, N=20)
+    from ladim.gridforce.ROMS import Grid
+
+    vinfo = dict(N=20, hc=100.0, theta_s=5.0, theta_b=4.0, Vstretching=5, Vtransform=2)
+    del vinfo[missing]
+    with pytest.raises(ValueError, match=f"{missing} is missing in gridforce.Vinfo"):
+        Grid(dict(gridforce=dict(grid_file=str(f), num_threads=1, Vinfo=vinfo)))
+
+
+def test_grid_requires_vtransform(tmp_path):
+    f = tmp_path / "grid.nc"
+    _write_vertical_grid_file(f, N=20, vtransform=None)
+    with pytest.raises(ValueError, match="Vtransform is missing"):
+        _grid(f)
