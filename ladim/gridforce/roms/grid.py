@@ -23,7 +23,9 @@ class Grid:
     Possible grid arguments are subgrid and Vinfo. subgrid = [i0, i1, j0, j1].
     Ordinary python style, start points included, not end points. Each of the
     elements can be replaced with None, for no limitation. Vinfo: dictionary
-    with N, hc, theta_s and theta_b (and optionally Vstretching, Vtransform).
+    with N, hc, theta_s, theta_b, Vtransform and Vstretching (all required).
+    If Vinfo is given, it replaces the vertical grid information in the file
+    (hc, Cs_r, Cs_w, Vtransform, Vstretching), which is then ignored.
 
     Horizontal positions X, Y are global grid coordinates, while the 2-D
     arrays (H, M, dx, ...) cover the subgrid only.
@@ -66,11 +68,12 @@ class Grid:
     def _make_coordinates(self):
         """Vertical coordinates at rho and w levels"""
         self.scoord = coords.SCoordinate(
-            self.H, self.Cs_r, self.hc, self.Vtransform, self.i0, self.j0
+            self.H, self.Cs_r, self.hc, self.Vtransform, self.i0, self.j0,
+            S=self.S_r,
         )
         self.scoord_w = coords.SCoordinate(
             self.H, self.Cs_w, self.hc, self.Vtransform, self.i0, self.j0,
-            stagger="w",
+            stagger="w", S=self.S_w,
         )
 
     def _read_grid(self, ncid, gconf):
@@ -130,13 +133,16 @@ class Grid:
             Vinfo = gconf["Vinfo"]
             self.N = Vinfo["N"]
             self.hc = Vinfo["hc"]
-            self.Vstretching = Vinfo.get("Vstretching", 1)
-            if "Vtransform" not in Vinfo:
-                raise ValueError("Vtransform is missing in gridforce.Vinfo")
+            for name in ("Vtransform", "Vstretching"):
+                if name not in Vinfo:
+                    raise ValueError(f"{name} is missing in gridforce.Vinfo")
             self.Vtransform = Vinfo["Vtransform"]
+            self.Vstretching = Vinfo["Vstretching"]
             args = (self.N, Vinfo["theta_s"], Vinfo["theta_b"])
             self.Cs_r = coords.s_stretch(*args, stagger="rho", Vstretching=self.Vstretching)
             self.Cs_w = coords.s_stretch(*args, stagger="w", Vstretching=self.Vstretching)
+            self.S_r = coords.s_coordinate(self.N, "rho", self.Vstretching)
+            self.S_w = coords.s_coordinate(self.N, "w", self.Vstretching)
         else:
             self.hc = ncid.variables["hc"].getValue()
             self.Cs_r = ncid.variables["Cs_r"][:]
@@ -148,13 +154,14 @@ class Grid:
                     "gridforce.Vinfo (Vtransform: 1 or 2)."
                 )
             self.Vtransform = ncid.variables["Vtransform"].getValue()
+            self.S_r, self.S_w = _read_s_coordinates(ncid, self.N)
 
     # Full 3-D depth arrays (1 GB each for large grids), computed on access
     @property
     def z_r(self):
         if self._z_r is None:
             self._z_r = coords.sdepth(self.H, self.hc, self.Cs_r, stagger="rho",
-                                      Vtransform=self.Vtransform)
+                                      Vtransform=self.Vtransform, S=self.S_r)
         return self._z_r
 
     @z_r.setter
@@ -165,7 +172,7 @@ class Grid:
     def z_w(self):
         if self._z_w is None:
             self._z_w = coords.sdepth(self.H, self.hc, self.Cs_w, stagger="w",
-                                      Vtransform=self.Vtransform)
+                                      Vtransform=self.Vtransform, S=self.S_w)
         return self._z_w
 
     @z_w.setter
@@ -221,3 +228,24 @@ class Grid:
     def ll2xy(self, lon, lat):
         Y, X = bilin_inv(lon, lat, self.lon, self.lat)
         return X + self.i0, Y + self.j0
+
+
+
+def _read_s_coordinates(ncid, N):
+    """The s-coordinates at rho and w levels, computed from Vstretching
+
+    The s-coordinate must be used together with the stretching curve (``Cs_r``,
+    ``Cs_w``) to get the depths. It is evenly spaced for Vstretching 1-4, but
+    not for Vstretching 5. It is computed from the ``Vstretching`` variable
+    of the file, and is not read from ``s_rho`` and ``s_w``.
+    """
+    if "Vstretching" not in ncid.variables:
+        raise ValueError(
+            "Vstretching is missing in the grid file. Specify it in "
+            "gridforce.Vinfo (N, hc, theta_s, theta_b, Vtransform, Vstretching)."
+        )
+    Vstretching = int(ncid.variables["Vstretching"].getValue())
+    return (
+        coords.s_coordinate(N, "rho", Vstretching),
+        coords.s_coordinate(N, "w", Vstretching),
+    )
