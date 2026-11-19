@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from ladim.state import State
-from ladim.tracker import Tracker, parse_vert_mix
+from ladim.tracker import Tracker
 
 
 class MockObj:
@@ -187,275 +187,103 @@ def test_unknown_method():
 
 # ---------- Vertical diffusion ----------
 
-def vertical_model(n, z0, depth, vert_mix, dt=600, active=None):
+def vertical_model(n, z0, depth, active=None, dt=600):
     model = make_model(np.zeros(n), np.zeros(n), velocity=still, dt=dt, active=active)
     model.state['Z'] = np.full(n, float(z0))
     model.grid.sample_depth = lambda x, y: np.full(len(x), float(depth))
     return model
 
 
-def test_vert_mix_defaults_to_zero():
-    for vert_mix in (None, 0, 0.0, dict(method="constant", value=0)):
-        assert Tracker.create("RK4", 0, vert_mix).vert_mix.value == 0
+def constant(value):
+    return dict(method="constant", value=value)
 
 
-def test_no_vertical_movement_without_vert_mix():
-    model = vertical_model(100, 5.0, 50.0, 0)
+def test_tracker_has_no_vertical_diffusion_by_default():
+    assert Tracker.create("RK4", 0).diffusor.enabled is False
+    model = vertical_model(100, 5.0, 50.0)
     del model.grid.sample_depth  # Must not be needed
     Tracker.create("RK4", 1.0).update(model)
+    Tracker.create("RK4", 1.0, constant(0)).update(model)
     assert np.all(model.state['Z'] == 5.0)
 
 
-def test_vertical_diffusion_has_correct_variance():
-    k, dt, n = 0.01, 600, 200_000
-    model = vertical_model(n, 500.0, 1000.0, k, dt=dt)
-    np.random.seed(1)
-    Tracker.create("RK4", 0, k).update(model)
-    dz = model.state['Z'] - 500.0
-    assert dz.mean() == pytest.approx(0, abs=0.01)
-    assert dz.var() == pytest.approx(2 * k * dt, rel=0.02)
-    assert np.all(np.abs(dz) <= 3 ** 0.5 * (2 * k * dt) ** 0.5 + 1e-4)
+def test_tracker_creates_diffusor_from_specification():
+    from ladim.vertical_diffusion import ConstantDiffusor, LaBolleDiffusor
+    assert isinstance(Tracker.create("RK4", 0, constant(1e-3)).diffusor, ConstantDiffusor)
+    spec = dict(method="labolle", min=0, max=1, resolution=5, vert_mix=lambda x, y, z: z)
+    assert isinstance(Tracker.create("RK4", 0, spec).diffusor, LaBolleDiffusor)
+    with pytest.raises(ValueError):
+        Tracker.create("RK4", 0, dict(method="foo"))
 
 
-@pytest.mark.parametrize("k", [0.01, 1.0, 100.0])  # Last one: steps >> depth
-def test_vertical_diffusion_stays_between_surface_and_bottom(k):
-    depth = 20.0
-    model = vertical_model(50_000, 0.0, depth, k)
-    tracker = Tracker.create("RK4", 0, k)
-    np.random.seed(2)
-    for _ in range(30):
-        tracker.update(model)
-        assert model.state['Z'].min() >= 0
-        assert model.state['Z'].max() <= depth
-
-    if k >= 1.0:  # Well mixed: uniform distribution
-        assert model.state['Z'].mean() == pytest.approx(depth / 2, rel=0.02)
-        assert model.state['Z'].var() == pytest.approx(depth ** 2 / 12, rel=0.03)
-
-
-def test_vertical_diffusion_reflects_at_surface_and_bottom():
-    from ladim.tracker import _vertical
-    Z = np.array([0.0, 0.0, 9.0, 9.0, 25.0, 3.0])
-    depth = np.array([10.0, 10.0, 10.0, 10.0, 10.0, np.nan])
-    pid = np.arange(len(Z), dtype=np.int64)
-    # With zero standard deviation only the folding of the positions is exercised
-    _vertical(Z, depth, pid, np.uint64(1), 0.0)
-    assert Z.tolist()[:5] == [0.0, 0.0, 9.0, 9.0, 5.0]  # 25 folds to 5
-    assert Z[5] == 3.0  # No depth: not moved
-
-
-def test_vertical_diffusion_does_not_move_inactive_particles():
-    active = np.array([True, False] * 50)
-    model = vertical_model(100, 5.0, 50.0, 0.1, active=active)
+def test_tracker_applies_vertical_diffusion_after_horizontal_movement():
+    model = vertical_model(20_000, 500.0, 1000.0)
     np.random.seed(3)
-    Tracker.create("RK4", 0, 0.1).update(model)
+    Tracker.create("RK4", 2.0, constant(0.1)).update(model)
+    Z = model.state['Z']
+    assert np.all(Z != 500.0)
+    assert Z.var() == pytest.approx(2 * 0.1 * 600, rel=0.05)
+    assert model.state['X'].var() > 0  # Horizontal random walk as well
+
+
+def test_tracker_does_not_move_inactive_particles_vertically():
+    active = np.array([True, False] * 50)
+    model = vertical_model(100, 5.0, 50.0, active=active)
+    np.random.seed(3)
+    Tracker.create("RK4", 0, constant(0.1)).update(model)
     Z = model.state['Z']
     assert np.all(Z[~active] == 5.0)
     assert np.all(Z[active] != 5.0)
 
 
-def test_vertical_diffusion_is_reproducible_and_keeps_horizontal_result():
-    def run(seed, vert_mix):
-        model = vertical_model(1000, 5.0, 50.0, vert_mix)
+def test_tracker_uses_depth_at_new_horizontal_position():
+    model = vertical_model(1000, 5.0, 50.0)
+    seen = []
+
+    def sample_depth(x, y):
+        seen.append(x.copy())
+        return np.full(len(x), 50.0)
+
+    model.grid.sample_depth = sample_depth
+    np.random.seed(3)
+    Tracker.create("RK4", 2.0, constant(0.1)).update(model)
+    assert np.array_equal(seen[0], model.state['X'])
+
+
+def test_tracker_vertical_diffusion_is_reproducible():
+    def run(seed):
+        model = vertical_model(1000, 5.0, 50.0)
         np.random.seed(seed)
-        Tracker.create("RK4", 2.0, vert_mix).update(model)
+        Tracker.create("RK4", 2.0, constant(0.1)).update(model)
         return model.state['X'].copy(), model.state['Z'].copy()
 
-    x_a, z_a = run(3, 0.1)
-    x_b, z_b = run(3, 0.1)
-    x_c, z_c = run(4, 0.1)
-    assert np.array_equal(z_a, z_b) and not np.allclose(z_a, z_c)
-
-    # Horizontal random walk is the same with and without vertical diffusion
-    x_0, z_0 = run(3, 0)
-    assert np.array_equal(x_a, x_0)
-    assert np.all(z_0 == 5.0)
+    x_a, z_a = run(3)
+    x_b, z_b = run(3)
+    x_c, z_c = run(4)
+    assert np.array_equal(z_a, z_b) and np.array_equal(x_a, x_b)
+    assert not np.allclose(z_a, z_c)
 
 
-def test_vertical_diffusion_is_uncorrelated_with_horizontal():
+def test_tracker_vertical_diffusion_is_uncorrelated_with_horizontal():
     n = 200_000
-    model = vertical_model(n, 500.0, 1000.0, 0.01)
+    model = vertical_model(n, 500.0, 1000.0)
     np.random.seed(5)
-    Tracker.create("RK4", 2.0, 0.01).update(model)
+    Tracker.create("RK4", 2.0, constant(0.01)).update(model)
     dz = model.state['Z'] - 500.0
     assert np.corrcoef(dz, model.state['X'])[0, 1] == pytest.approx(0, abs=0.01)
     assert np.corrcoef(dz, model.state['Y'])[0, 1] == pytest.approx(0, abs=0.01)
 
 
-def test_negative_vert_mix_is_rejected():
-    with pytest.raises(ValueError):
-        Tracker.create("RK4", 0, -1.0)
+def test_tracker_passes_positions_to_diffusivity_function():
+    model = vertical_model(10, 5.0, 50.0)
+    model.state['X'] = np.arange(10, dtype=float)
+    seen = []
 
+    def vert_mix(x, y, z):
+        seen.append((x.copy(), y.copy()))
+        return np.full(len(x), 1e-3)
 
-# ---------- Vertical diffusion specification ----------
-
-INF = float("inf")
-
-
-def test_parse_number_is_constant():
-    vm = parse_vert_mix(0.01)
-    assert (vm.method, vm.value) == ("constant", 0.01)
-    assert parse_vert_mix(2).value == 2.0
-    assert parse_vert_mix(dict(method="constant", value=0.5)) == parse_vert_mix(0.5)
-
-
-def test_parse_labolle_string_has_no_clipping_or_binning():
-    vm = parse_vert_mix("labolle")
-    assert (vm.method, vm.min, vm.max, vm.resolution) == ("labolle", 0, INF, INF)
-
-
-def test_parse_labolle_dict():
-    vm = parse_vert_mix(dict(method="labolle", min=1e-4, max=1e-2, resolution=5))
-    assert (vm.min, vm.max, vm.resolution) == (1e-4, 1e-2, 5.0)
-    # Infinity as a string, since "inf" is not a number in yaml
-    vm = parse_vert_mix(dict(method="labolle", min=0, max="inf", resolution="inf"))
-    assert (vm.max, vm.resolution) == (INF, INF)
-
-
-@pytest.mark.parametrize("spec", [
-    "labolle_5",  # Unknown string
-    True,  # Not a number
-    [1.0],
-    -1.0,
-    INF,
-    dict(value=1.0),  # No method
-    dict(method="foo", value=1.0),
-    dict(method="constant"),  # No defaults
-    dict(method="constant", value=1.0, min=0),  # Unknown field
-    dict(method="labolle", min=0, max=1),  # No resolution (no defaults)
-    dict(method="labolle", min=0, max=1, resolution=0),
-    dict(method="labolle", min=2, max=1, resolution=5),
-    dict(method="labolle", min=-1, max=1, resolution=5),
-    dict(method="labolle", min="a", max=1, resolution=5),
-])
-def test_parse_rejects_invalid_specification(spec):
-    with pytest.raises(ValueError):
-        parse_vert_mix(spec)
-
-
-# ---------- Vertical diffusion from the forcing (labolle) ----------
-
-def labolle_model(n, z0, depth, vert_mix_fn, dt=600, active=None):
-    model = vertical_model(n, z0, depth, 0, dt=dt, active=active)
-    model.forcing.vert_mix = vert_mix_fn
-    return model
-
-
-def labolle(**kwargs):
-    return dict(method="labolle", **kwargs)
-
-
-def test_labolle_with_constant_diffusivity_has_correct_variance():
-    k, dt, n = 0.01, 600, 200_000
-    model = labolle_model(n, 500.0, 1000.0, lambda x, y, z: np.full(len(z), k), dt=dt)
-    np.random.seed(1)
-    Tracker.create("RK4", 0, "labolle").update(model)
-    dz = model.state['Z'] - 500.0
-    assert dz.mean() == pytest.approx(0, abs=0.01)
-    assert dz.var() == pytest.approx(2 * k * dt, rel=0.02)
-
-
-def test_labolle_samples_diffusivity_at_bin_midpoints():
-    calls = []
-
-    def fn(x, y, z):
-        calls.append(z.copy())
-        return np.full(len(z), 1e-3)
-
-    n = 5000
-    model = labolle_model(n, 7.0, 1000.0, fn)
-    model.state['Z'] = np.random.default_rng(0).uniform(0, 50, n)
-    Z0 = model.state['Z'].copy()
-    np.random.seed(1)
-    Tracker.create("RK4", 0, labolle(min=0, max=1, resolution=5)).update(model)
-
-    assert len(calls) == 2  # Initial and intermediate position
-    assert np.array_equal(calls[0], (Z0 // 5) * 5 + 2.5)
-    for z in calls:
-        assert np.all(z % 5 == 2.5)
-    assert calls[0].min() == 2.5  # Top bin is sampled at 2.5 m
-
-
-def test_labolle_without_binning_samples_at_particle_depth():
-    calls = []
-
-    def fn(x, y, z):
-        calls.append(z.copy())
-        return np.full(len(z), 1e-3)
-
-    model = labolle_model(100, 7.3, 1000.0, fn)
-    np.random.seed(1)
-    Tracker.create("RK4", 0, "labolle").update(model)
-    assert np.all(calls[0] == 7.3)
-    assert np.all(calls[1] != 7.3)  # Intermediate position
-
-
-def test_labolle_final_step_uses_diffusivity_at_intermediate_position():
-    # Diffusivity is high above 10 m and tiny below: particles starting in
-    # the weak layer which step into the strong layer get a large final step
-    dt = 600
-
-    def fn(x, y, z):
-        return np.where(z < 10, 1.0, 1e-6)
-
-    n = 20_000
-    model = labolle_model(n, 10.0 + 1e-3, 1000.0, fn, dt=dt)
-    np.random.seed(2)
-    Tracker.create("RK4", 0, labolle(min=0, max=INF, resolution=INF)).update(model)
-    dz = model.state['Z'] - model.state['Z'].dtype.type(10.0 + 1e-3)
-    tiny = (2 * 1e-6 * dt) ** 0.5 * 3 ** 0.5
-    assert np.any(np.abs(dz) > 100 * tiny)  # Some made large final steps
-    assert np.any(np.abs(dz) <= tiny)  # Others kept their tiny steps
-
-
-def test_labolle_clips_diffusivity():
-    dt, n = 600, 100_000
-    for k, expected in [(1.0, 1e-2), (1e-9, 1e-4)]:
-        model = labolle_model(n, 500.0, 1000.0, lambda x, y, z: np.full(len(z), k), dt=dt)
-        np.random.seed(1)
-        Tracker.create("RK4", 0, labolle(min=1e-4, max=1e-2, resolution=5)).update(model)
-        dz = model.state['Z'] - 500.0
-        assert dz.var() == pytest.approx(2 * expected * dt, rel=0.03)
-
-
-def test_labolle_replaces_invalid_diffusivity_with_minimum():
-    model = labolle_model(100, 5.0, 1000.0, lambda x, y, z: np.full(len(z), np.nan))
-    np.random.seed(1)
-    Tracker.create("RK4", 0, labolle(min=0, max=1, resolution=5)).update(model)
-    assert np.all(model.state['Z'] == 5.0)
-
-
-def test_labolle_stays_between_surface_and_bottom():
-    depth = 20.0
-    model = labolle_model(20_000, 0.0, depth, lambda x, y, z: np.full(len(z), 1.0))
-    tracker = Tracker.create("RK4", 0, labolle(min=0, max=INF, resolution=5))
-    np.random.seed(2)
-    for _ in range(20):
-        tracker.update(model)
-        assert 0 <= model.state['Z'].min() and model.state['Z'].max() <= depth
-
-
-def test_labolle_does_not_move_inactive_particles():
-    active = np.array([True, False] * 50)
-    model = labolle_model(100, 5.0, 50.0, lambda x, y, z: np.full(len(z), 0.1), active=active)
-    np.random.seed(3)
-    Tracker.create("RK4", 0, "labolle").update(model)
-    assert np.all(model.state['Z'][~active] == 5.0)
-    assert np.all(model.state['Z'][active] != 5.0)
-
-
-def test_labolle_is_reproducible():
-    def run(seed):
-        model = labolle_model(1000, 5.0, 50.0, lambda x, y, z: np.full(len(z), 0.1))
-        np.random.seed(seed)
-        Tracker.create("RK4", 0, "labolle").update(model)
-        return model.state['Z'].copy()
-
-    assert np.array_equal(run(3), run(3))
-    assert not np.allclose(run(3), run(4))
-
-
-def test_labolle_requires_forcing_with_diffusivity():
-    model = vertical_model(10, 5.0, 50.0, 0)  # Forcing has no vert_mix
-    with pytest.raises(ValueError, match="vertical diffusivity"):
-        Tracker.create("RK4", 0, "labolle").update(model)
+    spec = dict(method="labolle", min=0, max=1, resolution=5, vert_mix=vert_mix)
+    Tracker.create("RK4", 0, spec).update(model)
+    assert len(seen) == 2
+    assert np.array_equal(seen[0][0], model.state['X'])

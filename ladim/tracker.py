@@ -1,91 +1,12 @@
 import numba
 import numpy as np
 from numba import prange
+
+from .noise import noise_pair
+from .vertical_diffusion import VerticalDiffusor
 import typing
-from collections import namedtuple
 if typing.TYPE_CHECKING:
     from .model import Model
-
-
-VertMix = namedtuple("VertMix", ["method", "value", "min", "max", "resolution"])
-VertMix.__doc__ = """Specification of the vertical diffusion
-
-``method`` is "constant" (diffusivity ``value`` [m2/s]) or "labolle"
-(diffusivity from the forcing, clipped to [``min``, ``max``] and sampled at
-the midpoints of depth bins of height ``resolution`` [m], or at the particle
-depth if ``resolution`` is infinite). Fields that do not apply to the method
-are None."""
-
-VERT_MIX_METHODS = ("constant", "labolle")
-
-
-def parse_vert_mix(spec):
-    """Vertical diffusion specification from the ``numerics.vert_mix`` config
-
-    :param spec: One of
-
-        * None or a number: Constant diffusivity [m2/s], same as
-          ``{method: constant, value: <number>}``. Zero means no vertical
-          diffusion.
-        * "labolle": Diffusivity from the forcing, same as
-          ``{method: labolle, min: 0, max: inf, resolution: inf}``.
-        * A dict with the keys ``method`` and the fields of the method, with
-          no default values. The "constant" method has the field ``value``.
-          The "labolle" method has the fields ``min`` and ``max`` (the limits
-          of the diffusivity [m2/s]) and ``resolution`` (the height [m] of
-          the depth bins where the diffusivity is sampled, at the midpoint of
-          the bin; infinite means no binning).
-
-    :return: A VertMix tuple
-    """
-    if spec is None:
-        spec = 0
-    if isinstance(spec, str):
-        if spec != "labolle":
-            raise ValueError(f"Unknown vertical diffusion method: {spec!r}. "
-                             f"Available strings: 'labolle'")
-        spec = dict(method="labolle", min=0, max=float("inf"), resolution=float("inf"))
-    elif isinstance(spec, dict):
-        spec = dict(spec)
-    elif isinstance(spec, (int, float)) and not isinstance(spec, bool):
-        spec = dict(method="constant", value=spec)
-    else:
-        raise ValueError(f"Invalid vertical diffusion: {spec!r}")
-
-    method = spec.pop("method", None)
-    if method not in VERT_MIX_METHODS:
-        raise ValueError(f"Unknown vertical diffusion method: {method!r}. "
-                         f"Available methods: {', '.join(VERT_MIX_METHODS)}")
-    fields = dict(constant=["value"], labolle=["min", "max", "resolution"])[method]
-    missing = [f for f in fields if f not in spec]
-    unknown = [f for f in spec if f not in fields]
-    if missing:
-        raise ValueError(f"Vertical diffusion method {method!r} requires "
-                         f"the fields: {', '.join(missing)}")
-    if unknown:
-        raise ValueError(f"Unknown fields for vertical diffusion method "
-                         f"{method!r}: {', '.join(unknown)}")
-    try:
-        values = {f: float(spec[f]) for f in fields}  # Also accepts "inf"
-    except (TypeError, ValueError):
-        raise ValueError(f"Vertical diffusion fields must be numbers: {spec}")
-    if any(np.isnan(v) for v in values.values()):
-        raise ValueError(f"Vertical diffusion fields must be numbers: {spec}")
-
-    out = dict(value=None, min=None, max=None, resolution=None)
-    out.update(values)
-    if method == "constant":
-        if not 0 <= out["value"] < float("inf"):
-            raise ValueError(f"Vertical diffusion must be non-negative and "
-                             f"finite: {out['value']}")
-    else:
-        if not 0 <= out["min"] <= out["max"]:
-            raise ValueError(f"Vertical diffusion limits must satisfy "
-                             f"0 <= min <= max: {out['min']}, {out['max']}")
-        if not out["resolution"] > 0:
-            raise ValueError(f"Vertical diffusion resolution must be positive "
-                             f"(or infinite): {out['resolution']}")
-    return VertMix(method=method, **out)
 
 
 class Tracker:
@@ -96,20 +17,12 @@ class Tracker:
     random walk with constant diffusion coefficient. The arithmetic runs in
     multithreaded numba kernels, the velocity is sampled by the forcing module.
 
-    Optionally, vertical diffusion is applied after the horizontal movement,
-    as a random walk in the depth Z (see :func:`parse_vert_mix` for the
-    options). Particles are reflected at the sea surface and at the sea bottom
-    (at the bottom depth of the grid cell of the new horizontal position).
-
-    With the "constant" method, the diffusivity is constant. With the "labolle"
-    method, the diffusivity is read from the forcing (``forcing.vert_mix``),
-    and the random walk uses the two-step scheme by LaBolle et al. (2000),
-    doi: 10.1029/1999WR900224, which is consistent with a depth-dependent
-    diffusivity: The diffusivity is first evaluated at the initial depth to
-    make an intermediate step, and the final step uses the diffusivity at the
-    intermediate depth. The diffusivity is clipped to [min, max], and sampled
-    at the midpoints of depth bins of height ``resolution``, to avoid
-    numerical errors from rapidly varying diffusivities.
+    Optionally, vertical diffusion is applied after the horizontal movement
+    by a :class:`~ladim.vertical_diffusion.VerticalDiffusor`, which is created
+    from the specification ``vertical_diffusion`` (a dict with the key
+    ``method`` and the fields of the method). Particles are reflected at the
+    sea surface and at the sea bottom (at the bottom depth of the grid cell
+    of the new horizontal position).
 
     The random walk uses a counter-based generator: the random numbers of a
     particle are a hash of its particle identifier and a key drawn from
@@ -121,17 +34,25 @@ class Tracker:
 
     METHODS = ("EF", "RK2", "RK4")
 
-    def __init__(self, method, diffusion, vert_mix=0):
+    def __init__(self, method, diffusion, vertical_diffusion=None):
+        """
+        :param method: Advection method, "EF", "RK2" or "RK4"
+        :param diffusion: Horizontal diffusion coefficient [m2/s]
+        :param vertical_diffusion: Specification of the vertical diffusion,
+            given to :meth:`VerticalDiffusor.create`. Default is no vertical
+            diffusion.
+        """
         if method not in self.METHODS:
             raise NotImplementedError(f"Unknown integration method: {method}")
+        if vertical_diffusion is None:
+            vertical_diffusion = dict(method="constant", value=0)
         self.method = method
         self.diffusion = diffusion  # [m2.s-1]
-        self.vert_mix = parse_vert_mix(vert_mix)
-        self._vertical = self.vert_mix.method != "constant" or self.vert_mix.value > 0
+        self.diffusor = VerticalDiffusor.create(**vertical_diffusion)
 
     @staticmethod
-    def create(method, diffusion, vert_mix=0):
-        return Tracker(method, diffusion, vert_mix)
+    def create(method, diffusion, vertical_diffusion=None):
+        return Tracker(method, diffusion, vertical_diffusion)
 
     def update(self, model: "Model"):
         state = model.state
@@ -175,57 +96,13 @@ class Tracker:
             state['X'][act] = X0
             state['Y'][act] = Y0
 
-        if self._vertical:
-            Z0 = np.ascontiguousarray(Z, dtype=np.float64)
-            self.diffuse_vertically(Z0, grid.sample_depth(X0, Y0), pid, dt,
-                                    forcing=forcing, X=X0, Y=Y0)
+        if self.diffusor.enabled:
+            depth = grid.sample_depth(X0, Y0)
+            Z1 = self.diffusor.diffuse(X0, Y0, Z, depth, pid, dt)
             if all_active:
-                state['Z'][:] = Z0
+                state['Z'][:] = Z1
             else:
-                state['Z'][act] = Z0
-
-    def diffuse_vertically(self, Z, depth, pid, dt, forcing=None, X=None, Y=None):
-        """Vertical random walk, in place
-
-        :param Z: Particle depths [m, positive downwards], float64 array
-        :param depth: Bottom depth [m] at the particle positions. Particles
-            at positions without depth (zero or NaN) are not moved.
-        :param pid: Particle identifiers (int64), for the random numbers
-        :param dt: Time step [s]
-        :param forcing: Forcing module with a function ``vert_mix(X, Y, Z)``.
-            Only used by the "labolle" method.
-        :param X, Y: Particle positions [grid units]. Only used by the
-            "labolle" method.
-        """
-        # A new random key for each time step
-        key = np.uint64(np.random.randint(0, 2**63, dtype=np.int64))
-        depth = np.ascontiguousarray(depth, dtype=np.float64)
-        vm = self.vert_mix
-
-        if vm.method == "constant":
-            _vertical(Z, depth, pid, key, (2 * vm.value * dt) ** 0.5)
-            return
-
-        # LaBolle et al. (2000): The diffusivity at the intermediate position
-        # is used to compute the final step, with the same random increment
-        if not hasattr(forcing, "vert_mix"):
-            raise ValueError(f"The forcing module {type(forcing).__name__} has no "
-                             f"vertical diffusivity, required by the vertical "
-                             f"diffusion method {vm.method!r}")
-        dW = np.empty(Z.size)
-        _noise_z(pid, key, dt ** 0.5, dW)
-        Z0 = Z.copy()
-
-        def mixing(z):
-            if np.isfinite(vm.resolution):
-                z = (z // vm.resolution) * vm.resolution + 0.5 * vm.resolution
-            k = np.asarray(forcing.vert_mix(X, Y, z), dtype=np.float64)
-            k = np.where(np.isfinite(k), k, vm.min)
-            return np.ascontiguousarray(np.clip(k, vm.min, vm.max))
-
-        Z1 = np.empty(Z.size)
-        _vertical_step(Z0, mixing(Z0), dW, depth, Z1)  # Intermediate step
-        _vertical_step(Z0, mixing(Z1), dW, depth, Z)  # Final step
+                state['Z'][act] = Z1
 
     def integrate(self, velocity, X0, Y0, dx, dy, dt, pid):
         """New positions after one time step
@@ -291,28 +168,6 @@ def _stage(X0, Y0, U, V, dx, dy, h, X, Y, AX, AY, w, accumulate, first):
                 AY[p] += w * vy
 
 
-@numba.njit(inline="always")
-def _splitmix64(z):
-    z = z + np.uint64(0x9E3779B97F4A7C15)
-    z = (z ^ (z >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
-    z = (z ^ (z >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
-    return z ^ (z >> np.uint64(31))
-
-
-@numba.njit(inline="always")
-def _noise_pair(key, pid):
-    """Two independent random numbers from (key, pid), mean 0 and variance 1
-
-    Uniform on [-sqrt(3), sqrt(3)), about 10 times cheaper than normal
-    deviates (Box-Muller).
-    """
-    h1 = _splitmix64(key ^ _splitmix64(np.uint64(pid)))
-    h2 = _splitmix64(h1)
-    scale = 2.0 * np.sqrt(3.0) / 9007199254740992.0  # 2 * sqrt(3) / 2**53
-    return (np.float64(h1 >> np.uint64(11)) * scale - np.sqrt(3.0),
-            np.float64(h2 >> np.uint64(11)) * scale - np.sqrt(3.0))
-
-
 @numba.njit(parallel=True, nogil=True, cache=True)
 def _final(X0, Y0, U, V, dx, dy, AX, AY, accumulate, scale, pid, key, stddev,
            diffuse, X, Y):
@@ -326,49 +181,11 @@ def _final(X0, Y0, U, V, dx, dy, AX, AY, accumulate, scale, pid, key, stddev,
         x = X0[p] + scale * ux
         y = Y0[p] + scale * vy
         if diffuse:
-            nx, ny = _noise_pair(key, pid[p])
+            nx, ny = noise_pair(key, pid[p])
             x += stddev / dx[p] * nx
             y += stddev / dy[p] * ny
         X[p] = x
         Y[p] = y
-
-
-@numba.njit(parallel=True, nogil=True, cache=True)
-def _vertical(Z, depth, pid, key, stddev):
-    """Z += stddev * noise, reflected at the surface (0) and the bottom (depth)
-
-    The reflection is a folding of the real line onto [0, depth], and works
-    for any step length.
-    """
-    for p in prange(Z.size):
-        d = depth[p]
-        if d > 0:  # False for NaN
-            noise, _ = _noise_pair(key, pid[p])
-            z = Z[p] + stddev * noise
-            Z[p] = d - abs(z % (2.0 * d) - d)  # Triangle wave
-
-
-@numba.njit(parallel=True, nogil=True, cache=True)
-def _noise_z(pid, key, scale, out):
-    """out = scale * noise, with unit variance noise"""
-    for p in prange(out.size):
-        noise, _ = _noise_pair(key, pid[p])
-        out[p] = scale * noise
-
-
-@numba.njit(parallel=True, nogil=True, cache=True)
-def _vertical_step(Z0, K, dW, depth, Z):
-    """Z = Z0 + sqrt(2 K) * dW, reflected at the surface and the bottom
-
-    Particles where the depth is not positive (or NaN) are not moved.
-    """
-    for p in prange(Z.size):
-        d = depth[p]
-        if d > 0:  # False for NaN
-            z = Z0[p] + np.sqrt(2.0 * K[p]) * dW[p]
-            Z[p] = d - abs(z % (2.0 * d) - d)  # Triangle wave
-        else:
-            Z[p] = Z0[p]
 
 
 @numba.njit(parallel=True, nogil=True, cache=True)
