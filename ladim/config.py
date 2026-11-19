@@ -125,6 +125,7 @@ def convert_1_to_2(c):
     out['tracker'] = {}
     out['tracker']['method'] = dict_get(c, 'numerics.advection')
     out['tracker']['diffusion'] = dict_get(c, 'numerics.diffusion')
+    out['tracker']['vertical_diffusion'] = dict_get(c, 'numerics.vert_mix', 0)
 
     # Read release config
     out['release'] = {}

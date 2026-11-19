@@ -1,6 +1,9 @@
 import numba
 import numpy as np
 from numba import prange
+
+from .noise import noise_pair
+from .vertical_diffusion import VerticalDiffusor
 import typing
 if typing.TYPE_CHECKING:
     from .model import Model
@@ -14,6 +17,14 @@ class Tracker:
     random walk with constant diffusion coefficient. The arithmetic runs in
     multithreaded numba kernels, the velocity is sampled by the forcing module.
 
+    Optionally, vertical diffusion is applied after the horizontal movement
+    by a :class:`~ladim.vertical_diffusion.VerticalDiffusor`, which is created
+    from the configuration value ``vertical_diffusion``. The diffusivity of the ocean
+    model, for the methods which need it, is taken from ``forcing.vert_mix``.
+    Particles are reflected at the
+    sea surface and at the sea bottom (at the bottom depth of the grid cell
+    of the new horizontal position).
+
     The random walk uses a counter-based generator: the random numbers of a
     particle are a hash of its particle identifier and a key drawn from
     ``np.random`` once per time step. Results are reproducible when the numpy
@@ -24,15 +35,23 @@ class Tracker:
 
     METHODS = ("EF", "RK2", "RK4")
 
-    def __init__(self, method, diffusion):
+    def __init__(self, method, diffusion, vertical_diffusion=None):
+        """
+        :param method: Advection method, "EF", "RK2" or "RK4"
+        :param diffusion: Horizontal diffusion coefficient [m2/s]
+        :param vertical_diffusion: The vertical diffusion (number, string or
+            dict), see :meth:`VerticalDiffusor.create`. Default is no
+            vertical diffusion.
+        """
         if method not in self.METHODS:
             raise NotImplementedError(f"Unknown integration method: {method}")
         self.method = method
         self.diffusion = diffusion  # [m2.s-1]
+        self.diffusor = VerticalDiffusor.create(vertical_diffusion)
 
     @staticmethod
-    def create(method, diffusion):
-        return Tracker(method, diffusion)
+    def create(method, diffusion, vertical_diffusion=None):
+        return Tracker(method, diffusion, vertical_diffusion)
 
     def update(self, model: "Model"):
         state = model.state
@@ -75,6 +94,15 @@ class Tracker:
         else:
             state['X'][act] = X0
             state['Y'][act] = Y0
+
+        if self.diffusor.enabled:
+            depth = grid.sample_depth(X0, Y0)
+            vert_mix = getattr(forcing, "vert_mix", None)
+            Z1 = self.diffusor.diffuse(X0, Y0, Z, depth, pid, dt, vert_mix)
+            if all_active:
+                state['Z'][:] = Z1
+            else:
+                state['Z'][act] = Z1
 
     def integrate(self, velocity, X0, Y0, dx, dy, dt, pid):
         """New positions after one time step
@@ -140,28 +168,6 @@ def _stage(X0, Y0, U, V, dx, dy, h, X, Y, AX, AY, w, accumulate, first):
                 AY[p] += w * vy
 
 
-@numba.njit(inline="always")
-def _splitmix64(z):
-    z = z + np.uint64(0x9E3779B97F4A7C15)
-    z = (z ^ (z >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
-    z = (z ^ (z >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
-    return z ^ (z >> np.uint64(31))
-
-
-@numba.njit(inline="always")
-def _noise_pair(key, pid):
-    """Two independent random numbers from (key, pid), mean 0 and variance 1
-
-    Uniform on [-sqrt(3), sqrt(3)), about 10 times cheaper than normal
-    deviates (Box-Muller).
-    """
-    h1 = _splitmix64(key ^ _splitmix64(np.uint64(pid)))
-    h2 = _splitmix64(h1)
-    scale = 2.0 * np.sqrt(3.0) / 9007199254740992.0  # 2 * sqrt(3) / 2**53
-    return (np.float64(h1 >> np.uint64(11)) * scale - np.sqrt(3.0),
-            np.float64(h2 >> np.uint64(11)) * scale - np.sqrt(3.0))
-
-
 @numba.njit(parallel=True, nogil=True, cache=True)
 def _final(X0, Y0, U, V, dx, dy, AX, AY, accumulate, scale, pid, key, stddev,
            diffuse, X, Y):
@@ -175,7 +181,7 @@ def _final(X0, Y0, U, V, dx, dy, AX, AY, accumulate, scale, pid, key, stddev,
         x = X0[p] + scale * ux
         y = Y0[p] + scale * vy
         if diffuse:
-            nx, ny = _noise_pair(key, pid[p])
+            nx, ny = noise_pair(key, pid[p])
             x += stddev / dx[p] * nx
             y += stddev / dy[p] * ny
         X[p] = x

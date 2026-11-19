@@ -13,6 +13,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.10.0] - 2026-11-19
+### Added
+- New option `numerics.vert_mix` for vertical diffusion. Either a number
+  (constant diffusivity [m2/s], default 0), the string `labolle` (diffusivity
+  from the forcing), or a dict with the fields `method`, `min`, `max` and
+  `resolution`.
+
 ## [2.9.0] - 2026-11-19
 ### Added
 - ROMS and zROMS forcing: `Forcing.vert_mix(X, Y, Z)` returns the vertical

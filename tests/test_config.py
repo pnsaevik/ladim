@@ -96,6 +96,7 @@ class Test_convert_1_to_2:
             'tracker': {
                 'diffusion': 0.1,
                 'method': 'RK4',
+                'vertical_diffusion': 0,
             },
             'version': 2
         }
