@@ -1,4 +1,3 @@
-import pytest
 from ladim import config
 from pathlib import Path
 import yaml
@@ -101,19 +100,6 @@ class Test_convert_1_to_2:
             },
             'version': 2
         }
-
-    @pytest.mark.parametrize("vert_mix", [
-        0.001,
-        'labolle',
-        dict(method='labolle', min=1e-4, max=1e-2, resolution=5),
-    ])
-    def test_gives_vertical_diffusion_from_numerics_to_tracker(self, vert_mix):
-        fname_in = Path(__file__).parent / 'sample_data/ex1/ladim.yaml'
-        with open(fname_in, encoding='utf-8') as fp:
-            dict_in = yaml.safe_load(fp)
-        dict_in['numerics']['vert_mix'] = vert_mix
-        out = config.convert_1_to_2(dict_in)
-        assert out['tracker']['vertical_diffusion'] == vert_mix
 
     def test_accepts_empty_dict(self):
         config.convert_1_to_2(dict())

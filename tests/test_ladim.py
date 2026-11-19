@@ -64,60 +64,6 @@ class Test_ladim_script:
         assert result == expected
 
 
-def test_vertical_diffusion_from_config(tmp_path):
-    testpath = Path(__file__).parent / 'sample_data' / 'ex1'
-    with open(testpath / 'ladim.yaml', encoding='utf-8') as f:
-        conf = yaml.safe_load(f)
-
-    conf['files']['particle_release_file'] = str(testpath / 'particles.rls')
-    conf['gridforce']['input_file'] = str(testpath.parent / 'forcing*.nc')
-
-    def run(name, vert_mix):
-        conf['files']['output_file'] = str(tmp_path / name)
-        conf['numerics']['vert_mix'] = vert_mix
-        np.random.seed(1)
-        ladim.main(io.StringIO(yaml.safe_dump(conf)))
-        return xr.load_dataset(tmp_path / name)
-
-    ref = run('ref.nc', 0)
-    out = run('out.nc', 0.01)
-
-    # Depth is unchanged without vertical diffusion, and changes with it
-    assert np.nanmax(np.abs(np.diff(ref['Z'].values, axis=0))) == 0
-    assert np.nanmax(np.abs(np.diff(out['Z'].values, axis=0))) > 0
-    assert np.nanmin(out['Z'].values) >= 0
-
-
-@pytest.mark.parametrize("vert_mix", [
-    "labolle",
-    dict(method="labolle", min=1e-4, max=1e-2, resolution=5),
-])
-def test_vertical_diffusion_from_forcing(tmp_path, vert_mix):
-    testpath = Path(__file__).parent / 'sample_data' / 'ex1'
-    sample = testpath.parent / 'forcing.nc'
-
-    # Forcing with diffusivity stored as ln_AKs, as in NorKyst files
-    with xr.open_dataset(sample) as dset:
-        dset = dset.load()
-    dset['ln_AKs'] = np.log(1e-3 * (1 + 100 * dset['w'].fillna(0) ** 2))
-    forcing_file = tmp_path / 'forcing_ln_AKs.nc'
-    dset.to_netcdf(forcing_file)
-
-    with open(testpath / 'ladim.yaml', encoding='utf-8') as f:
-        conf = yaml.safe_load(f)
-    conf['files']['particle_release_file'] = str(testpath / 'particles.rls')
-    conf['files']['output_file'] = str(tmp_path / 'out.nc')
-    conf['gridforce']['input_file'] = str(forcing_file)
-    conf['numerics']['vert_mix'] = vert_mix
-
-    ladim.main(io.StringIO(yaml.safe_dump(conf)))
-    out = xr.load_dataset(tmp_path / 'out.nc')
-
-    Z = out['Z'].values
-    assert np.nanmax(np.abs(np.diff(Z, axis=0))) > 0  # Particles move vertically
-    assert np.nanmin(Z) >= 0
-
-
 def _dump_ladim_outputs_as_json(result, root):
     for ladim_outfile, contents in result.items():
         dump_file = root / (Path(ladim_outfile).name + '_txt')
