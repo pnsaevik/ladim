@@ -19,8 +19,7 @@ class Tracker:
 
     Optionally, vertical diffusion is applied after the horizontal movement
     by a :class:`~ladim.vertical_diffusion.VerticalDiffusor`, which is created
-    from the specification ``vertical_diffusion`` (a dict with the key
-    ``method`` and the fields of the method). The diffusivity of the ocean
+    from the configuration value ``vertical_diffusion``. The diffusivity of the ocean
     model, for the methods which need it, is taken from ``forcing.vert_mix``.
     Particles are reflected at the
     sea surface and at the sea bottom (at the bottom depth of the grid cell
@@ -40,17 +39,15 @@ class Tracker:
         """
         :param method: Advection method, "EF", "RK2" or "RK4"
         :param diffusion: Horizontal diffusion coefficient [m2/s]
-        :param vertical_diffusion: Specification of the vertical diffusion,
-            given to :meth:`VerticalDiffusor.create`. Default is no vertical
-            diffusion.
+        :param vertical_diffusion: The vertical diffusion (number, string or
+            dict), see :meth:`VerticalDiffusor.create`. Default is no
+            vertical diffusion.
         """
         if method not in self.METHODS:
             raise NotImplementedError(f"Unknown integration method: {method}")
-        if vertical_diffusion is None:
-            vertical_diffusion = dict(method="constant", value=0)
         self.method = method
         self.diffusion = diffusion  # [m2.s-1]
-        self.diffusor = VerticalDiffusor.create(**vertical_diffusion)
+        self.diffusor = VerticalDiffusor.create(vertical_diffusion)
 
     @staticmethod
     def create(method, diffusion, vertical_diffusion=None):

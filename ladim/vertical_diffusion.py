@@ -1,10 +1,10 @@
 """
 Vertical diffusion of particles
 
-A vertical diffusor is created from a specification (the ``vertical_diffusion``
-part of the tracker configuration) with :meth:`VerticalDiffusor.create`::
+A vertical diffusor is created from the configuration value
+(``numerics.vert_mix``) with :meth:`VerticalDiffusor.create`::
 
-    diffusor = VerticalDiffusor.create(method="constant", value=0.001)
+    diffusor = VerticalDiffusor.create(0.001)
     Z1 = diffusor.diffuse(X, Y, Z, depth, pid, dt, vert_mix)
 
 where ``vert_mix(X, Y, Z)`` is a function which returns the vertical
@@ -34,16 +34,27 @@ class VerticalDiffusor:
     enabled = True
 
     @staticmethod
-    def create(method, **kwargs):
+    def create(spec):
         """Create a vertical diffusor
 
-        :param method: The name of the method, "constant" or "labolle"
-        :param kwargs: The fields of the method. All fields are mandatory, there
-            are no default values. Fields which are numbers may also be given
-            as strings like "inf".
+        :param spec: One of
+
+            * None or a number: A constant diffusivity [m2/s], the same as
+              ``{method: constant, value: <number>}``. Zero (or None) means
+              no vertical diffusion.
+            * A string: A predefined specification (see ``VERT_MIX_STRINGS``),
+              for example "labolle", which is the same as
+              ``{method: labolle, min: 0, max: inf, resolution: inf}``.
+            * A dict with the key ``method`` (the name of the method,
+              "constant" or "labolle") and the fields of the method. All
+              fields are mandatory, there are no default values. Fields which
+              are numbers may also be given as strings like "inf".
+
         :raises ValueError: If the method is unknown, the fields are missing
             or unknown, or the field values are not valid
         """
+        kwargs = _as_dict(spec)
+        method = kwargs.pop("method", None)
         try:
             cls = _METHODS[method]
         except (KeyError, TypeError):
@@ -152,6 +163,25 @@ class LaBolleDiffusor(VerticalDiffusor):
 
 
 _METHODS = dict(constant=ConstantDiffusor, labolle=LaBolleDiffusor)
+
+# Specifications which can be given as a string
+VERT_MIX_STRINGS = dict(
+    labolle=dict(method="labolle", min=0, max=float("inf"), resolution=float("inf")),
+)
+
+
+def _as_dict(spec):
+    """Specification as a dict with the key "method" and the fields of the method"""
+    if spec is None:
+        spec = 0
+    if isinstance(spec, dict):
+        return dict(spec)
+    if isinstance(spec, str):
+        # Unknown strings are rejected by the factory, as unknown methods
+        return dict(VERT_MIX_STRINGS.get(spec, dict(method=spec)))
+    if isinstance(spec, (int, float)) and not isinstance(spec, bool):
+        return dict(method="constant", value=spec)
+    raise ValueError(f"Invalid vertical diffusion: {spec!r}")
 
 
 def _number(value, name):

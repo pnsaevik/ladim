@@ -97,32 +97,23 @@ class Test_convert_1_to_2:
             'tracker': {
                 'diffusion': 0.1,
                 'method': 'RK4',
-                'vertical_diffusion': {'method': 'constant', 'value': 0},
+                'vertical_diffusion': 0,
             },
             'version': 2
         }
 
-    @pytest.mark.parametrize("vert_mix, expected", [
-        (0.001, dict(method='constant', value=0.001)),
-        ('labolle', dict(method='labolle', min=0, max=float('inf'), resolution=float('inf'))),
-        (dict(method='labolle', min=1e-4, max=1e-2, resolution=5),
-         dict(method='labolle', min=1e-4, max=1e-2, resolution=5)),
-        (dict(method='constant', value=0.5), dict(method='constant', value=0.5)),
+    @pytest.mark.parametrize("vert_mix", [
+        0.001,
+        'labolle',
+        dict(method='labolle', min=1e-4, max=1e-2, resolution=5),
     ])
-    def test_reads_vertical_diffusion_from_numerics(self, vert_mix, expected):
+    def test_gives_vertical_diffusion_from_numerics_to_tracker(self, vert_mix):
         fname_in = Path(__file__).parent / 'sample_data/ex1/ladim.yaml'
         with open(fname_in, encoding='utf-8') as fp:
             dict_in = yaml.safe_load(fp)
         dict_in['numerics']['vert_mix'] = vert_mix
         out = config.convert_1_to_2(dict_in)
-        assert out['tracker']['vertical_diffusion'] == expected
-
-    def test_dict_has_no_default_values(self):
-        spec = config.vertical_diffusion_spec(dict(method='labolle'))
-        assert spec == dict(method='labolle')
-
-    def test_unknown_string_is_given_as_method(self):
-        assert config.vertical_diffusion_spec('foo') == dict(method='foo')
+        assert out['tracker']['vertical_diffusion'] == vert_mix
 
     def test_accepts_empty_dict(self):
         config.convert_1_to_2(dict())

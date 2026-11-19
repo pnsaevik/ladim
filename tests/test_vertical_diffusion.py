@@ -9,12 +9,12 @@ INF = float("inf")
 
 
 def create_constant(value):
-    return VerticalDiffusor.create(method="constant", value=value)
+    return VerticalDiffusor.create(dict(method="constant", value=value))
 
 
 def create_labolle(min=0, max=INF, resolution=INF):
     return VerticalDiffusor.create(
-        method="labolle", min=min, max=max, resolution=resolution)
+        dict(method="labolle", min=min, max=max, resolution=resolution))
 
 
 def particles(n, z0, depth=1000.0):
@@ -33,6 +33,26 @@ class Test_create:
         assert isinstance(create_constant(0.01), ConstantDiffusor)
         assert isinstance(create_labolle(), LaBolleDiffusor)
 
+    def test_number_is_constant_diffusivity(self):
+        for spec in (0.01, dict(method="constant", value=0.01)):
+            d = VerticalDiffusor.create(spec)
+            assert isinstance(d, ConstantDiffusor) and d.value == 0.01
+        assert VerticalDiffusor.create(2).value == 2.0
+
+    def test_no_diffusivity_is_disabled(self):
+        for spec in (None, 0, 0.0, dict(method="constant", value=0)):
+            assert VerticalDiffusor.create(spec).enabled is False
+
+    def test_labolle_string_has_no_clipping_or_binning(self):
+        d = VerticalDiffusor.create("labolle")
+        assert isinstance(d, LaBolleDiffusor)
+        assert (d.min, d.max, d.resolution) == (0, INF, INF)
+
+    def test_does_not_modify_specification(self):
+        spec = dict(method="labolle", min=0, max=1, resolution=5)
+        VerticalDiffusor.create(spec)
+        assert spec == dict(method="labolle", min=0, max=1, resolution=5)
+
     def test_stores_fields(self):
         d = create_labolle(min=1e-4, max=1e-2, resolution=5)
         assert (d.min, d.max, d.resolution) == (1e-4, 1e-2, 5.0)
@@ -45,19 +65,24 @@ class Test_create:
     def test_diffusivity_function_is_not_a_field(self):
         # The function is given to diffuse(), not to the factory
         with pytest.raises(ValueError):
-            VerticalDiffusor.create(method="constant", value=1, vert_mix=len)
+            VerticalDiffusor.create(dict(method="constant", value=1, vert_mix=len))
         with pytest.raises(ValueError):
-            VerticalDiffusor.create(method="labolle", min=0, max=1, resolution=5,
-                                    vert_mix=len)
+            VerticalDiffusor.create(
+                dict(method="labolle", min=0, max=1, resolution=5, vert_mix=len))
 
-    @pytest.mark.parametrize("kwargs", [
+    @pytest.mark.parametrize("spec", [
+        "labolle_5",  # Unknown string
+        "constant",  # Fields are missing
+        True,
+        [1.0],
+        dict(value=1.0),  # No method
         dict(method="foo", value=1.0),
         dict(method=None),
         dict(method="constant"),  # No default values
         dict(method="constant", value=1.0, min=0),  # Unknown field
         dict(method="labolle", min=0, max=1),  # No resolution
-        dict(method="constant", value=-1),
-        dict(method="constant", value=INF),
+        -1.0,
+        INF,
         dict(method="constant", value=True),
         dict(method="constant", value="a"),
         dict(method="constant", value=[1]),
@@ -65,13 +90,15 @@ class Test_create:
         dict(method="labolle", min=-1, max=1, resolution=5),
         dict(method="labolle", min=0, max=1, resolution=0),
     ])
-    def test_rejects_invalid_specification(self, kwargs):
+    def test_rejects_invalid_specification(self, spec):
         with pytest.raises(ValueError):
-            VerticalDiffusor.create(**kwargs)
+            VerticalDiffusor.create(spec)
 
     def test_unknown_method_lists_available_methods(self):
         with pytest.raises(ValueError, match="constant, labolle"):
-            VerticalDiffusor.create(method="foo")
+            VerticalDiffusor.create(dict(method="foo"))
+        with pytest.raises(ValueError, match="constant, labolle"):
+            VerticalDiffusor.create("foo")
 
 
 # ---------- Constant diffusivity ----------

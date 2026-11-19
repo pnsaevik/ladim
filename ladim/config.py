@@ -46,32 +46,6 @@ def dict_get(d, items, default=None):
     return default
 
 
-# Specifications of the vertical diffusion which can be given as a string
-VERT_MIX_STRINGS = dict(
-    labolle=dict(method='labolle', min=0, max=float('inf'), resolution=float('inf')),
-)
-
-
-def vertical_diffusion_spec(vert_mix):
-    """Specification of the vertical diffusion, from ``numerics.vert_mix``
-
-    The result is a dict with the key ``method`` and the fields of the method,
-    to be given to ``VerticalDiffusor.create``.
-
-    * A number is a constant diffusivity, ``{method: constant, value: <number>}``
-    * The string "labolle" is ``{method: labolle, min: 0, max: inf, resolution: inf}``
-    * A dict is used as it is. There are no default values.
-    """
-    if vert_mix is None:
-        vert_mix = 0
-    if isinstance(vert_mix, dict):
-        return dict(vert_mix)
-    if isinstance(vert_mix, str):
-        # Unknown strings are rejected when the diffusor is created
-        return dict(VERT_MIX_STRINGS.get(vert_mix, dict(method=vert_mix)))
-    return dict(method='constant', value=vert_mix)
-
-
 def dict_get_single(d, item):
     tokens = str(item).split(sep='.')
     sub_dict = d
@@ -151,8 +125,7 @@ def convert_1_to_2(c):
     out['tracker'] = {}
     out['tracker']['method'] = dict_get(c, 'numerics.advection')
     out['tracker']['diffusion'] = dict_get(c, 'numerics.diffusion')
-    out['tracker']['vertical_diffusion'] = vertical_diffusion_spec(
-        dict_get(c, 'numerics.vert_mix', 0))
+    out['tracker']['vertical_diffusion'] = dict_get(c, 'numerics.vert_mix', 0)
 
     # Read release config
     out['release'] = {}
