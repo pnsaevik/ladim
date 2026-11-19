@@ -14,6 +14,11 @@ class Tracker:
     random walk with constant diffusion coefficient. The arithmetic runs in
     multithreaded numba kernels, the velocity is sampled by the forcing module.
 
+    Optionally, vertical diffusion with constant diffusion coefficient is
+    applied after the horizontal movement, as a random walk in the depth Z.
+    Particles are reflected at the sea surface and at the sea bottom (at the
+    bottom depth of the grid cell of the new horizontal position).
+
     The random walk uses a counter-based generator: the random numbers of a
     particle are a hash of its particle identifier and a key drawn from
     ``np.random`` once per time step. Results are reproducible when the numpy
@@ -24,15 +29,18 @@ class Tracker:
 
     METHODS = ("EF", "RK2", "RK4")
 
-    def __init__(self, method, diffusion):
+    def __init__(self, method, diffusion, vert_mix=0):
         if method not in self.METHODS:
             raise NotImplementedError(f"Unknown integration method: {method}")
+        if vert_mix is not None and vert_mix < 0:
+            raise ValueError(f"Vertical diffusion must be non-negative: {vert_mix}")
         self.method = method
         self.diffusion = diffusion  # [m2.s-1]
+        self.vert_mix = vert_mix or 0  # [m2.s-1]
 
     @staticmethod
-    def create(method, diffusion):
-        return Tracker(method, diffusion)
+    def create(method, diffusion, vert_mix=0):
+        return Tracker(method, diffusion, vert_mix)
 
     def update(self, model: "Model"):
         state = model.state
@@ -61,7 +69,14 @@ class Tracker:
                     np.ascontiguousarray(v, dtype=np.float64))
 
         pid = np.ascontiguousarray(pid, dtype=np.int64)
-        X1, Y1 = self.integrate(velocity, X0, Y0, dx, dy, dt, pid)
+
+        # A new random key for each time step, shared by the horizontal and
+        # vertical random walks (so that the horizontal walk does not depend
+        # on the vertical diffusion)
+        key = np.uint64(0)
+        if self.diffusion or self.vert_mix:
+            key = np.uint64(np.random.randint(0, 2**63, dtype=np.int64))
+        X1, Y1 = self.integrate(velocity, X0, Y0, dx, dy, dt, pid, key)
 
         # Land, boundary treatment. Do not move the particles
         should_move = np.ascontiguousarray(grid.atsea(X1, Y1), dtype=np.bool_)
@@ -76,7 +91,31 @@ class Tracker:
             state['X'][act] = X0
             state['Y'][act] = Y0
 
-    def integrate(self, velocity, X0, Y0, dx, dy, dt, pid):
+        if self.vert_mix:
+            Z0 = np.ascontiguousarray(Z, dtype=np.float64)
+            self.diffuse_vertically(Z0, grid.sample_depth(X0, Y0), pid, dt, key)
+            if all_active:
+                state['Z'][:] = Z0
+            else:
+                state['Z'][act] = Z0
+
+    def diffuse_vertically(self, Z, depth, pid, dt, key):
+        """Vertical random walk, in place
+
+        :param Z: Particle depths [m, positive downwards], float64 array
+        :param depth: Bottom depth [m] at the particle positions. Particles
+            at positions without depth (zero or NaN) are not moved.
+        :param pid: Particle identifiers (int64), for the random numbers
+        :param dt: Time step [s]
+        :param key: Random key of the time step (uint64)
+        """
+        # Random numbers independent of the horizontal ones
+        key = key ^ np.uint64(0xA5A5A5A55A5A5A5A)
+        stddev = (2 * self.vert_mix * dt) ** 0.5
+        depth = np.ascontiguousarray(depth, dtype=np.float64)
+        _vertical(Z, depth, pid, key, stddev)
+
+    def integrate(self, velocity, X0, Y0, dx, dy, dt, pid, key=np.uint64(0)):
         """New positions after one time step
 
         :param velocity: Function (x, y, tstep) -> (u, v), velocity [m/s] at
@@ -85,6 +124,7 @@ class Tracker:
         :param dx, dy: Grid spacing [m] at the initial positions
         :param dt: Time step [s]
         :param pid: Particle identifiers (int64), for the random walk
+        :param key: Random key of the time step (uint64), for the random walk
         :return: X1, Y1
         """
         n = X0.size
@@ -108,10 +148,7 @@ class Tracker:
             _stage(X0, Y0, U, V, dx, dy, dt, X1, Y1, AX, AY, 2.0, True, False)
             U, V = velocity(X1, Y1, 1.0)
 
-        # Random walk, with a new random key for each time step
-        key = np.uint64(0)
-        if self.diffusion:
-            key = np.uint64(np.random.randint(0, 2**63, dtype=np.int64))
+        # Random walk
         stddev = (2 * self.diffusion) ** 0.5 * dt ** 0.5
 
         scale = dt / 6.0 if self.method == "RK4" else dt
@@ -180,6 +217,21 @@ def _final(X0, Y0, U, V, dx, dy, AX, AY, accumulate, scale, pid, key, stddev,
             y += stddev / dy[p] * ny
         X[p] = x
         Y[p] = y
+
+
+@numba.njit(parallel=True, nogil=True, cache=True)
+def _vertical(Z, depth, pid, key, stddev):
+    """Z += stddev * noise, reflected at the surface (0) and the bottom (depth)
+
+    The reflection is a folding of the real line onto [0, depth], and works
+    for any step length.
+    """
+    for p in prange(Z.size):
+        d = depth[p]
+        if d > 0:  # False for NaN
+            noise, _ = _noise_pair(key, pid[p])
+            z = Z[p] + stddev * noise
+            Z[p] = d - abs(z % (2.0 * d) - d)  # Triangle wave
 
 
 @numba.njit(parallel=True, nogil=True, cache=True)

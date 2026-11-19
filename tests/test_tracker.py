@@ -183,3 +183,105 @@ def test_diffusion_follows_particle_identifier():
 def test_unknown_method():
     with pytest.raises(NotImplementedError):
         Tracker.create("RK3", 0)
+
+
+# ---------- Vertical diffusion ----------
+
+def vertical_model(n, z0, depth, vert_mix, dt=600, active=None):
+    model = make_model(np.zeros(n), np.zeros(n), velocity=still, dt=dt, active=active)
+    model.state['Z'] = np.full(n, float(z0))
+    model.grid.sample_depth = lambda x, y: np.full(len(x), float(depth))
+    return model
+
+
+def test_vert_mix_defaults_to_zero():
+    assert Tracker.create("RK4", 0).vert_mix == 0
+    assert Tracker.create("RK4", 0, None).vert_mix == 0
+
+
+def test_no_vertical_movement_without_vert_mix():
+    model = vertical_model(100, 5.0, 50.0, 0)
+    del model.grid.sample_depth  # Must not be needed
+    Tracker.create("RK4", 1.0).update(model)
+    assert np.all(model.state['Z'] == 5.0)
+
+
+def test_vertical_diffusion_has_correct_variance():
+    k, dt, n = 0.01, 600, 200_000
+    model = vertical_model(n, 500.0, 1000.0, k, dt=dt)
+    np.random.seed(1)
+    Tracker.create("RK4", 0, k).update(model)
+    dz = model.state['Z'] - 500.0
+    assert dz.mean() == pytest.approx(0, abs=0.01)
+    assert dz.var() == pytest.approx(2 * k * dt, rel=0.02)
+    assert np.all(np.abs(dz) <= 3 ** 0.5 * (2 * k * dt) ** 0.5 + 1e-4)
+
+
+@pytest.mark.parametrize("k", [0.01, 1.0, 100.0])  # Last one: steps >> depth
+def test_vertical_diffusion_stays_between_surface_and_bottom(k):
+    depth = 20.0
+    model = vertical_model(50_000, 0.0, depth, k)
+    tracker = Tracker.create("RK4", 0, k)
+    np.random.seed(2)
+    for _ in range(30):
+        tracker.update(model)
+        assert model.state['Z'].min() >= 0
+        assert model.state['Z'].max() <= depth
+
+    if k >= 1.0:  # Well mixed: uniform distribution
+        assert model.state['Z'].mean() == pytest.approx(depth / 2, rel=0.02)
+        assert model.state['Z'].var() == pytest.approx(depth ** 2 / 12, rel=0.03)
+
+
+def test_vertical_diffusion_reflects_at_surface_and_bottom():
+    from ladim.tracker import _vertical
+    Z = np.array([0.0, 0.0, 9.0, 9.0, 25.0, 3.0])
+    depth = np.array([10.0, 10.0, 10.0, 10.0, 10.0, np.nan])
+    pid = np.arange(len(Z), dtype=np.int64)
+    # With zero standard deviation only the folding of the positions is exercised
+    _vertical(Z, depth, pid, np.uint64(1), 0.0)
+    assert Z.tolist()[:5] == [0.0, 0.0, 9.0, 9.0, 5.0]  # 25 folds to 5
+    assert Z[5] == 3.0  # No depth: not moved
+
+
+def test_vertical_diffusion_does_not_move_inactive_particles():
+    active = np.array([True, False] * 50)
+    model = vertical_model(100, 5.0, 50.0, 0.1, active=active)
+    np.random.seed(3)
+    Tracker.create("RK4", 0, 0.1).update(model)
+    Z = model.state['Z']
+    assert np.all(Z[~active] == 5.0)
+    assert np.all(Z[active] != 5.0)
+
+
+def test_vertical_diffusion_is_reproducible_and_keeps_horizontal_result():
+    def run(seed, vert_mix):
+        model = vertical_model(1000, 5.0, 50.0, vert_mix)
+        np.random.seed(seed)
+        Tracker.create("RK4", 2.0, vert_mix).update(model)
+        return model.state['X'].copy(), model.state['Z'].copy()
+
+    x_a, z_a = run(3, 0.1)
+    x_b, z_b = run(3, 0.1)
+    x_c, z_c = run(4, 0.1)
+    assert np.array_equal(z_a, z_b) and not np.allclose(z_a, z_c)
+
+    # Horizontal random walk is the same with and without vertical diffusion
+    x_0, z_0 = run(3, 0)
+    assert np.array_equal(x_a, x_0)
+    assert np.all(z_0 == 5.0)
+
+
+def test_vertical_diffusion_is_uncorrelated_with_horizontal():
+    n = 200_000
+    model = vertical_model(n, 500.0, 1000.0, 0.01)
+    np.random.seed(5)
+    Tracker.create("RK4", 2.0, 0.01).update(model)
+    dz = model.state['Z'] - 500.0
+    assert np.corrcoef(dz, model.state['X'])[0, 1] == pytest.approx(0, abs=0.01)
+    assert np.corrcoef(dz, model.state['Y'])[0, 1] == pytest.approx(0, abs=0.01)
+
+
+def test_negative_vert_mix_is_rejected():
+    with pytest.raises(ValueError):
+        Tracker.create("RK4", 0, -1.0)

@@ -96,9 +96,17 @@ class Test_convert_1_to_2:
             'tracker': {
                 'diffusion': 0.1,
                 'method': 'RK4',
+                'vert_mix': 0,
             },
             'version': 2
         }
+
+    def test_reads_vertical_diffusion_from_numerics(self):
+        fname_in = Path(__file__).parent / 'sample_data/ex1/ladim.yaml'
+        with open(fname_in, encoding='utf-8') as fp:
+            dict_in = yaml.safe_load(fp)
+        dict_in['numerics']['vert_mix'] = 0.001
+        assert config.convert_1_to_2(dict_in)['tracker']['vert_mix'] == 0.001
 
     def test_accepts_empty_dict(self):
         config.convert_1_to_2(dict())

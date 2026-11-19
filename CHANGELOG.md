@@ -13,6 +13,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.10.0] - 2026-11-19
+### Added
+- New option `numerics.vert_mix`: Constant vertical diffusion coefficient
+  [m2/s], default 0 (no vertical diffusion). The tracker applies a vertical
+  random walk after the horizontal movement of the particles, with
+  reflection at the sea surface and at the bottom. Without the option, runs
+  give the same results as before.
+
 ## [2.9.0] - 2026-11-19
 ### Added
 - ROMS and zROMS forcing: `Forcing.vert_mix(X, Y, Z)` returns the vertical
