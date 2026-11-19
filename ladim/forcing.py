@@ -15,6 +15,9 @@ class Forcing:
     def velocity(self, X, Y, Z, tstep=0.0):
         raise NotImplementedError
 
+    def vert_mix(self, X, Y, Z):
+        raise NotImplementedError
+
     def update(self, model: "Model"):
         raise NotImplementedError
 
@@ -91,6 +94,10 @@ class RomsForcing(Forcing):
 
     def field(self, X, Y, Z, name):
         return self.forcing.field(X, Y, Z, name)
+
+    def vert_mix(self, X, Y, Z):
+        """Vertical diffusivity [m2/s] at the particle positions"""
+        return self.forcing.vert_mix(X, Y, Z)
 
     def close(self):
         return self.forcing.close()
