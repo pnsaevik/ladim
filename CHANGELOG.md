@@ -15,21 +15,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [2.10.0] - 2026-11-19
 ### Added
-- New option `numerics.vert_mix`: Constant vertical diffusion coefficient
-  [m2/s], default 0 (no vertical diffusion). The tracker applies a vertical
-  random walk after the horizontal movement of the particles, with
-  reflection at the sea surface and at the bottom. Without the option, runs
-  give the same results as before.
-- `numerics.vert_mix` can also be a string or a dict, to take the vertical
-  diffusivity from the forcing (`Forcing.vert_mix`, i.e. `AKs` or `ln_AKs`).
-  The number from before is the same as `{method: constant, value: <number>}`.
-  The string `labolle` is the same as
-  `{method: labolle, min: 0, max: inf, resolution: inf}`. The "labolle"
-  method uses the two-step scheme of LaBolle et al. (2000), where the
-  diffusivity at the intermediate position gives the final step. The
-  diffusivity is clipped to [min, max] and sampled at the midpoints of depth
-  bins of height `resolution` (infinite: at the particle depth, no binning).
-  The dict has no default values.
+- New option `numerics.vert_mix` for vertical diffusion. Either a number
+  (constant diffusivity [m2/s], default 0), the string `labolle` (diffusivity
+  from the forcing), or a dict with the fields `method`, `min`, `max` and
+  `resolution`.
 
 ## [2.9.0] - 2026-11-19
 ### Added
