@@ -46,9 +46,9 @@ def dict_get(d, items, default=None):
     return default
 
 
-# Values of the fields when the vertical diffusion is given as a string
+# Specifications of the vertical diffusion which can be given as a string
 VERT_MIX_STRINGS = dict(
-    labolle=dict(min=0, max=float('inf'), resolution=float('inf')),
+    labolle=dict(method='labolle', min=0, max=float('inf'), resolution=float('inf')),
 )
 
 
@@ -67,7 +67,8 @@ def vertical_diffusion_spec(vert_mix):
     if isinstance(vert_mix, dict):
         return dict(vert_mix)
     if isinstance(vert_mix, str):
-        return dict(method=vert_mix, **VERT_MIX_STRINGS.get(vert_mix, {}))
+        # Unknown strings are rejected when the diffusor is created
+        return dict(VERT_MIX_STRINGS.get(vert_mix, dict(method=vert_mix)))
     return dict(method='constant', value=vert_mix)
 
 
