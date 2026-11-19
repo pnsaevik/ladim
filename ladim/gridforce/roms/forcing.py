@@ -245,6 +245,28 @@ class Forcing:
         frame = self._velocity_frames() if "t" in linear else self._nf
         return var.interp(position, frame, linear=linear)
 
+    def vert_mix(self, X, Y, Z):
+        """Vertical diffusivity at particle positions
+
+        Sampled with :meth:`field` from the variable ``AKs``, or, if the
+        forcing files have no such variable, from ``exp(ln_AKs)`` (the natural
+        logarithm of the diffusivity is stored in NorKyst files). The
+        variable has no interpolation by default, but this can be changed
+        with the gridforce setting ``interpolation`` (e.g. ``{AKs: z}``).
+        For ``ln_AKs``, interpolation is applied to the logarithm.
+
+        :param X: Particle X positions
+        :param Y: Particle Y positions
+        :param Z: Particle depths (positive downwards)
+        :return: Vertical diffusivity [m2/s]
+        :raises KeyError: If the forcing files have neither AKs nor ln_AKs
+        """
+        if "AKs" in self._dset:
+            return self.field(X, Y, Z, "AKs")
+        if "ln_AKs" in self._dset:
+            return np.exp(self.field(X, Y, Z, "ln_AKs"))
+        raise KeyError("The forcing files contain neither AKs nor ln_AKs")
+
     def _staggering(self, var):
         """Offsets (dy, dx) of the horizontal grid points of a variable
 

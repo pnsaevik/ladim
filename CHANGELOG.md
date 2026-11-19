@@ -13,6 +13,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
   take care of coordinate system changes, while forcing should return static
   fields.
 
+## [2.9.0] - 2026-11-19
+### Added
+- ROMS and zROMS forcing: `Forcing.vert_mix(X, Y, Z)` returns the vertical
+  diffusivity at the particle positions, sampled from `AKs` or, if the
+  forcing files have no `AKs` (as for NorKyst), from `exp(ln_AKs)`. This
+  replaces custom gridforce subclasses that implemented `vert_mix`.
+
 ## [2.8.1] - 2026-11-16
 ### Fixed
 - ROMS: The depths of the vertical levels were computed from evenly spaced
