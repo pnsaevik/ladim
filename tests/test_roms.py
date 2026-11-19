@@ -291,3 +291,61 @@ def test_sample3DUV_matches_interp(dense_fields):
     v = dset["V"].interp([K - A, Y + 0.5, X], frame=0)
     assert np.allclose(u, u0, rtol=0, atol=1e-12)
     assert np.allclose(v, v0, rtol=0, atol=1e-12)
+
+
+# ---------- Vertical mixing ----------
+
+def _forcing_with_diffusivity(path, names):
+    """Forcing with a diffusivity derived from w. ``names`` is a subset of
+    ("AKs", "ln_AKs")"""
+    import xarray as xr
+    from ladim.gridforce.ROMS import Forcing
+
+    with xr.open_dataset(SAMPLE) as dset:
+        dset = dset.load()
+    aks = 1e-3 * (1 + 100 * dset["w"] ** 2)
+    if "AKs" in names:
+        dset["AKs"] = aks
+    if "ln_AKs" in names:
+        dset["ln_AKs"] = np.log(aks)
+    fname = path / "forcing_aks.nc"
+    dset.to_netcdf(fname)
+
+    config = dict(
+        gridforce=dict(input_file=str(fname), num_threads=2),
+        start_time="2015-09-07T01:00:00",
+        stop_time="2015-09-07T04:00:00",
+        dt=600,
+    )
+    return Forcing(config, None), aks.values
+
+
+@pytest.mark.parametrize("names", [("AKs",), ("ln_AKs",), ("AKs", "ln_AKs")])
+def test_vert_mix(tmp_path, names):
+    if not SAMPLE.exists():
+        pytest.skip("Sample data not available")
+    f, aks = _forcing_with_diffusivity(tmp_path, names)
+    try:
+        grid = f._grid
+        X, Y, Z = _particles(grid)
+        J = np.round(Y - grid.j0).astype(int)
+        I = np.round(X - grid.i0).astype(int)
+        level = np.minimum(np.sum(grid.z_w[:, J, I] < -Z, axis=0), grid.N)
+        assert np.isfinite(f.vert_mix(X, Y, Z)).sum() > len(X) // 2
+        for t in (0, 7, 13):
+            f.update(t)
+            ref = aks[min(t // 6, 3)][level, J + grid.j0, I + grid.i0]
+            assert np.allclose(f.vert_mix(X, Y, Z), ref, rtol=1e-10, equal_nan=True), t
+    finally:
+        f.close()
+
+
+def test_vert_mix_requires_diffusivity(tmp_path):
+    if not SAMPLE.exists():
+        pytest.skip("Sample data not available")
+    f, _ = _forcing_with_diffusivity(tmp_path, ())
+    try:
+        with pytest.raises(KeyError, match="AKs"):
+            f.vert_mix(np.array([5.0]), np.array([5.0]), np.array([1.0]))
+    finally:
+        f.close()
