@@ -49,13 +49,7 @@ class Model:
         grid = Grid.create(**config['grid'])
         forc = Forcing.create(**config['forcing'])
         rele = Releaser.create(lonlat_converter=grid.ll2xy, **config['release'])
-
-        # The vertical diffusion uses the diffusivity of the forcing
-        trac_conf = dict(config['tracker'])
-        if trac_conf.get('vertical_diffusion') is not None:
-            trac_conf['vertical_diffusion'] = dict(
-                trac_conf['vertical_diffusion'], vert_mix=forc.vert_mix)
-        trac = Tracker.create(**trac_conf)
+        trac = Tracker.create(**config['tracker'])
         outp = Output.create(**config['output'])
         ibms = IBM.create(**config['ibm'])
         solv = Solver.create(**config['solver'])

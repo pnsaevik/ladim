@@ -210,7 +210,7 @@ def test_tracker_has_no_vertical_diffusion_by_default():
 def test_tracker_creates_diffusor_from_specification():
     from ladim.vertical_diffusion import ConstantDiffusor, LaBolleDiffusor
     assert isinstance(Tracker.create("RK4", 0, constant(1e-3)).diffusor, ConstantDiffusor)
-    spec = dict(method="labolle", min=0, max=1, resolution=5, vert_mix=lambda x, y, z: z)
+    spec = dict(method="labolle", min=0, max=1, resolution=5)
     assert isinstance(Tracker.create("RK4", 0, spec).diffusor, LaBolleDiffusor)
     with pytest.raises(ValueError):
         Tracker.create("RK4", 0, dict(method="foo"))
@@ -274,7 +274,7 @@ def test_tracker_vertical_diffusion_is_uncorrelated_with_horizontal():
     assert np.corrcoef(dz, model.state['Y'])[0, 1] == pytest.approx(0, abs=0.01)
 
 
-def test_tracker_passes_positions_to_diffusivity_function():
+def test_tracker_gives_diffusivity_function_of_forcing_to_diffusor():
     model = vertical_model(10, 5.0, 50.0)
     model.state['X'] = np.arange(10, dtype=float)
     seen = []
@@ -283,7 +283,15 @@ def test_tracker_passes_positions_to_diffusivity_function():
         seen.append((x.copy(), y.copy()))
         return np.full(len(x), 1e-3)
 
-    spec = dict(method="labolle", min=0, max=1, resolution=5, vert_mix=vert_mix)
+    model.forcing.vert_mix = vert_mix
+    spec = dict(method="labolle", min=0, max=1, resolution=5)
     Tracker.create("RK4", 0, spec).update(model)
     assert len(seen) == 2
     assert np.array_equal(seen[0][0], model.state['X'])
+
+
+def test_tracker_requires_diffusivity_in_forcing_for_labolle():
+    model = vertical_model(10, 5.0, 50.0)  # Forcing without vert_mix
+    spec = dict(method="labolle", min=0, max=1, resolution=5)
+    with pytest.raises(ValueError, match="vert_mix"):
+        Tracker.create("RK4", 0, spec).update(model)

@@ -20,7 +20,9 @@ class Tracker:
     Optionally, vertical diffusion is applied after the horizontal movement
     by a :class:`~ladim.vertical_diffusion.VerticalDiffusor`, which is created
     from the specification ``vertical_diffusion`` (a dict with the key
-    ``method`` and the fields of the method). Particles are reflected at the
+    ``method`` and the fields of the method). The diffusivity of the ocean
+    model, for the methods which need it, is taken from ``forcing.vert_mix``.
+    Particles are reflected at the
     sea surface and at the sea bottom (at the bottom depth of the grid cell
     of the new horizontal position).
 
@@ -98,7 +100,8 @@ class Tracker:
 
         if self.diffusor.enabled:
             depth = grid.sample_depth(X0, Y0)
-            Z1 = self.diffusor.diffuse(X0, Y0, Z, depth, pid, dt)
+            vert_mix = getattr(forcing, "vert_mix", None)
+            Z1 = self.diffusor.diffuse(X0, Y0, Z, depth, pid, dt, vert_mix)
             if all_active:
                 state['Z'][:] = Z1
             else:

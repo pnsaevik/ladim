@@ -12,9 +12,9 @@ def create_constant(value):
     return VerticalDiffusor.create(method="constant", value=value)
 
 
-def create_labolle(vert_mix, min=0, max=INF, resolution=INF):
+def create_labolle(min=0, max=INF, resolution=INF):
     return VerticalDiffusor.create(
-        method="labolle", min=min, max=max, resolution=resolution, vert_mix=vert_mix)
+        method="labolle", min=min, max=max, resolution=resolution)
 
 
 def particles(n, z0, depth=1000.0):
@@ -31,37 +31,39 @@ def uniform_mix(value):
 class Test_create:
     def test_creates_diffusor_of_given_method(self):
         assert isinstance(create_constant(0.01), ConstantDiffusor)
-        assert isinstance(create_labolle(uniform_mix(1.0)), LaBolleDiffusor)
+        assert isinstance(create_labolle(), LaBolleDiffusor)
 
     def test_stores_fields(self):
-        d = create_labolle(uniform_mix(1.0), min=1e-4, max=1e-2, resolution=5)
+        d = create_labolle(min=1e-4, max=1e-2, resolution=5)
         assert (d.min, d.max, d.resolution) == (1e-4, 1e-2, 5.0)
         assert create_constant(2).value == 2.0
 
     def test_accepts_infinity_as_string(self):
-        d = create_labolle(uniform_mix(1.0), min=0, max="inf", resolution="Infinity")
+        d = create_labolle(min=0, max="inf", resolution="Infinity")
         assert (d.max, d.resolution) == (INF, INF)
 
-    def test_constant_ignores_diffusivity_function(self):
-        d = VerticalDiffusor.create(method="constant", value=1, vert_mix=lambda x, y, z: z)
-        assert d.value == 1
+    def test_diffusivity_function_is_not_a_field(self):
+        # The function is given to diffuse(), not to the factory
+        with pytest.raises(ValueError):
+            VerticalDiffusor.create(method="constant", value=1, vert_mix=len)
+        with pytest.raises(ValueError):
+            VerticalDiffusor.create(method="labolle", min=0, max=1, resolution=5,
+                                    vert_mix=len)
 
     @pytest.mark.parametrize("kwargs", [
         dict(method="foo", value=1.0),
         dict(method=None),
         dict(method="constant"),  # No default values
         dict(method="constant", value=1.0, min=0),  # Unknown field
-        dict(method="labolle", min=0, max=1, resolution=5),  # No vert_mix
-        dict(method="labolle", min=0, max=1, vert_mix=len),  # No resolution
+        dict(method="labolle", min=0, max=1),  # No resolution
         dict(method="constant", value=-1),
         dict(method="constant", value=INF),
         dict(method="constant", value=True),
         dict(method="constant", value="a"),
         dict(method="constant", value=[1]),
-        dict(method="labolle", min=2, max=1, resolution=5, vert_mix=len),
-        dict(method="labolle", min=-1, max=1, resolution=5, vert_mix=len),
-        dict(method="labolle", min=0, max=1, resolution=0, vert_mix=len),
-        dict(method="labolle", min=0, max=1, resolution=5, vert_mix=3),
+        dict(method="labolle", min=2, max=1, resolution=5),
+        dict(method="labolle", min=-1, max=1, resolution=5),
+        dict(method="labolle", min=0, max=1, resolution=0),
     ])
     def test_rejects_invalid_specification(self, kwargs):
         with pytest.raises(ValueError):
@@ -135,16 +137,33 @@ class Test_constant:
         assert np.array_equal(a, b[::-1])
 
 
-# ---------- Diffusivity from the forcing (labolle) ----------
+# ---------- Diffusivity from the ocean model (labolle) ----------
 
 class Test_labolle:
     def test_constant_diffusivity_has_correct_variance(self):
         k, dt, n = 0.01, 600, 200_000
         X, Y, Z, depth, pid = particles(n, 500.0)
         np.random.seed(1)
-        dz = create_labolle(uniform_mix(k)).diffuse(X, Y, Z, depth, pid, dt) - 500.0
+        d = create_labolle()
+        dz = d.diffuse(X, Y, Z, depth, pid, dt, uniform_mix(k)) - 500.0
         assert dz.mean() == pytest.approx(0, abs=0.01)
         assert dz.var() == pytest.approx(2 * k * dt, rel=0.02)
+
+    def test_requires_diffusivity_function(self):
+        X, Y, Z, depth, pid = particles(10, 5.0)
+        with pytest.raises(ValueError, match="vert_mix"):
+            create_labolle().diffuse(X, Y, Z, depth, pid, 600)
+        with pytest.raises(ValueError, match="vert_mix"):
+            create_labolle().diffuse(X, Y, Z, depth, pid, 600, vert_mix=0.1)
+
+    def test_constant_method_does_not_use_diffusivity_function(self):
+        def vert_mix(x, y, z):
+            raise AssertionError("Should not be called")
+
+        X, Y, Z, depth, pid = particles(10, 5.0)
+        np.random.seed(1)
+        Z1 = create_constant(0.01).diffuse(X, Y, Z, depth, pid, 600, vert_mix)
+        assert np.all(Z1 != 5.0)
 
     def test_passes_positions_and_depths_to_diffusivity_function(self):
         calls = []
@@ -157,7 +176,7 @@ class Test_labolle:
         X = np.arange(10.0)
         Y = np.arange(10.0) * 2
         np.random.seed(1)
-        create_labolle(vert_mix).diffuse(X, Y, Z, depth, pid, 600)
+        create_labolle().diffuse(X, Y, Z, depth, pid, 600, vert_mix)
 
         assert len(calls) == 2  # Initial and intermediate position
         for x, y, z in calls:
@@ -176,7 +195,7 @@ class Test_labolle:
         X, Y, _, depth, pid = particles(n, 0.0)
         Z = np.random.default_rng(0).uniform(0, 50, n)
         np.random.seed(1)
-        create_labolle(vert_mix, resolution=5).diffuse(X, Y, Z, depth, pid, 600)
+        create_labolle(resolution=5).diffuse(X, Y, Z, depth, pid, 600, vert_mix)
 
         assert np.array_equal(calls[0], (Z // 5) * 5 + 2.5)
         for z in calls:
@@ -189,8 +208,8 @@ class Test_labolle:
         dt, z0 = 600, 10.0 + 1e-3
         X, Y, Z, depth, pid = particles(20_000, z0)
         np.random.seed(2)
-        d = create_labolle(lambda x, y, z: np.where(z < 10, 1.0, 1e-6))
-        dz = d.diffuse(X, Y, Z, depth, pid, dt) - z0
+        vert_mix = lambda x, y, z: np.where(z < 10, 1.0, 1e-6)
+        dz = create_labolle().diffuse(X, Y, Z, depth, pid, dt, vert_mix) - z0
         tiny = (6 * 1e-6 * dt) ** 0.5  # Largest step with the weak diffusivity
         assert np.any(np.abs(dz) > 100 * tiny)
         assert np.any(np.abs(dz) <= tiny)
@@ -200,33 +219,33 @@ class Test_labolle:
         for k, expected in [(1.0, 1e-2), (1e-9, 1e-4)]:
             X, Y, Z, depth, pid = particles(100_000, 500.0)
             np.random.seed(1)
-            d = create_labolle(uniform_mix(k), min=1e-4, max=1e-2, resolution=5)
-            dz = d.diffuse(X, Y, Z, depth, pid, dt) - 500.0
+            d = create_labolle(min=1e-4, max=1e-2, resolution=5)
+            dz = d.diffuse(X, Y, Z, depth, pid, dt, uniform_mix(k)) - 500.0
             assert dz.var() == pytest.approx(2 * expected * dt, rel=0.03)
 
     def test_replaces_invalid_diffusivity_with_minimum(self):
         X, Y, Z, depth, pid = particles(100, 5.0)
         np.random.seed(1)
-        d = create_labolle(uniform_mix(np.nan), min=0, max=1, resolution=5)
-        assert np.all(d.diffuse(X, Y, Z, depth, pid, 600) == 5.0)
+        d = create_labolle(min=0, max=1, resolution=5)
+        assert np.all(d.diffuse(X, Y, Z, depth, pid, 600, uniform_mix(np.nan)) == 5.0)
 
-        d = create_labolle(uniform_mix(np.nan), min=1e-2, max=1, resolution=5)
-        assert np.all(d.diffuse(X, Y, Z, depth, pid, 600) != 5.0)
+        d = create_labolle(min=1e-2, max=1, resolution=5)
+        assert np.all(d.diffuse(X, Y, Z, depth, pid, 600, uniform_mix(np.nan)) != 5.0)
 
     def test_stays_between_surface_and_bottom(self):
         depth = 20.0
         X, Y, Z, d, pid = particles(20_000, 0.0, depth)
-        diffusor = create_labolle(uniform_mix(1.0), resolution=5)
+        diffusor = create_labolle(resolution=5)
         np.random.seed(2)
         for _ in range(20):
-            Z = diffusor.diffuse(X, Y, Z, d, pid, 600)
+            Z = diffusor.diffuse(X, Y, Z, d, pid, 600, uniform_mix(1.0))
             assert Z.min() >= 0 and Z.max() <= depth
 
     def test_is_reproducible(self):
         def run(seed):
             X, Y, Z, depth, pid = particles(1000, 5.0, 50.0)
             np.random.seed(seed)
-            return create_labolle(uniform_mix(0.1)).diffuse(X, Y, Z, depth, pid, 600)
+            return create_labolle().diffuse(X, Y, Z, depth, pid, 600, uniform_mix(0.1))
 
         assert np.array_equal(run(3), run(3))
         assert not np.allclose(run(3), run(4))
@@ -237,4 +256,4 @@ class Test_labolle:
 
         X, Y, Z, depth, pid = particles(10, 5.0)
         with pytest.raises(KeyError, match="AKs"):
-            create_labolle(vert_mix).diffuse(X, Y, Z, depth, pid, 600)
+            create_labolle().diffuse(X, Y, Z, depth, pid, 600, vert_mix)

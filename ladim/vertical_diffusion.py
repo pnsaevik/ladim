@@ -5,7 +5,11 @@ A vertical diffusor is created from a specification (the ``vertical_diffusion``
 part of the tracker configuration) with :meth:`VerticalDiffusor.create`::
 
     diffusor = VerticalDiffusor.create(method="constant", value=0.001)
-    Z1 = diffusor.diffuse(X, Y, Z, depth, pid, dt)
+    Z1 = diffusor.diffuse(X, Y, Z, depth, pid, dt, vert_mix)
+
+where ``vert_mix(X, Y, Z)`` is a function which returns the vertical
+diffusivity [m2/s] of the ocean model at the particle positions. It is only
+used by methods which take the diffusivity from the ocean model.
 
 The random walk takes place in the depth Z (positive downwards). Particles are
 reflected at the sea surface (Z = 0) and at the sea bottom (Z = depth).
@@ -35,11 +39,8 @@ class VerticalDiffusor:
 
         :param method: The name of the method, "constant" or "labolle"
         :param kwargs: The fields of the method. All fields are mandatory, there
-            are no default values. Besides the fields of the method,
-            ``vert_mix`` is the function ``vert_mix(X, Y, Z)`` which returns
-            the vertical diffusivity [m2/s] at the particle positions (it is
-            supplied automatically by the model, from the forcing). Fields
-            which are numbers may also be given as strings like "inf".
+            are no default values. Fields which are numbers may also be given
+            as strings like "inf".
         :raises ValueError: If the method is unknown, the fields are missing
             or unknown, or the field values are not valid
         """
@@ -56,7 +57,7 @@ class VerticalDiffusor:
             raise ValueError(f"Vertical diffusion method {method!r}: {err}") from None
         return cls(**kwargs)
 
-    def diffuse(self, X, Y, Z, depth, pid, dt):
+    def diffuse(self, X, Y, Z, depth, pid, dt, vert_mix=None):
         """Vertical random walk for one time step
 
         :param X: Particle X positions [grid units]
@@ -66,6 +67,9 @@ class VerticalDiffusor:
             at positions without depth (zero or NaN) are not moved.
         :param pid: Particle identifiers (int64), for the random numbers
         :param dt: Time step [s]
+        :param vert_mix: Function ``vert_mix(X, Y, Z)`` which returns the
+            vertical diffusivity [m2/s] at the particle positions. Only
+            required by the methods which use it.
         :return: New particle depths [m], a float64 array
         """
         raise NotImplementedError
@@ -75,17 +79,16 @@ class ConstantDiffusor(VerticalDiffusor):
     """Random walk with constant diffusivity
 
     :param value: The diffusivity [m2/s]. Zero means no vertical diffusion.
-    :param vert_mix: Not used
     """
 
-    def __init__(self, value, vert_mix=None):
+    def __init__(self, value):
         self.value = _number(value, "value")
         if not 0 <= self.value < np.inf:
             raise ValueError(f"The diffusivity must be non-negative and finite: "
                              f"{self.value}")
         self.enabled = self.value > 0
 
-    def diffuse(self, X, Y, Z, depth, pid, dt):
+    def diffuse(self, X, Y, Z, depth, pid, dt, vert_mix=None):
         Z0 = np.array(Z, dtype=np.float64)
         if not self.enabled:
             return Z0
@@ -95,7 +98,7 @@ class ConstantDiffusor(VerticalDiffusor):
 
 
 class LaBolleDiffusor(VerticalDiffusor):
-    """Random walk with diffusivity from the forcing
+    """Random walk with diffusivity from the ocean model
 
     Uses the two-step scheme by LaBolle et al. (2000),
     doi: 10.1029/1999WR900224, which is consistent with a depth-dependent
@@ -114,11 +117,9 @@ class LaBolleDiffusor(VerticalDiffusor):
         sampled at the midpoints of the bins, which are at depths
         resolution / 2, 3 * resolution / 2, ... Infinity means no bins, so
         that the diffusivity is sampled at the particle depth.
-    :param vert_mix: Function ``vert_mix(X, Y, Z)`` returning the diffusivity
-        [m2/s] at the particle positions
     """
 
-    def __init__(self, min, max, resolution, vert_mix):
+    def __init__(self, min, max, resolution):
         self.min = _number(min, "min")
         self.max = _number(max, "max")
         self.resolution = _number(resolution, "resolution")
@@ -128,21 +129,24 @@ class LaBolleDiffusor(VerticalDiffusor):
         if not self.resolution > 0:
             raise ValueError(f"The resolution must be positive (or infinite): "
                              f"{self.resolution}")
-        if not callable(vert_mix):
-            raise ValueError("vert_mix must be a function of X, Y, Z")
-        self.vert_mix = vert_mix
 
-    def diffuse(self, X, Y, Z, depth, pid, dt):
+    def diffuse(self, X, Y, Z, depth, pid, dt, vert_mix=None):
+        if not callable(vert_mix):
+            raise ValueError("The vertical diffusion method 'labolle' requires "
+                             "a function vert_mix(X, Y, Z) for the diffusivity "
+                             "of the ocean model")
         Z0 = np.array(Z, dtype=np.float64)
         dW = _increments(pid, dt)
-        Z1 = _step(Z0, self._diffusivity(X, Y, Z0), dW, depth)  # Intermediate
-        return _step(Z0, self._diffusivity(X, Y, Z1), dW, depth)  # Final
+        K0 = self._diffusivity(vert_mix, X, Y, Z0)
+        Z1 = _step(Z0, K0, dW, depth)  # Intermediate step
+        K1 = self._diffusivity(vert_mix, X, Y, Z1)
+        return _step(Z0, K1, dW, depth)  # Final step
 
-    def _diffusivity(self, X, Y, Z):
+    def _diffusivity(self, vert_mix, X, Y, Z):
         """Clipped diffusivity, sampled at the midpoints of the depth bins"""
         if np.isfinite(self.resolution):
             Z = (Z // self.resolution) * self.resolution + 0.5 * self.resolution
-        K = np.asarray(self.vert_mix(X, Y, Z), dtype=np.float64)
+        K = np.asarray(vert_mix(X, Y, Z), dtype=np.float64)
         K = np.where(np.isfinite(K), K, self.min)
         return np.ascontiguousarray(np.clip(K, self.min, self.max))
 
